@@ -16,6 +16,11 @@ respecto al fragmento principal, usando el dataset [PENGWIN](https://pengwin.gra
 
 Semana 8 completa: dataset curado, splits fijos reproducibles, módulo de preprocesamiento
 unificado, visualizador 1 (reconstrucción 3D del volumen crudo) y EDA de fragmentos.
+
+Semana 9 completa: backbone convolucional propio con CBAM, cabeza de detección por grid,
+NMS propio y prueba de overfit intencional sobre un batch pequeño. El código está en
+`src/week9_detection.py` y `src/train_overfit_detection.py`; el resultado visual está en
+`outputs/figures/week9_detection_overfit.png`.
 Detalle completo en [`docs/resumen_semana8.md`](docs/resumen_semana8.md).
 
 ## Estructura del repositorio
@@ -82,12 +87,22 @@ python src/hu_windowing_check.py          # outputs/figures/hu_window_check_*.pn
 python src/volumen_3d_visualizer.py       # outputs/figures/volumen_3d_<id>.html
 python src/eda_fragments.py               # data/eda_fragments_detalle.csv + outputs/eda/
 python src/eda_fragmento_principal_y_tamano.py   # data/eda_fragmentos_individuales.csv + outputs/eda/
+python src/train_overfit_detection.py --case-id 001 --epochs 150  # prueba Semana 9
+python src/visualize_overfit_detection.py --case-id 001  # cajas GT vs. predicción
+python src/prepare_week9_detection_data.py              # cache de cortes train/val
+python src/train_week9_detection.py                      # primer entrenamiento multi-paciente
+python src/visualize_week9_validation.py --case-id 014  # validación cualitativa
 ```
 
 `src/pengwin_io.py` no se corre directo (salvo como prueba de humo, `python src/pengwin_io.py <case_id>`):
 es el módulo que centraliza la carga y el preprocesamiento (clip, ventaneo HU, resize,
 máscara ósea limpia) para que entrenamiento, inferencia y visualizadores usen siempre la
 misma función.
+
+La prueba de Semana 9 usa las máscaras de referencia solo para construir las cajas de
+entrenamiento. Predice una caja por región visible y por corte: sacro, coxal izquierdo y
+coxal derecho. La cabeza usa una celda de grid por objeto, calcula la pérdida multitarea y
+aplica NMS implementado en `week9_detection.py`, sin YOLO, torchvision o Detectron2.
 
 ## Verificación de reproducibilidad
 

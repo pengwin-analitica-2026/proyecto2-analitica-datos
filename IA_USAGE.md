@@ -158,3 +158,6 @@ directamente con el profesor antes de marcarla como resuelta en el documento.
   principal y para la limpieza de máscaras óseas).
 - Ningún resultado generado por la IA se subió al repo sin correrlo primero en el
   entorno local y confirmar la salida.
+
+---
+
