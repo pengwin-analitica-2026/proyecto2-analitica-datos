@@ -1,0 +1,11 @@
+{
+  "classification_f1_macro": 0.9842931937172775,
+  "classification_auc_macro": 0.949350067234424,
+  "detection_iou_mean": 0.8004661937843931,
+  "detection_map50": 0.8857059566990045,
+  "detection_map50_95": 0.6718908563149939,
+  "segmentation_dice_macro": 0.8392595183894423,
+  "segmentation_iou_macro": 0.728926927811817,
+  "instance_dice_matched": 0.6498943014111169,
+  "instance_iou_matched": 0.5576032260889124
+}

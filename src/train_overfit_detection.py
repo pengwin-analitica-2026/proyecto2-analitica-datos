@@ -1,7 +1,7 @@
 """Prueba de correctitud Semana 9: overfit deliberado de detección.
 
 Uso real (requiere data/raw y dependencias instaladas):
-    python src/train_overfit_detection.py --case-id 001 --epochs 300
+    python src/train_overfit_detection.py --case-id 001 --epochs 150
 
 La prueba selecciona cortes con etiquetas, redimensiona a 256x256, construye
 las cajas por región y verifica que la pérdida baje sobre el mismo batch.
@@ -17,7 +17,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch import nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pengwin_io import load_case, resize_label_slice, resize_slice, window_hu

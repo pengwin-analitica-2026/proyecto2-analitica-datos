@@ -10,7 +10,6 @@ compatible con el pipeline corte-a-corte que se construirá en semanas 10-11.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 import torch
 from torch import Tensor, nn
@@ -99,6 +98,14 @@ class FundidoraBackbone(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self.cbam(self.features(x))
 
+    def forward_with_skips(self, x: Tensor) -> tuple[Tensor, list[Tensor]]:
+        """Retorna bottleneck con CBAM y mapas /2, /4, /8 para segmentación."""
+        skips = []
+        for block in self.features:
+            x = block(x)
+            skips.append(x)
+        return self.cbam(x), skips[:-1]
+
 
 class GridDetectionHead(nn.Module):
     """Cabeza propia: una predicción por celda del grid."""
@@ -150,7 +157,6 @@ def detection_loss(pred: Tensor, target: Tensor,
     obj_target = target[..., 0]
     obj_logit = pred[..., 0]
     pos = obj_target > 0.5
-    neg = ~pos
     # Reduce el dominio negativo para que el fondo no domine el overfit.
     obj_raw = F.binary_cross_entropy_with_logits(obj_logit, obj_target, reduction="none")
     obj_weight = torch.where(pos, torch.ones_like(obj_raw), torch.full_like(obj_raw, 0.25))

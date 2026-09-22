@@ -90,3 +90,27 @@ inicial cualitativa, no una métrica final ni el objetivo de mAP del proyecto.
 La ejecución se verificó con Python 3.12, PyTorch 2.2.2 y CPU. En macOS x86_64, esa versión
 de PyTorch requiere `numpy<2`; por eso `requirements.txt` fija una familia compatible de
 NumPy, SciPy y scikit-image.
+
+## Auditoria de cierre
+
+Se añadieron pruebas automáticas en `tests/test_week9_detection.py`:
+
+```bash
+python -m unittest tests.test_week9_detection -v
+```
+
+| Verificación | Resultado |
+|---|---|
+| Backbone produce grid `16x16` para entrada `256x256` | Aprobada |
+| CBAM está dentro del backbone, antes de la cabeza | Aprobada |
+| Máscara → target → caja conserva coordenadas | Aprobada |
+| NMS elimina una caja solapada de menor confianza | Aprobada |
+| La pérdida es finita y propaga gradientes | Aprobada |
+| Separación por paciente entre train y validación | 24 vs 15, intersección vacía |
+| Targets del cache | 429 regiones visibles, 429 celdas positivas |
+| Overfit intencional | Aprobado, reducción 758.4x |
+| Primera predicción en casos no vistos | Aprobada cualitativamente |
+
+**Conclusión:** el entregable de Semana 9 está completo. El IoU inicial de 0.3883 no se
+presenta como desempeño final; deberá mejorar durante el entrenamiento completo de Semana
+10 hasta acercarse al objetivo sugerido de 0.65.

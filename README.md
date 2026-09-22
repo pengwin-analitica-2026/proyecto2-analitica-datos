@@ -21,6 +21,10 @@ Semana 9 completa: backbone convolucional propio con CBAM, cabeza de detección 
 NMS propio y prueba de overfit intencional sobre un batch pequeño. El código está en
 `src/week9_detection.py` y `src/train_overfit_detection.py`; el resultado visual está en
 `outputs/figures/week9_detection_overfit.png`.
+
+Semana 10 en desarrollo: modelo de tres cabezas sobre el backbone compartido, pérdida
+multitarea y medición física de separación entre fragmentos ya implementados y cubiertos
+por pruebas automáticas. Ver `docs/resumen_semana10.md`.
 Detalle completo en [`docs/resumen_semana8.md`](docs/resumen_semana8.md).
 
 ## Estructura del repositorio
@@ -92,6 +96,7 @@ python src/visualize_overfit_detection.py --case-id 001  # cajas GT vs. predicci
 python src/prepare_week9_detection_data.py              # cache de cortes train/val
 python src/train_week9_detection.py                      # primer entrenamiento multi-paciente
 python src/visualize_week9_validation.py --case-id 014  # validación cualitativa
+python -m unittest discover -s tests -v                 # pruebas Semanas 9-10
 ```
 
 `src/pengwin_io.py` no se corre directo (salvo como prueba de humo, `python src/pengwin_io.py <case_id>`):

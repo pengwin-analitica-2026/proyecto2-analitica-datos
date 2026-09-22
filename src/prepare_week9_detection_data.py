@@ -35,6 +35,8 @@ def main() -> None:
     parser.add_argument("--slices-per-case", type=int, default=4)
     parser.add_argument("--max-train-cases", type=int, default=24)
     parser.add_argument("--max-val-cases", type=int, default=15)
+    parser.add_argument("--max-test-cases", type=int, default=0,
+                        help="Incluye test solo para evaluación final; 0 conserva el cache de entrenamiento.")
     args = parser.parse_args()
 
     with open(args.splits) as stream:
@@ -42,6 +44,7 @@ def main() -> None:
     selected = {
         "train": [str(cid).zfill(3) for cid in splits["train"][:args.max_train_cases]],
         "val": [str(cid).zfill(3) for cid in splits["val"][:args.max_val_cases]],
+        "test": [str(cid).zfill(3) for cid in splits["test"][:args.max_test_cases]],
     }
     images, labels, case_ids, z_indices, split_names = [], [], [], [], []
     for split, ids in selected.items():
@@ -66,9 +69,8 @@ def main() -> None:
         split_names=np.array(split_names), size=np.array(args.size),
     )
     print(f"Cache: {out} | cortes={len(images)} | train={sum(s == 'train' for s in split_names)} "
-          f"| val={sum(s == 'val' for s in split_names)}")
+          f"| val={sum(s == 'val' for s in split_names)} | test={sum(s == 'test' for s in split_names)}")
 
 
 if __name__ == "__main__":
     main()
-
