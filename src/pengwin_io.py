@@ -12,6 +12,10 @@ train y en inferencia, como pidio el profesor).
 Convenciones del equipo (mismas constantes que el resto del repo):
 - Clip previo: [-1024, 3000] HU, neutraliza padding y metal.
 - Ventana osea de visualizacion/entrada al modelo: centro 400, ancho 1800.
+- CLAHE (clip_limit=0.02) sobre la imagen ya en [0,1], activado por defecto
+  en window_hu(): corrige casos con histograma oseo corrido/comprimido
+  (ej. caso 025, diagnosticado en asesoria con el profesor), sin tocar los
+  umbrales en HU crudo que usan bone_mask/body_mask.
 - Umbral osea (mascara gruesa, sin ML): 250 HU sobre el volumen crudo.
 
 Uso:
@@ -29,6 +33,7 @@ import numpy as np
 import SimpleITK as sitk
 from scipy import ndimage as ndi
 from skimage.transform import resize as _sk_resize
+from skimage import exposure as _sk_exposure
 
 # ---------------------------------------------------------------------------
 # CONFIGURACION — mismas rutas y constantes que el resto del repo
@@ -115,19 +120,56 @@ def clip_hu(volume: np.ndarray, clip_min: int = CLIP_MIN, clip_max: int = CLIP_M
     return np.clip(volume, clip_min, clip_max)
 
 
+CLAHE_CLIP_LIMIT = 0.02  # mismo valor con el que se comparo contra gamma y ecualizacion global
+
+
 def window_hu(volume: np.ndarray, center: int = WINDOW_CENTER, width: int = WINDOW_WIDTH,
-              clip_min: int = CLIP_MIN, clip_max: int = CLIP_MAX) -> np.ndarray:
+              clip_min: int = CLIP_MIN, clip_max: int = CLIP_MAX,
+              aplicar_clahe: bool = True) -> np.ndarray:
     """
-    Ventaneo HU -> [0, 1] float32. Aplica clip_hu internamente, asi que se
-    puede llamar directo sobre el volumen crudo de load_case().
-    Misma formula que hu_windowing_check.py, para que el chequeo visual
-    y el pipeline real produzcan exactamente lo mismo.
+    Ventaneo HU -> [0, 1] float32 + CLAHE por defecto. Aplica clip_hu
+    internamente, asi que se puede llamar directo sobre el volumen crudo
+    de load_case(). Espera un CORTE 2D (y, x), no un volumen 3D completo
+    — asi la llaman todos los scripts del repo (train_overfit_detection.py,
+    prepare_week9_detection_data.py); CLAHE es local por parches y no tiene
+    sentido aplicarlo de una sola vez sobre un volumen 3D entero.
+
+    CLAHE (skimage.exposure.equalize_adapthist) se agrego tras diagnosticar
+    el caso 025 en la asesoria con el profesor: NO es metal (esa hipotesis
+    se descarto, ver docs/resumen_semana8.md) sino que su histograma oseo
+    esta corrido y comprimido ~150-200 HU por debajo de lo tipico (unico
+    caso con z-score < -2 en hueso_media/hueso_p50 sobre los 100 casos),
+    probablemente por diferencia de kernel de reconstruccion entre
+    instituciones. Se comparo contra gamma fijo (distorsiona por igual los
+    casos ya normales, descartado) y ecualizacion global (demasiado
+    agresiva, aplana el tejido blando a un bloque gris uniforme y pierde
+    toda la anatomia, descartada). CLAHE es local/adaptivo por parches:
+    en el caso 025 recupera la textura trabecular que el corrimiento HU
+    escondia, y en casos ya normales no distorsiona la imagen de forma
+    perceptible. Comparacion visual en
+    outputs/eda/diagnostico_normalizacion_caso025.png.
+
+    Se aplica AQUI (a la imagen ya en [0,1]), nunca al HU crudo: bone_mask,
+    body_mask y clean_bone_mask siguen operando sobre volume_hu_crudo sin
+    tocar, tal como exigio el profesor (el umbral en HU se aplica antes de
+    normalizar la imagen que entra al modelo).
+
+    aplicar_clahe=False deshabilita el paso para comparaciones/debug; todo
+    el pipeline de entrenamiento e inferencia debe dejarlo en True (default)
+    para que ambos usen exactamente el mismo preprocesamiento.
     """
     volume = clip_hu(volume, clip_min, clip_max)
     low, high = center - width / 2, center + width / 2
     windowed = np.clip(volume, low, high)
     windowed = (windowed - low) / (high - low)
-    return windowed.astype(np.float32)
+    windowed = windowed.astype(np.float32)
+
+    if aplicar_clahe and windowed.max() > windowed.min():
+        windowed = _sk_exposure.equalize_adapthist(
+            windowed, clip_limit=CLAHE_CLIP_LIMIT
+        ).astype(np.float32)
+
+    return windowed
 
 
 def bone_mask(volume_hu_crudo: np.ndarray, threshold: int = BONE_HU_THRESHOLD) -> np.ndarray:
