@@ -81,6 +81,10 @@ cualquier intento adicional de quitarlo arriesgaba dañar hueso sano en el resto
 dataset — se decidió documentarlo como limitación conocida en vez de perseguir una
 limpieza perfecta.
 
+> **Nota de seguimiento (entrada 7):** esta hipótesis de "fijador externo" resultó
+> **incorrecta** — el profesor la corrigió en asesoría. Ver entrada 7 para el
+> diagnóstico real y la corrección aplicada.
+
 **Análisis crítico:** el proceso de prueba-error fue necesario y valioso — la primera
 propuesta de la IA, aunque razonada, fallaba en la práctica y solo se detectó al ver el
 resultado visual. Aprendizaje: no aceptar una heurística de limpieza sin validarla contra
@@ -147,6 +151,56 @@ directamente con el profesor antes de marcarla como resuelta en el documento.
 
 ---
 
+## 7. Corrección del caso 025 tras asesoría con el profesor
+
+**Contexto:** en asesoría, el profesor corrigió directamente la hipótesis de "fijador
+externo" de la entrada 3 (equivocada, salió de la IA): si fuera metal no se vería la
+parte superior de la cresta ilíaca. Según él, es mala distribución de HU y hay que
+normalizar con corrección gamma o ecualización de histograma, evaluando cuál conviene.
+
+**Qué se pidió:** diagnosticar el problema real del caso 025 contra los 100 casos, y
+comparar métodos de normalización con evidencia antes de elegir uno.
+
+**Diagnóstico:** se le pidió a la IA comparar los percentiles de HU del caso 025 contra
+el resto del dataset, usando el CSV que ya existía de la semana 8
+(`data/eda_intensidades_detalle.csv`), sin volver a procesar los volúmenes crudos. El
+resultado con datos reales: el HU máximo y el volumen de metal del caso 025 **no son
+atípicos** (z-score 1.47 y 1.13, por debajo del umbral de 2) — la hipótesis de metal no
+se sostenía ni con los números. Lo único atípico es `hueso_media` y `hueso_p50`
+(z ≈ −2.1): el histograma óseo está corrido y comprimido ~150–250 HU por debajo de lo
+típico. Esto confirmó el diagnóstico del profesor con evidencia cuantitativa concreta,
+no solo su palabra.
+
+**Elección del método:** la IA propuso comparar gamma, ecualización global y CLAHE
+visualmente sobre el caso 025 y un caso típico (007) en paralelo, con un criterio
+explícito para decidir: el método se aplica igual a los 100 casos dentro de
+`pengwin_io.py`, así que no basta con que arregle el 025 — no puede dañar los casos que
+ya están bien. Con esa comparación (`outputs/eda/diagnostico_normalizacion_caso025.png`),
+**la decisión de descartar ecualización global fue evidente a simple vista** (aplana el
+tejido blando a un bloque gris uniforme, pierde toda la anatomía) y **CLAHE se eligió**
+porque recupera la textura trabecular del caso 025 sin distorsionar el caso 007. Gamma
+se descartó porque usa la misma curva fija para todos los casos y distorsionaba por
+igual el caso ya normal.
+
+**Qué se implementó:** se integró CLAHE (`skimage.exposure.equalize_adapthist`,
+`clip_limit=0.02`) directamente dentro de `pengwin_io.window_hu`, activado por defecto,
+en vez de dejarlo como una función aparte sin usar — todos los scripts que ya llaman a
+`window_hu` (propios y de otros integrantes) quedan corregidos sin tener que tocarlos
+uno por uno. Se verificó con datos reales en los 3 casos de referencia del proyecto
+(001, 025, 068) que el contraste mejora sin destruir la anatomía en ninguno
+(`outputs/eda/verificacion_clahe_casos_ejemplo.png`).
+
+**Análisis crítico:** este es el ejemplo más claro del proyecto de por qué no hay que
+aceptar una hipótesis de la IA sin verificarla — la explicación de "fijador externo" de
+la entrada 3 sonaba razonable (dato clínico real, plausible en fracturas pélvicas) pero
+era incorrecta, y solo se detectó porque el profesor la revisó directamente. La lección
+concreta: cuando la IA da una explicación plausible pero no verificada con los datos
+mismos, conviene pedirle que la contraste numéricamente contra el resto del dataset
+antes de darla por buena, en vez de aceptarla porque "tiene sentido". Además, este
+cambio invalida los caches de entrenamiento y checkpoints de semanas 9-10 de otros
+integrantes (usan `window_hu` sin CLAHE) — hay que avisarles que toca regenerar datos y
+reentrenar.
+
 ## Resumen de aprendizajes
 
 - La IA es útil para generar código de preprocesamiento (carga, limpieza de máscaras,
@@ -158,6 +212,9 @@ directamente con el profesor antes de marcarla como resuelta en el documento.
   principal y para la limpieza de máscaras óseas).
 - Ningún resultado generado por la IA se subió al repo sin correrlo primero en el
   entorno local y confirmar la salida.
+- Una explicación de la IA que "suena razonable" (entrada 3, fijador externo) no es lo
+  mismo que una explicación verificada contra los datos — la entrada 7 muestra que
+  contrastarla numéricamente contra el resto del dataset destapó que estaba mal, antes
+  de que quedara como limitación permanente en el model card.
 
 ---
-

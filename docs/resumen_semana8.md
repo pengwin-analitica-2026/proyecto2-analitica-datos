@@ -93,7 +93,7 @@ Splits guardados en: data/splits.json
 Nuevo en `continuacion_semana08`. Centraliza en un solo lugar lo que antes estaba repetido en `build_manifest.py`, `mip_visualizer.py` y `hu_windowing_check.py`, para que entrenamiento, inferencia y los tres visualizadores usen exactamente la misma lógica:
 
 - `load_case(case_id)` — carga imagen + label y devuelve el volumen crudo en HU junto con el spacing del header.
-- `clip_hu` / `window_hu` — clip [-1024, 3000] + ventana ósea C400/W1800 → `[0, 1]` (misma fórmula que `hu_windowing_check.py`).
+- `clip_hu` / `window_hu` — clip [-1024, 3000] + ventana ósea C400/W1800 → `[0, 1]` (misma fórmula que `hu_windowing_check.py`). **Actualizado tras la asesoría:** `window_hu` aplica CLAHE (`skimage.exposure.equalize_adapthist`, `clip_limit=0.02`) por defecto sobre la imagen ya en `[0,1]`, para corregir casos con histograma óseo corrido/comprimido como el 025 (ver sección 8). No toca el HU crudo: `bone_mask`/`body_mask` siguen operando sobre el volumen sin normalizar. Desactivable con `aplicar_clahe=False` para comparación/debug.
 - `resize_slice` / `resize_label_slice` — resize a 224–256 px (bilineal para imagen, vecino más cercano para máscaras de etiqueta, para no promediar valores de fragmento).
 - `bone_mask`, `body_mask`, `clean_bone_mask` — máscara ósea limpia sin camilla ni cables, ver sección 7.
 
@@ -116,7 +116,7 @@ Reemplaza la versión anterior (`mip_visualizer.py`, tres PNG estáticos de proy
 
 **Decisión de diseño importante:** se probó primero con apertura morfológica (erosión + dilatación) para limpiar cables y rayas delgadas, pero **se descartó**: a este spacing (~0.7–0.8 mm/vóxel) el hueso cortical real solo tiene 2–3 vóxeles de grosor, el mismo grosor que el ruido, así que la erosión perforaba y fragmentaba hueso sano (crestas ilíacas rotas, sacro deshecho). El filtro por tamaño de componente conectado es más seguro porque es una decisión de todo-o-nada por bloque completo, nunca le quita una capa a una estructura que sobrevive.
 
-**Limitación conocida (caso 025):** HU máximo de 12 939 (vs. ~2000–2800 en los otros casos de ejemplo), consistente con un **fijador externo ortopédico** atravesando el hueso — plausible en pacientes con fractura pélvica de alta energía. Las varillas quedan conectadas al mismo componente que la pelvis (imposible separarlas por tamaño o silueta sin también dañar hueso sano) y proyectan sombra (*dark streaking*) sobre el hueso vecino, generando huecos visibles en la reconstrucción. Se documenta aquí y se debe repetir en el model card final (sección de limitaciones del entregable).
+**Corrección post-asesoría (caso 025):** la hipótesis original de este documento (fijador externo ortopédico, por el HU máximo de 12 939) **se descartó en asesoría con el profesor**: si fuera metal no se vería la parte superior de la cresta ilíaca, y el diagnóstico contra los 100 casos (`data/eda_intensidades_detalle.csv`) confirma que el HU máximo y el volumen de metal del caso 025 **no son estadísticamente atípicos** (z-score < 2). Lo atípico real es `hueso_media` y `hueso_p50` (z ≈ −2.1), es decir, el histograma óseo está corrido y comprimido ~150–250 HU por debajo de lo típico — probablemente por diferencia de kernel de reconstrucción entre instituciones, no por metal. Corregido con CLAHE dentro de `pengwin_io.window_hu` (ver sección 6). Detalle del diagnóstico y de por qué se descartó gamma y ecualización global en `IA_USAGE.md`.
 
 Acepta `case_id` por línea de comandos. Probado en `001`, `025` y `068` → `outputs/figures/volumen_3d_<id>.html`.
 
@@ -254,7 +254,7 @@ python src/eda_fragmento_principal_y_tamano.py
 
 ## Archivos generados hasta ahora
 
-- `src/`: `build_manifest.py`, `check_hu_outliers.py`, `make_splits.py`, `hu_windowing_check.py`, `pengwin_io.py`, `volumen_3d_visualizer.py`, `eda_fragments.py`, `eda_fragmento_principal_y_tamano.py`
+- `src/`: `build_manifest.py`, `check_hu_outliers.py`, `make_splits.py`, `hu_windowing_check.py`, `pengwin_io.py`, `volumen_3d_visualizer.py`, `eda_fragments.py`, `eda_fragmento_principal_y_tamano.py`, `diagnostico_normalizacion_caso025.py`, `verificar_clahe_casos_ejemplo.py`
 - `data/`: `manifest.csv`, `splits.json`, `eda_fragments_detalle.csv`, `eda_fragmentos_individuales.csv`, `eda_fragmento_principal_resumen.csv`
 - `outputs/figures/`: `hu_window_check_{001,068,080}.png`, `volumen_3d_{001,025,068}.html`
-- `outputs/eda/`: `resumen_estadistico.csv`, `hist_fragmentos_totales.png`, `barras_fragmentos_por_region.png`, `boxplot_volumen_hueso_mm3.png`, `hist_tamano_fragmentos_mm3.png`, `hist_cortes_por_fragmento.png`
+- `outputs/eda/`: `resumen_estadistico.csv`, `hist_fragmentos_totales.png`, `barras_fragmentos_por_region.png`, `boxplot_volumen_hueso_mm3.png`, `hist_tamano_fragmentos_mm3.png`, `hist_cortes_por_fragmento.png`, `diagnostico_normalizacion_caso025.png`, `verificacion_clahe_casos_ejemplo.png`
