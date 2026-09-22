@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from instance_postprocess import semantic_to_instances
+from instance_postprocess import geometry_to_instances, semantic_to_instances
 from pengwin_metrics import (detection_metrics, matched_instance_metrics,
                              multilabel_f1_auc, refine_boxes_with_semantic,
                              segmentation_metrics)
@@ -29,7 +29,8 @@ def seed_everything(seed: int = 42) -> None:
 
 def evaluate(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor,
              device: torch.device, batch_size: int, confidence: float = 0.10,
-             use_boundary: bool = False, boundary_threshold: float = 0.50) -> dict[str, float]:
+             use_boundary: bool = False, boundary_threshold: float = 0.50,
+             use_geometry: bool = False, center_threshold: float = 0.25) -> dict[str, float]:
     model.eval()
     all_logits, all_targets, all_predictions, all_truths = [], [], [], []
     all_instances, all_direct_instances, all_semantic, all_labels = [], [], [], []
@@ -44,9 +45,14 @@ def evaluate(model: torch.nn.Module, images: torch.Tensor, labels: torch.Tensor,
             all_truths.extend(boxes_from_label(y))
             boundary = (torch.sigmoid(output["boundary"]).squeeze(1).cpu().numpy()
                         if use_boundary else None)
-            all_instances.append(semantic_to_instances(
-                output["semantic"].argmax(1).cpu().numpy(), boundary,
-                boundary_threshold=boundary_threshold))
+            semantic_batch = output["semantic"].argmax(1).cpu().numpy()
+            if use_geometry:
+                all_instances.append(geometry_to_instances(
+                    semantic_batch, torch.sigmoid(output["centers"]).cpu().numpy(),
+                    output["offsets"].cpu().numpy(), center_threshold=center_threshold))
+            else:
+                all_instances.append(semantic_to_instances(
+                    semantic_batch, boundary, boundary_threshold=boundary_threshold))
             all_direct_instances.append(output["instance"].argmax(1).cpu().numpy())
             all_semantic.append(output["semantic"].argmax(1).cpu().numpy())
             all_labels.append(y.numpy())
@@ -78,6 +84,8 @@ def main() -> None:
     parser.add_argument("--confidence", type=float, default=0.10)
     parser.add_argument("--use-boundary", action="store_true")
     parser.add_argument("--boundary-threshold", type=float, default=0.50)
+    parser.add_argument("--use-geometry", action="store_true")
+    parser.add_argument("--center-threshold", type=float, default=0.25)
     parser.add_argument("--detection-weight", type=float, default=1.0)
     parser.add_argument("--classification-weight", type=float, default=0.5)
     parser.add_argument("--semantic-weight", type=float, default=2.0)
@@ -85,6 +93,10 @@ def main() -> None:
     parser.add_argument("--instance-weight", type=float, default=1.0)
     parser.add_argument("--boundary-weight", type=float, default=1.0)
     parser.add_argument("--freeze-except-boundary", action="store_true")
+    parser.add_argument("--center-weight", type=float, default=1.0)
+    parser.add_argument("--offset-weight", type=float, default=1.0)
+    parser.add_argument("--instance-dice-weight", type=float, default=1.0)
+    parser.add_argument("--freeze-except-geometry", action="store_true")
     args = parser.parse_args()
     seed_everything(); torch.set_num_threads(args.threads)
     data = np.load(args.cache)
@@ -116,6 +128,12 @@ def main() -> None:
             parameter.requires_grad = False
         for parameter in model.segmentation_head.boundary.parameters():
             parameter.requires_grad = True
+    if args.freeze_except_geometry:
+        for parameter in model.parameters():
+            parameter.requires_grad = False
+        for head in (model.segmentation_head.centers, model.segmentation_head.offsets):
+            for parameter in head.parameters():
+                parameter.requires_grad = True
     trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=1e-4)
     amp_enabled = device.type == "cuda"
@@ -128,17 +146,24 @@ def main() -> None:
         instance=args.instance_weight,
         semantic_dice=args.semantic_dice_weight,
         boundary=args.boundary_weight,
+        centers=args.center_weight,
+        offsets=args.offset_weight,
+        instance_dice=args.instance_dice_weight,
     )
     if args.epochs == 0:
         best_metrics = evaluate(model, val_x, val_y, device, args.batch_size, args.confidence,
-                                args.use_boundary, args.boundary_threshold)
+                                args.use_boundary, args.boundary_threshold,
+                                args.use_geometry, args.center_threshold)
         best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
     for epoch in range(1, args.epochs + 1):
         model.train()
-        if args.freeze_except_boundary:
+        if args.freeze_except_boundary or args.freeze_except_geometry:
             # Conserva estadísticas BatchNorm del checkpoint validado.
             model.eval()
             model.segmentation_head.boundary.train()
+            if args.freeze_except_geometry:
+                model.segmentation_head.centers.train()
+                model.segmentation_head.offsets.train()
         losses = []
         for x, y, target in loader:
             optimizer.zero_grad(set_to_none=True)
@@ -150,8 +175,10 @@ def main() -> None:
         should_evaluate = epoch == 1 or epoch % args.eval_every == 0 or epoch == args.epochs
         if should_evaluate:
             metrics = evaluate(model, val_x, val_y, device, args.batch_size, args.confidence,
-                               args.use_boundary, args.boundary_threshold)
-            score = metrics["segmentation_dice_macro"] + metrics["detection_map50"]
+                               args.use_boundary, args.boundary_threshold,
+                               args.use_geometry, args.center_threshold)
+            score = (metrics["segmentation_dice_macro"] + metrics["detection_map50"] +
+                     metrics["instance_dice_matched"])
             if score > best_score:
                 best_score, best_metrics = score, metrics
                 best_state = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}

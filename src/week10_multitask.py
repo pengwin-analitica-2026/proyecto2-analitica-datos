@@ -76,14 +76,18 @@ class SegmentationHead(nn.Module):
         self.semantic = nn.Conv2d(c3, semantic_classes, 1)
         self.instance = nn.Conv2d(c3, instance_classes, 1)
         self.boundary = nn.Conv2d(c3, 1, 1)
+        self.centers = nn.Conv2d(c3, 3, 1)
+        self.offsets = nn.Conv2d(c3, 2, 1)
 
-    def forward(self, features: Tensor, skips: list[Tensor] | None = None) -> tuple[Tensor, Tensor, Tensor]:
+    def forward(self, features: Tensor, skips: list[Tensor] | None = None
+                ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         decoded = features
         for index, block in enumerate(self.decoder):
             decoded = block(decoded)
             if skips is not None and index < 3:
                 decoded = decoded + self.skip_projections[index](skips[-1 - index])
-        return self.semantic(decoded), self.instance(decoded), self.boundary(decoded)
+        return (self.semantic(decoded), self.instance(decoded), self.boundary(decoded),
+                self.centers(decoded), torch.tanh(self.offsets(decoded)))
 
 
 class PengwinMultiTaskModel(nn.Module):
@@ -99,13 +103,15 @@ class PengwinMultiTaskModel(nn.Module):
 
     def forward(self, x: Tensor) -> dict[str, Tensor]:
         features, skips = self.backbone.forward_with_skips(x)
-        semantic, instance, boundary = self.segmentation_head(features, skips)
+        semantic, instance, boundary, centers, offsets = self.segmentation_head(features, skips)
         return {
             "classification": self.classification_head(features),
             "detection": self.detection_head(features),
             "semantic": semantic,
             "instance": instance,
             "boundary": boundary,
+            "centers": centers,
+            "offsets": offsets,
         }
 
 
@@ -135,6 +141,9 @@ class MultiTaskLossWeights:
     instance: float = 1.0
     semantic_dice: float = 1.0
     boundary: float = 1.0
+    centers: float = 1.0
+    offsets: float = 1.0
+    instance_dice: float = 1.0
 
 
 def multiclass_foreground_dice_loss(logits: Tensor, target: Tensor) -> Tensor:
@@ -163,6 +172,55 @@ def fragment_boundary_target(labels: Tensor) -> Tensor:
     return target
 
 
+def fragment_geometry_targets(labels: Tensor) -> tuple[Tensor, Tensor, Tensor]:
+    """Heatmaps de centros y offsets normalizados hacia el centro de instancia."""
+    batch, height, width = labels.shape
+    centers = torch.zeros((batch, 3, height, width), device=labels.device)
+    offsets = torch.zeros((batch, 2, height, width), device=labels.device)
+    valid = labels > 0
+    yy, xx = torch.meshgrid(torch.arange(height, device=labels.device),
+                            torch.arange(width, device=labels.device), indexing="ij")
+    for bi in range(batch):
+        for fragment_id in torch.unique(labels[bi]).tolist():
+            if fragment_id == 0:
+                continue
+            mask = labels[bi] == fragment_id
+            cy = yy[mask].float().mean(); cx = xx[mask].float().mean()
+            region = min((int(fragment_id) - 1) // 10, 2)
+            iy, ix = int(torch.round(cy)), int(torch.round(cx))
+            radius = 3
+            y0, y1 = max(0, iy - radius), min(height, iy + radius + 1)
+            x0, x1 = max(0, ix - radius), min(width, ix + radius + 1)
+            distance2 = (yy[y0:y1, x0:x1] - cy).float().square() + (xx[y0:y1, x0:x1] - cx).float().square()
+            centers[bi, region, y0:y1, x0:x1] = torch.maximum(
+                centers[bi, region, y0:y1, x0:x1], torch.exp(-distance2 / 4.0))
+            offsets[bi, 0][mask] = (cx - xx[mask]) / width
+            offsets[bi, 1][mask] = (cy - yy[mask]) / height
+    return centers, offsets, valid
+
+
+def instance_dice_loss(logits: Tensor, labels: Tensor) -> Tensor:
+    """Dice medio por ID de fragmento presente, excluyendo fondo.
+
+    A diferencia de CE, cada fragmento visible contribuye por igual, incluso
+    los conminutos pequeños que de otro modo quedan eclipsados por el hueso
+    principal y el fondo.
+    """
+    probabilities = torch.softmax(logits, dim=1)
+    losses = []
+    for fragment_id in range(1, probabilities.shape[1]):
+        truth = labels == fragment_id
+        if not truth.any():
+            continue
+        predicted = probabilities[:, fragment_id]
+        truth_float = truth.float()
+        numerator = 2 * (predicted * truth_float).sum(dim=(-2, -1)) + 1.0
+        denominator = predicted.sum(dim=(-2, -1)) + truth_float.sum(dim=(-2, -1)) + 1.0
+        present = truth.sum(dim=(-2, -1)) > 0
+        losses.append(1 - (numerator[present] / denominator[present]).mean())
+    return torch.stack(losses).mean() if losses else logits.sum() * 0.0
+
+
 def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
                    labels: Tensor, weights: MultiTaskLossWeights | None = None,
                    detection_weights: DetectionLossWeights | None = None
@@ -183,6 +241,7 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
     instance_weights[0] = 0.1
     instance = F.cross_entropy(outputs["instance"], labels.long(),
                                weight=instance_weights)
+    instance_dice = instance_dice_loss(outputs["instance"], labels)
     boundary_target = fragment_boundary_target(labels)
     boundary_probability = torch.sigmoid(outputs["boundary"].squeeze(1))
     boundary_bce = F.binary_cross_entropy_with_logits(
@@ -192,9 +251,17 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
     boundary_denominator = (boundary_probability.sum(dim=(-2, -1)) +
                             boundary_target.sum(dim=(-2, -1)) + 1.0)
     boundary = boundary_bce + (1 - boundary_numerator / boundary_denominator).mean()
+    center_target, offset_target, offset_valid = fragment_geometry_targets(labels)
+    center_probability = torch.sigmoid(outputs["centers"])
+    center_weight = 1.0 + 20.0 * center_target
+    centers = ((center_probability - center_target).square() * center_weight).mean()
+    offsets = F.smooth_l1_loss(outputs["offsets"].permute(0, 2, 3, 1)[offset_valid],
+                               offset_target.permute(0, 2, 3, 1)[offset_valid])
     total = (weights.detection * det + weights.classification * classification +
              weights.semantic * semantic + weights.instance * instance)
-    total = total + weights.semantic_dice * semantic_dice + weights.boundary * boundary
+    total = (total + weights.semantic_dice * semantic_dice + weights.boundary * boundary +
+             weights.centers * centers + weights.offsets * offsets)
+    total = total + weights.instance_dice * instance_dice
     parts = {
         "total": float(total.detach()),
         "detection": float(det.detach()),
@@ -203,6 +270,9 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
         "instance": float(instance.detach()),
         "semantic_dice": float(semantic_dice.detach()),
         "boundary": float(boundary.detach()),
+        "centers": float(centers.detach()),
+        "offsets": float(offsets.detach()),
+        "instance_dice": float(instance_dice.detach()),
         "det_objectness": det_parts["objectness"],
         "det_box": det_parts["box"],
         "det_classification": det_parts["classification"],
