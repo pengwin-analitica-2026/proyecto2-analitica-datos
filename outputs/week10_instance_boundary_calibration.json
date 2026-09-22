@@ -1,0 +1,160 @@
+{
+  "best": {
+    "threshold": null,
+    "min_size": 12,
+    "instance_dice_matched": 0.6670485737636896,
+    "instance_iou_matched": 0.5840219674331606
+  },
+  "trials": [
+    {
+      "threshold": null,
+      "min_size": 12,
+      "instance_dice_matched": 0.6670485737636896,
+      "instance_iou_matched": 0.5840219674331606
+    },
+    {
+      "threshold": 0.99,
+      "min_size": 4,
+      "instance_dice_matched": 0.6662865704649534,
+      "instance_iou_matched": 0.5828814558998795
+    },
+    {
+      "threshold": 0.99,
+      "min_size": 8,
+      "instance_dice_matched": 0.6662162435844504,
+      "instance_iou_matched": 0.5828459902863005
+    },
+    {
+      "threshold": 0.99,
+      "min_size": 12,
+      "instance_dice_matched": 0.6661773112210891,
+      "instance_iou_matched": 0.582826356705023
+    },
+    {
+      "threshold": 0.99,
+      "min_size": 24,
+      "instance_dice_matched": 0.6656728075638976,
+      "instance_iou_matched": 0.5825643886033345
+    },
+    {
+      "threshold": 0.98,
+      "min_size": 4,
+      "instance_dice_matched": 0.6541374169191281,
+      "instance_iou_matched": 0.5679149170204206
+    },
+    {
+      "threshold": 0.98,
+      "min_size": 8,
+      "instance_dice_matched": 0.6540670900386251,
+      "instance_iou_matched": 0.5678794514068416
+    },
+    {
+      "threshold": 0.98,
+      "min_size": 12,
+      "instance_dice_matched": 0.6540281576752637,
+      "instance_iou_matched": 0.5678598178255642
+    },
+    {
+      "threshold": 0.98,
+      "min_size": 24,
+      "instance_dice_matched": 0.6535236540180721,
+      "instance_iou_matched": 0.5675978497238756
+    },
+    {
+      "threshold": 0.95,
+      "min_size": 4,
+      "instance_dice_matched": 0.5867917133693048,
+      "instance_iou_matched": 0.5057940171746305
+    },
+    {
+      "threshold": 0.95,
+      "min_size": 8,
+      "instance_dice_matched": 0.5863819624538997,
+      "instance_iou_matched": 0.5055793245785356
+    },
+    {
+      "threshold": 0.95,
+      "min_size": 12,
+      "instance_dice_matched": 0.5850480438456167,
+      "instance_iou_matched": 0.5047298173758086
+    },
+    {
+      "threshold": 0.95,
+      "min_size": 24,
+      "instance_dice_matched": 0.5790780194652917,
+      "instance_iou_matched": 0.5012307244442905
+    },
+    {
+      "threshold": 0.9,
+      "min_size": 4,
+      "instance_dice_matched": 0.5338661243278628,
+      "instance_iou_matched": 0.4691231917393032
+    },
+    {
+      "threshold": 0.9,
+      "min_size": 8,
+      "instance_dice_matched": 0.5308904261895276,
+      "instance_iou_matched": 0.4675256903416342
+    },
+    {
+      "threshold": 0.9,
+      "min_size": 12,
+      "instance_dice_matched": 0.5306039568208095,
+      "instance_iou_matched": 0.46737959740770946
+    },
+    {
+      "threshold": 0.9,
+      "min_size": 24,
+      "instance_dice_matched": 0.5257567861873208,
+      "instance_iou_matched": 0.46470081211440195
+    },
+    {
+      "threshold": 0.8,
+      "min_size": 4,
+      "instance_dice_matched": 0.5124915803201809,
+      "instance_iou_matched": 0.45621800534398266
+    },
+    {
+      "threshold": 0.8,
+      "min_size": 8,
+      "instance_dice_matched": 0.5121103081989247,
+      "instance_iou_matched": 0.4560239189598393
+    },
+    {
+      "threshold": 0.8,
+      "min_size": 12,
+      "instance_dice_matched": 0.5115410406911287,
+      "instance_iou_matched": 0.4557339854114635
+    },
+    {
+      "threshold": 0.8,
+      "min_size": 24,
+      "instance_dice_matched": 0.510238571397933,
+      "instance_iou_matched": 0.45505213411032663
+    },
+    {
+      "threshold": 0.7,
+      "min_size": 4,
+      "instance_dice_matched": 0.5065324476156216,
+      "instance_iou_matched": 0.4529162172235348
+    },
+    {
+      "threshold": 0.7,
+      "min_size": 8,
+      "instance_dice_matched": 0.5059839972436802,
+      "instance_iou_matched": 0.4526392106210449
+    },
+    {
+      "threshold": 0.7,
+      "min_size": 12,
+      "instance_dice_matched": 0.5056989190100422,
+      "instance_iou_matched": 0.4524933323423659
+    },
+    {
+      "threshold": 0.7,
+      "min_size": 24,
+      "instance_dice_matched": 0.5050233383686308,
+      "instance_iou_matched": 0.4521465295403701
+    }
+  ]
+}
