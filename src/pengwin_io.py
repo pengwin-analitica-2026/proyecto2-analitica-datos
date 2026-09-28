@@ -22,7 +22,7 @@ Uso:
     from pengwin_io import load_case, window_hu, resize_slice
 
     caso = load_case("001")
-    corte = window_hu(caso["image"][caso["image"].shape[0] // 2])
+    corte = window_hu(caso.image[caso.image.shape[0] // 2])
     corte_256 = resize_slice(corte, 256)
 """
 
@@ -34,6 +34,7 @@ import SimpleITK as sitk
 from scipy import ndimage as ndi
 from skimage.transform import resize as _sk_resize
 from skimage import exposure as _sk_exposure
+from skimage.morphology import ball as _sk_ball
 
 # ---------------------------------------------------------------------------
 # CONFIGURACION — mismas rutas y constantes que el resto del repo
@@ -46,7 +47,7 @@ IMAGES_DIRS = [
 LABELS_DIR = DATA_ROOT / "PENGWIN_CT_train_labels"
 
 CLIP_MIN, CLIP_MAX = -1024, 3000        # neutraliza padding y metal
-WINDOW_CENTER, WINDOW_WIDTH = 400, 1800  # ventana osea
+WINDOW_CENTER, WINDOW_WIDTH = 400, 1800  # ventana osea -500 a 1300HU
 BONE_HU_THRESHOLD = 250                  # umbral osea (mascara gruesa, no-ML)
 
 # Fragmento principal por convencion del dataset: la etiqueta que termina en
@@ -189,6 +190,24 @@ MIN_NOISE_VOXELS = 3000       # descarta bloques de ruido (streaks/metal-artifac
                                # docstring de clean_bone_mask para el porque
                                # de no usar apertura morfologica en su lugar.
 
+# Filtro por profundidad (ver clean_bone_mask). Valores elegidos con el
+# diagnostico sobre 20 casos: las islas externas del caso 001 estaban a 1.6 mm
+# de la piel; todo componente pequeno real (fragmentos y huesos sin etiquetar)
+# estaba a 36 mm o mas. 10 mm cae dentro de ese hueco, sesgado a conservar hueso.
+MIN_SURFACE_DEPTH_MM = 10.0   # profundidad minima (mm bajo la piel) de un componente pequeno
+BIG_COMPONENT_VOXELS = 50_000  # componentes >= a esto (esqueleto, femures) nunca se filtran
+DEPTH_DOWNSAMPLE = 2           # submuestreo del mapa de profundidad (memoria); error ~1-2 mm
+
+# Recuperacion de hueso de baja densidad (solo para la mascara visual del V1).
+# Con umbral fijo 250 HU la mascara captura en mediana solo 57% del hueso
+# etiquetado (22 casos, diag_umbral.py). Crecimiento por histeresis 150/250 +
+# cierre + relleno de cavidades sube la mediana a ~92% dentro de la caja del
+# hueso (diag_relleno.py). Se aplica DESPUES de la limpieza y solo a >= 10 mm de
+# la piel: aplicado antes, fusiono con el hueso los arcos pegados a la piel del
+# caso 001 y el filtro de profundidad dejo de poder borrarlos.
+BONE_LOW_HU_THRESHOLD = 150   # umbral bajo del crecimiento (semilla = mascara ya limpia)
+CLOSING_RADIUS_VOX = 2        # radio (voxeles) del cierre morfologico que sella grietas
+
 
 def body_mask(volume_hu_crudo: np.ndarray, threshold: int = BODY_HU_THRESHOLD) -> np.ndarray:
     """
@@ -222,13 +241,44 @@ def body_mask(volume_hu_crudo: np.ndarray, threshold: int = BODY_HU_THRESHOLD) -
 def clean_bone_mask(volume_hu_crudo: np.ndarray, bone_threshold: int = BONE_HU_THRESHOLD,
                      body_threshold: int = BODY_HU_THRESHOLD,
                      min_noise_voxels: int = MIN_NOISE_VOXELS,
-                     opening_iterations: int = 0) -> np.ndarray:
+                     opening_iterations: int = 0,
+                     spacing_zyx: tuple | None = None,
+                     min_surface_depth_mm: float = MIN_SURFACE_DEPTH_MM,
+                     big_component_voxels: int = BIG_COMPONENT_VOXELS,
+                     low_threshold: int | None = BONE_LOW_HU_THRESHOLD,
+                     fill_cavities: bool = True,
+                     closing_radius: int = CLOSING_RADIUS_VOX) -> np.ndarray:
     """
     Mascara de hueso limpia, sin camilla ni cables: interseccion entre
-    bone_mask() y body_mask(), seguida de un filtro de componentes
-    conectados pequenos (rayas de beam hardening y motas de metal-artifact
-    que, dentro del cuerpo, forman bloques mucho mas chicos que la masa
-    osea completa).
+    bone_mask() y body_mask(), seguida de dos filtros de componentes
+    conectados (todo-o-nada por bloque):
+
+    1. Tamano: descarta bloques de menos de min_noise_voxels (rayas de beam
+       hardening y motas de metal-artifact dentro del cuerpo).
+    2. Profundidad (solo si se pasa spacing_zyx): descarta componentes
+       pequenos (< big_component_voxels) que tocan la zona a menos de
+       min_surface_depth_mm de la piel. Un fragmento oseo real queda
+       rodeado de tejido blando; un cinturon, electrodo o cable que roza la
+       silueta del cuerpo queda pegado a la superficie. Los componentes
+       grandes (esqueleto, femures) se conservan siempre. Se eligio profundidad
+       y no distancia al hueso principal porque un fragmento desplazado puede
+       quedar a varios cm del hueso, y esos son justo los que hay que medir.
+
+    spacing_zyx = (sz, sy, sx) en mm, en el orden del volumen (z, y, x). Si
+    es None el filtro de profundidad se omite (comportamiento anterior).
+
+    3. Recuperacion de hueso de baja densidad (requiere spacing_zyx): partiendo
+    de la mascara ya limpia (filtros 1 y 2), crece hacia voxeles entre
+    low_threshold (150 HU) y bone_threshold, solo si estan conectados a ese
+    hueso y a >= min_surface_depth_mm de la piel; luego un cierre morfologico
+    sella grietas de la cortical y se rellenan las cavidades 3D encerradas
+    (interior esponjoso), tambien solo en la zona profunda. Como el crecimiento
+    parte de la mascara limpia y no toca la zona cercana a la piel, no puede
+    fusionar cinturones o cables con el hueso. low_threshold=None y
+    fill_cavities=False reproducen el comportamiento de umbral fijo.
+    SOLO para visualizacion: el cierre puede unir huesos separados por un
+    espacio fino o tapar una linea de fractura, asi que esta mascara NO debe
+    usarse para medir distancias.
 
     opening_iterations=0 por defecto A PROPOSITO. Se probo con apertura
     morfologica y destruyo hueso cortical real: a este spacing (~0.7-0.8
@@ -263,12 +313,69 @@ def clean_bone_mask(volume_hu_crudo: np.ndarray, bone_threshold: int = BONE_HU_T
         return limpio
     sizes = ndi.sum(limpio, labels, index=np.arange(1, n_components + 1))
 
-    keep = np.zeros_like(limpio)
-    for comp_id, size in enumerate(sizes, start=1):
-        if size >= min_noise_voxels:
-            keep |= (labels == comp_id)
+    # Filtro 1: tamano minimo
+    keep_ids = sizes >= min_noise_voxels
 
-    return keep
+    # Mapa de profundidad bajo la piel (submuestreado), si hay spacing
+    f = DEPTH_DOWNSAMPLE
+    depth = None
+    if spacing_zyx is not None:
+        depth = ndi.distance_transform_edt(
+            cuerpo[::f, ::f, ::f],
+            sampling=tuple(sp * f for sp in spacing_zyx),
+        )
+
+        # Filtro 2: profundidad, solo para componentes pequenos
+        small_ids = np.flatnonzero(keep_ids & (sizes < big_component_voxels)) + 1
+        if len(small_ids) > 0:
+            objs = ndi.find_objects(labels)
+            for k in small_ids:
+                sl = objs[k - 1]
+                zz, yy, xx = np.nonzero(labels[sl] == k)
+                d = depth[(zz + sl[0].start) // f,
+                          (yy + sl[1].start) // f,
+                          (xx + sl[2].start) // f]
+                if d.min() < min_surface_depth_mm:
+                    keep_ids[k - 1] = False
+
+    lut = np.zeros(n_components + 1, dtype=bool)
+    lut[1:] = keep_ids
+    seguro = lut[labels]
+
+    # Filtro 3: recuperacion de hueso tenue, DESPUES de limpiar y solo en profundidad
+    if (depth is None or low_threshold is None or low_threshold >= bone_threshold
+            or not seguro.any()):
+        return seguro
+
+    shape = seguro.shape
+    interior = np.repeat(np.repeat(np.repeat(depth >= min_surface_depth_mm, f, axis=0),
+                                   f, axis=1), f, axis=2)[:shape[0], :shape[1], :shape[2]]
+
+    bb = ndi.find_objects(cuerpo.astype(np.uint8))[0]
+    seg_c = seguro[bb]
+    int_c = interior[bb] & cuerpo[bb]
+    debil = seg_c | ((volume_hu_crudo[bb] > low_threshold) & int_c)
+    lab_w, n_w = ndi.label(debil)                       # conectividad de 6 vecinos
+    con_semilla = np.unique(lab_w[seg_c])
+    con_semilla = con_semilla[con_semilla > 0]
+    lut_w = np.zeros(n_w + 1, dtype=bool)
+    lut_w[con_semilla] = True
+    crecido = lut_w[lab_w]
+
+    if fill_cavities and closing_radius > 0:
+        # Cierre + relleno solo sobre la caja del hueso; pad 'edge' para que la
+        # erosion del cierre no se coma hueso que toca el borde del volumen.
+        r = closing_radius
+        sb = ndi.find_objects(crecido.astype(np.uint8))[0]
+        sl2 = tuple(slice(max(b.start - r - 1, 0), b.stop + r + 1) for b in sb)
+        sub = np.pad(crecido[sl2], r, mode="edge")
+        sub = ndi.binary_closing(sub, structure=_sk_ball(r))
+        sub = ndi.binary_fill_holes(sub)[r:-r, r:-r, r:-r]
+        crecido[sl2] |= sub & int_c[sl2]
+
+    salida = seguro.copy()
+    salida[bb] |= crecido
+    return salida
 
 
 def resize_slice(slice_2d: np.ndarray, size: int = 256, order: int = 1) -> np.ndarray:
