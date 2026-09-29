@@ -43,7 +43,8 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
-    model = DetectionModel(base_channels=checkpoint.get("base_channels", 32)).to(device)
+    model = DetectionModel(base_channels=checkpoint.get("base_channels", 32),
+                           use_cbam=checkpoint.get("use_cbam", True)).to(device)
     model.load_state_dict(checkpoint["model"])
     model.eval()
     x, labels = make_batch(args.case_id, size=checkpoint.get("input_size", 256),

@@ -48,7 +48,8 @@ def main() -> None:
     image = torch.from_numpy(data["images"][index:index + 1].astype(np.float32))
     label = torch.from_numpy(data["labels"][index:index + 1].astype(np.int64))
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
-    model = DetectionModel(base_channels=checkpoint["base_channels"])
+    model = DetectionModel(base_channels=checkpoint["base_channels"],
+                           use_cbam=checkpoint.get("use_cbam", True))
     model.load_state_dict(checkpoint["model"])
     model.eval()
     with torch.no_grad():

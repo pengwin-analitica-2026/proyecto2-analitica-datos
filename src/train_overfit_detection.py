@@ -56,6 +56,8 @@ def main() -> None:
     parser.add_argument("--size", type=int, default=256)
     parser.add_argument("--base-channels", type=int, default=8,
                         help="ancho del backbone para la prueba de correctitud")
+    parser.add_argument("--no-cbam", dest="use_cbam", action="store_false",
+                        help="rama de control de la ablacion: reemplaza CBAM por Identity")
     parser.add_argument("--threads", type=int, default=min(4, os.cpu_count() or 1))
     parser.add_argument("--output", default="outputs/week9_overfit_detection.pth")
     parser.add_argument("--min-reduction", type=float, default=4.0,
@@ -65,9 +67,11 @@ def main() -> None:
     torch.set_num_threads(args.threads)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     x, labels = make_batch(args.case_id, size=args.size, max_slices=args.max_slices)
-    target = labels_to_grid(labels).to(device)
+    codificacion: dict = {}
+    target = labels_to_grid(labels, stats=codificacion).to(device)
     x = x.to(device)
-    model = DetectionModel(base_channels=args.base_channels).to(device)
+    model = DetectionModel(base_channels=args.base_channels,
+                           use_cbam=args.use_cbam).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     first, last = None, None
     model.train()
@@ -85,10 +89,13 @@ def main() -> None:
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     torch.save({"model": model.state_dict(), "case_id": args.case_id,
                 "input_size": args.size, "base_channels": args.base_channels,
-                "max_slices": args.max_slices,
+                "max_slices": args.max_slices, "use_cbam": args.use_cbam,
                 "regions": ("sacro", "coxal_izquierdo", "coxal_derecho")}, args.output)
     detections = decode_predictions(model(x), confidence=0.5)
     print(f"\nDispositivo: {device}")
+    print(f"CBAM: {'si' if args.use_cbam else 'no (rama de ablacion)'}")
+    print(f"Codificacion: {codificacion.get('reubicadas', 0)} reubicadas, "
+          f"{codificacion.get('descartadas', 0)} descartadas")
     print(f"Pérdida inicial: {first:.5f} | final: {last:.5f}")
     print(f"Reducción: {first / max(last, 1e-8):.1f}x")
     print(f"Predicciones del primer corte: {detections[0]}")
