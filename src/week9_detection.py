@@ -81,9 +81,14 @@ class FundidoraBackbone(nn.Module):
 
     Produce un mapa 16 veces menor que la imagen. CBAM se aplica al final,
     antes de la bifurcación hacia las cabezas de tareas.
+
+    use_cbam=False sustituye CBAM por nn.Identity y deja el resto de la red
+    intacta. Es la rama de control de la ablación con y sin atención que pide
+    el documento del proyecto; no es una configuración de entrega.
     """
 
-    def __init__(self, in_channels: int = 1, base_channels: int = 32):
+    def __init__(self, in_channels: int = 1, base_channels: int = 32,
+                 use_cbam: bool = True):
         super().__init__()
         c = base_channels
         self.features = nn.Sequential(
@@ -92,7 +97,8 @@ class FundidoraBackbone(nn.Module):
             ConvBlock(c * 2, c * 4, 2),
             ConvBlock(c * 4, c * 8, 2),
         )
-        self.cbam = CBAM(c * 8)
+        self.use_cbam = use_cbam
+        self.cbam = CBAM(c * 8) if use_cbam else nn.Identity()
         self.out_channels = c * 8
 
     def forward(self, x: Tensor) -> Tensor:
@@ -127,13 +133,19 @@ class GridDetectionHead(nn.Module):
 
 
 class DetectionModel(nn.Module):
-    """Modelo Semana 9: backbone + CBAM + cabeza de detección."""
+    """Modelo Semana 9: backbone + CBAM + cabeza de detección.
 
-    def __init__(self, num_classes: int = NUM_CLASSES, base_channels: int = 32):
+    use_cbam=False produce el modelo de control de la ablación: mismo backbone
+    y misma cabeza, sin atención.
+    """
+
+    def __init__(self, num_classes: int = NUM_CLASSES, base_channels: int = 32,
+                 use_cbam: bool = True):
         super().__init__()
-        self.backbone = FundidoraBackbone(base_channels=base_channels)
+        self.backbone = FundidoraBackbone(base_channels=base_channels, use_cbam=use_cbam)
         self.detection_head = GridDetectionHead(self.backbone.out_channels, num_classes)
         self.num_classes = num_classes
+        self.use_cbam = use_cbam
 
     def forward(self, x: Tensor) -> Tensor:
         return self.detection_head(self.backbone(x))
@@ -177,18 +189,65 @@ def detection_loss(pred: Tensor, target: Tensor,
     return total, values
 
 
-def labels_to_grid(label: Tensor, num_classes: int = NUM_CLASSES) -> Tensor:
+def _celda_libre(ocupadas: set, gi: int, gj: int, gh: int, gw: int,
+                 radio_max: int = 2) -> tuple[int, int] | None:
+    """Celda libre más cercana a (gi, gj), buscando en anillos crecientes.
+
+    Devuelve None si no hay ninguna dentro de radio_max. Se limita el radio a
+    propósito: reubicar más lejos desplazaría demasiado el centro de la caja
+    (ver labels_to_grid) y sería peor que no aprenderla.
+    """
+    if (gi, gj) not in ocupadas:
+        return gi, gj
+    for radio in range(1, radio_max + 1):
+        candidatas = []
+        for di in range(-radio, radio + 1):
+            for dj in range(-radio, radio + 1):
+                if max(abs(di), abs(dj)) != radio:      # solo el borde del anillo
+                    continue
+                ni, nj = gi + di, gj + dj
+                if 0 <= ni < gh and 0 <= nj < gw and (ni, nj) not in ocupadas:
+                    candidatas.append((di * di + dj * dj, ni, nj))
+        if candidatas:
+            _, ni, nj = min(candidatas)
+            return ni, nj
+    return None
+
+
+def labels_to_grid(label: Tensor, num_classes: int = NUM_CLASSES,
+                   stats: dict | None = None) -> Tensor:
     """Convierte máscaras [B,H,W] en targets [B,h,w,5+C].
 
     Las cajas se calculan por región anatómica. Si una región aparece en el
     corte, se usa una sola caja que cubre todos sus fragmentos visibles.
+
+    Colisiones: dos regiones distintas pueden tener su centro dentro de la
+    misma celda del grid (celdas de 16x16 px). La versión anterior conservaba
+    solo la caja de mayor área y descartaba la otra en silencio, de modo que
+    el modelo aprendía a NO predecir esa región mientras boxes_from_label sí
+    la contaba al evaluar: el IoU bajaba por un defecto de codificación, no
+    por el modelo. Ahora la región desplazada se reubica en la celda libre
+    más cercana.
+
+    Coste de la reubicación: tx/ty se guardan relativos a su celda y se
+    decodifican con sigmoid, que solo cubre [0,1]. Al mover la caja de celda,
+    su centro real cae fuera de ese rango, así que tx/ty se recortan al borde.
+    El error máximo es de una celda (16 px sobre 256, ~6%) y solo afecta al
+    centro; el ancho y el alto quedan exactos. Es preferible a perder la
+    región entera, que es un error del 100%.
+
+    stats: diccionario opcional; si se pasa, se llena con el número de
+    regiones reubicadas y descartadas, para poder reportarlo en el informe en
+    vez de que la pérdida ocurra en silencio.
     """
     if label.ndim != 3:
         raise ValueError(f"label debe ser [B,H,W], recibido {tuple(label.shape)}")
     b, height, width = label.shape
     gh, gw = height // 16, width // 16
     target = torch.zeros((b, gh, gw, 5 + num_classes), dtype=torch.float32, device=label.device)
+    reubicadas = descartadas = 0
     for bi in range(b):
+        ocupadas: set = set()
         for cls in range(num_classes):
             if cls == 0:
                 mask = (label[bi] >= 1) & (label[bi] <= 10)
@@ -207,19 +266,29 @@ def labels_to_grid(label: Tensor, num_classes: int = NUM_CLASSES) -> Tensor:
             bh = (ymax - ymin + 1) / height
             gi = min(int(cy * gh), gh - 1)
             gj = min(int(cx * gw), gw - 1)
-            # Si hay colisión, conserva la caja de mayor área y la reporta.
-            area = bw * bh
-            old_area = target[bi, gi, gj, 3] * target[bi, gi, gj, 4]
-            if target[bi, gi, gj, 0] == 1 and old_area >= area:
+
+            destino = _celda_libre(ocupadas, gi, gj, gh, gw)
+            if destino is None:
+                # Sin celda libre cerca: no hay dónde codificarla sin mover
+                # demasiado el centro. Se descarta, pero queda contabilizado.
+                descartadas += 1
                 continue
+            if destino != (gi, gj):
+                reubicadas += 1
+            gi, gj = destino
+            ocupadas.add((gi, gj))
+
             target[bi, gi, gj, 0] = 1
             # cx/cy se guardan relativos a la celda, igual que los logits
             # decodificados con sigmoid. w/h permanecen normalizados a la imagen.
-            tx = cx * gw - gj
-            ty = cy * gh - gi
+            tx = (cx * gw - gj).clamp(0.0, 1.0)
+            ty = (cy * gh - gi).clamp(0.0, 1.0)
             target[bi, gi, gj, 1:5] = torch.stack([tx, ty, bw, bh])
             target[bi, gi, gj, 5:] = 0
             target[bi, gi, gj, 5 + cls] = 1
+    if stats is not None:
+        stats["reubicadas"] = stats.get("reubicadas", 0) + reubicadas
+        stats["descartadas"] = stats.get("descartadas", 0) + descartadas
     return target
 
 
@@ -283,6 +352,57 @@ def decode_predictions(pred: Tensor, confidence: float = 0.25,
                 final.append(item)
         result.append(sorted(final, key=lambda r: float(r["score"]), reverse=True))
     return result
+
+
+def match_detections(predicciones: list[dict[str, object]],
+                     verdad: list[dict[str, object]],
+                     iou_threshold: float = 0.5) -> dict[str, float]:
+    """Empareja predicciones con cajas reales de un corte y cuenta aciertos.
+
+    Motivación: la métrica anterior tomaba, por cada caja real, la predicción
+    que mejor le calzara, y no miraba las demás. Un modelo que dispare veinte
+    cajas por corte mejoraba su número sin ser mejor, porque los falsos
+    positivos no costaban nada. Aquí el emparejamiento es uno a uno y en orden
+    de confianza, así que toda predicción que sobre cuenta como falso positivo.
+
+    Emparejamiento voraz: se recorren las predicciones de mayor a menor
+    puntaje y cada una toma la caja real libre de su misma clase con mayor
+    IoU, siempre que supere iou_threshold. Es el criterio estándar de
+    detección y es el que hará falta para el mAP de la semana 10.
+
+    Devuelve verdaderos positivos, falsos positivos, falsos negativos, y la
+    suma del mejor IoU por caja real (iou_suma / n_gt da el IoU medio,
+    contando como 0 las regiones que el modelo no detectó).
+    """
+    tp = fp = 0
+    libres = list(range(len(verdad)))
+    mejor_iou = [0.0] * len(verdad)
+
+    for pred in sorted(predicciones, key=lambda p: float(p["score"]), reverse=True):
+        candidatas = [k for k in libres if verdad[k]["class_id"] == pred["class_id"]]
+        # El mejor IoU por caja real se mide sobre TODAS las predicciones de su
+        # clase, estén libres o no; es la continuidad con la métrica anterior.
+        for k, gt in enumerate(verdad):
+            if gt["class_id"] != pred["class_id"]:
+                continue
+            iou = float(box_iou_xyxy(torch.tensor([gt["box"]]),
+                                     torch.tensor([pred["box"]]))[0, 0])
+            mejor_iou[k] = max(mejor_iou[k], iou)
+        if not candidatas:
+            fp += 1
+            continue
+        ious = [float(box_iou_xyxy(torch.tensor([verdad[k]["box"]]),
+                                   torch.tensor([pred["box"]]))[0, 0]) for k in candidatas]
+        mejor = int(max(range(len(candidatas)), key=lambda i: ious[i]))
+        if ious[mejor] >= iou_threshold:
+            tp += 1
+            libres.remove(candidatas[mejor])
+        else:
+            fp += 1
+
+    return {"tp": float(tp), "fp": float(fp), "fn": float(len(libres)),
+            "n_gt": float(len(verdad)), "n_pred": float(len(predicciones)),
+            "iou_suma": float(sum(mejor_iou))}
 
 
 def boxes_from_label(label: Tensor) -> list[list[dict[str, object]]]:
