@@ -20,10 +20,16 @@ Limpieza aplicada (clean_bone_mask de pengwin_io.py):
    pesar mas voxeles que un fragmento oseo fracturado.)
 2. Interseccion con el umbral oseo (250 HU) y descarte de motas aisladas
    pequenas dentro del cuerpo (artefactos puntuales de metal).
+3. Filtro por profundidad: los componentes pequenos que tocan la zona a
+   menos de 10 mm de la piel (cinturones, electrodos o cables que rozan la
+   silueta) se descartan. Un fragmento oseo real queda rodeado de tejido
+   blando. Los componentes grandes (esqueleto, femures) se conservan siempre.
+4. Recuperacion de hueso tenue (150-250 HU) y relleno del interior esponjoso,
+   partiendo de la mascara ya limpia y solo a >= 10 mm de la piel.
 
-Si aun asi se ve algun cable pegado al cuerpo (ej. electrodo sobre la piel)
-o falta hueso muy periferico, ajusta BODY_HU_THRESHOLD o MIN_NOISE_VOXELS
-en pengwin_io.py; ese modulo es compartido con el visualizador 3.
+Si aun asi se ve algun cable pegado al cuerpo o falta hueso muy periferico,
+ajusta BODY_HU_THRESHOLD, MIN_NOISE_VOXELS o MIN_SURFACE_DEPTH_MM en
+pengwin_io.py; ese modulo es compartido con el visualizador 3.
 
 Requisitos:
     pip install SimpleITK numpy scipy scikit-image plotly
@@ -86,8 +92,8 @@ def render_html(verts, faces, case_id: str, n_voxels_finales: int, n_voxels_tota
         title=(
             f"Caso {case_id} — Volumen crudo (V1), solo hueso "
             f"(umbral {BONE_HU_THRESHOLD} HU)<br>"
-            f"<sub>{n_voxels_finales:,} / {n_voxels_totales:,} voxeles oseos "
-            f"tras limpieza morfologica — sin intervencion del modelo</sub>"
+            f"<sub>{n_voxels_finales:,} voxeles oseos tras limpieza por silueta y "
+            f"profundidad y recuperacion de hueso tenue — sin intervencion del modelo</sub>"
         ),
         scene=dict(
             xaxis_title="x (mm)", yaxis_title="y (mm)", zaxis_title="z (mm)",
@@ -109,22 +115,23 @@ def procesar_caso(case_id: str):
         print(f"[AVISO] No se encontro el caso {case_id}, se omite.")
         return
 
+    # spacing_xyz de SimpleITK es (sx, sy, sz); el volumen esta en (z,y,x).
+    sx, sy, sz = caso.spacing_xyz
+
     mask_cruda = bone_mask(caso.image)
-    mask_limpia = clean_bone_mask(caso.image)
+    mask_limpia = clean_bone_mask(caso.image, spacing_zyx=(sz, sy, sx))
 
     n_totales = int(mask_cruda.sum())
     n_finales = int(mask_limpia.sum())
-    print(f"Caso {case_id}: {n_totales:,} voxeles oseos crudos -> "
-          f"{n_finales:,} tras limpieza ({100 * n_finales / max(n_totales, 1):.1f}%)")
+    print(f"Caso {case_id}: {n_totales:,} voxeles > {BONE_HU_THRESHOLD} HU en todo el volumen -> "
+          f"{n_finales:,} en la mascara final")
 
     mask_ds = downsample_mask(mask_limpia, DOWNSAMPLE_FACTOR)
     if mask_ds.sum() == 0:
         print(f"[AVISO] Caso {case_id}: mascara vacia tras limpieza/downsample, se omite.")
         return
 
-    # spacing_xyz de SimpleITK es (sx, sy, sz); el volumen esta en (z,y,x),
-    # y el downsample multiplica el espaciado efectivo entre voxeles.
-    sx, sy, sz = caso.spacing_xyz
+    # el downsample multiplica el espaciado efectivo entre voxeles.
     spacing_zyx = (sz * DOWNSAMPLE_FACTOR, sy * DOWNSAMPLE_FACTOR, sx * DOWNSAMPLE_FACTOR)
 
     verts, faces = mask_to_mesh(mask_ds, spacing_zyx)

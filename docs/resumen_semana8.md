@@ -51,7 +51,7 @@ Manifest guardado en: data/manifest.csv
 - **Explicación identificada, no es un error:**
   - Valores mínimos repetidos exactos (ej. -2048, -1023) = **padding** del escáner fuera del campo de reconstrucción.
   - Valores máximos muy altos (hasta 47,685 HU en un caso) = **artefacto de metal**, pero casi nunca está en el hueso pélvico: el EDA de intensidades (notebook 02) muestra que proviene de implantes femorales y de objetos externos al paciente.
-- **Decisión:** antes de normalizar se aplica un `clip` a **[-1024, 3000] HU**, que solo acota los picos extremos (evita que un outlier de 47 685 HU distorsione cálculos numéricos aguas abajo). **La neutralización visual real del padding y el metal la hace el ventaneo óseo (C400/W1800, sección 6)**, no el clip: cualquier valor por encima de la ventana (≥1300 HU tras el clip) queda mapeado al mismo blanco saturado (1.0), y por eso el contraste del hueso no se ve afectado por los picos de metal. El clip solo evita overflow/inestabilidad antes de llegar a ese paso.
+- **Decisión:** antes de normalizar se aplica un `clip` a **[-1024, 3000] HU**, que solo acota los picos extremos (evita que un outlier de 47 685 HU distorsione cálculos numéricos aguas abajo). **La neutralización visual real del padding y el metal la hace el ventaneo óseo (C400/W1800, sección 7)**, no el clip: cualquier valor por encima de la ventana (≥1300 HU tras el clip) queda mapeado al mismo blanco saturado (1.0), y por eso el contraste del hueso no se ve afectado por los picos de metal. El clip solo evita overflow/inestabilidad antes de llegar a ese paso.
 
 ```text
 Total casos válidos: 100
@@ -93,9 +93,28 @@ Splits guardados en: data/splits.json
 Nuevo en `continuacion_semana08`. Centraliza en un solo lugar lo que antes estaba repetido en `build_manifest.py`, `mip_visualizer.py` y `hu_windowing_check.py`, para que entrenamiento, inferencia y los tres visualizadores usen exactamente la misma lógica:
 
 - `load_case(case_id)` — carga imagen + label y devuelve el volumen crudo en HU junto con el spacing del header.
-- `clip_hu` / `window_hu` — clip [-1024, 3000] + ventana ósea C400/W1800 → `[0, 1]` (misma fórmula que `hu_windowing_check.py`).
+- `clip_hu` / `window_hu` — clip [-1024, 3000] + ventana ósea C400/W1800 → `[0, 1]` (misma fórmula que `hu_windowing_check.py`). **Actualizado tras la asesoría:** `window_hu` aplica CLAHE (`skimage.exposure.equalize_adapthist`, `clip_limit=0.02`) por defecto sobre la imagen ya en `[0,1]`, para corregir casos con histograma óseo corrido/comprimido como el 025 (ver sección 8). No toca el HU crudo: `bone_mask`/`body_mask` siguen operando sobre el volumen sin normalizar. Desactivable con `aplicar_clahe=False` para comparación/debug.
 - `resize_slice` / `resize_label_slice` — resize a 224–256 px (bilineal para imagen, vecino más cercano para máscaras de etiqueta, para no promediar valores de fragmento).
-- `bone_mask`, `body_mask`, `clean_bone_mask` — máscara ósea limpia sin camilla ni cables, ver sección 7.
+- `bone_mask`, `body_mask`, `clean_bone_mask` — máscara ósea para el Visualizador 1. **Actualizado:** `clean_bone_mask` ahora incluye filtro por profundidad bajo la piel y recuperación de hueso de baja densidad, activados al pasarle `spacing_zyx`. Detalle y justificación en la sección 8.
+
+**Dos flujos separados que salen del mismo tronco** (`load_case` + `clip_hu`):
+
+| Flujo | Funciones | Escala | Para qué |
+|---|---|---|---|
+| Entrada al modelo | `window_hu` (+ CLAHE) → `resize_slice` | Grises `[0, 1]` | Entrenamiento e inferencia |
+| Visualizador 1 | `clean_bone_mask` (usa `bone_mask` y `body_mask`) | HU reales | Reconstrucción 3D sin modelo |
+
+Las máscaras se calculan sobre HU reales porque los umbrales (250, 150 y −300 HU) solo tienen sentido en esa escala; el ventaneo y CLAHE la destruyen. **Verificado en el código** (búsqueda de `bone_mask|clean_bone_mask` en `src/`): la máscara ósea solo la usan `pengwin_io.py`, `volumen_3d_visualizer.py` y los scripts de diagnóstico. Ningún script de entrenamiento la llama, así que los cambios de la sección 8 **no afectan al modelo, a las métricas ni a la medición de distancias**.
+
+Constantes nuevas en `pengwin_io.py`:
+
+| Constante | Valor | Uso |
+|---|---|---|
+| `MIN_SURFACE_DEPTH_MM` | 10.0 | Profundidad mínima bajo la piel de un componente pequeño |
+| `BIG_COMPONENT_VOXELS` | 50 000 | Componentes mayores (esqueleto, fémures) nunca se filtran |
+| `DEPTH_DOWNSAMPLE` | 2 | Submuestreo del mapa de profundidad (memoria), error ~1–2 mm |
+| `BONE_LOW_HU_THRESHOLD` | 150 | Umbral bajo para recuperar hueso tenue |
+| `CLOSING_RADIUS_VOX` | 2 | Radio del cierre que sella grietas de la cortical |
 
 ## 7. Carga de volúmenes y ventaneo HU (`hu_windowing_check.py`)
 
@@ -109,16 +128,71 @@ Nuevo en `continuacion_semana08`. Centraliza en un solo lugar lo que antes estab
 
 Reemplaza la versión anterior (`mip_visualizer.py`, tres PNG estáticos de proyección de máxima intensidad) por una **isosuperficie 3D interactiva en Plotly**, rotable con el mouse — lo que pide literalmente el pliego para el V1 ("reconstrucción 3D inicial del volumen original").
 
-**Limpieza aplicada** (sin intervención del modelo, preprocesamiento clásico, función `clean_bone_mask` de `pengwin_io.py`):
+Uso: `python src/volumen_3d_visualizer.py` corre los casos de ejemplo (`001`, `025`, `068`); `python src/volumen_3d_visualizer.py 007` corre un caso puntual. Salida: `outputs/figures/volumen_3d_<id>.html`. Tarda entre 4 y 17 s por caso solo en la máscara, así que para la demo los HTML se dejan pregenerados.
 
-1. **Silueta corporal:** componente conectado más grande de la máscara `HU > -300`, con huecos internos rellenos (pulmones, gas intestinal). Los rieles de la camilla y los cables quedan fuera porque no tocan al paciente (aire de por medio), aunque tengan HU alto igual que el hueso.
-2. **Intersección con el umbral óseo** (250 HU) y descarte de bloques de ruido conectados menores a 3000 vóxeles (rayas de *beam hardening* que no tocan directamente al hueso).
+### 8.1 Limpieza final aplicada
 
-**Decisión de diseño importante:** se probó primero con apertura morfológica (erosión + dilatación) para limpiar cables y rayas delgadas, pero **se descartó**: a este spacing (~0.7–0.8 mm/vóxel) el hueso cortical real solo tiene 2–3 vóxeles de grosor, el mismo grosor que el ruido, así que la erosión perforaba y fragmentaba hueso sano (crestas ilíacas rotas, sacro deshecho). El filtro por tamaño de componente conectado es más seguro porque es una decisión de todo-o-nada por bloque completo, nunca le quita una capa a una estructura que sobrevive.
+Sin intervención del modelo, preprocesamiento clásico, todo dentro de `clean_bone_mask(image, spacing_zyx=(sz, sy, sx))`. El orden importa (ver 8.3, paso 7):
 
-**Limitación conocida (caso 025):** HU máximo de 12 939 (vs. ~2000–2800 en los otros casos de ejemplo), consistente con un **fijador externo ortopédico** atravesando el hueso — plausible en pacientes con fractura pélvica de alta energía. Las varillas quedan conectadas al mismo componente que la pelvis (imposible separarlas por tamaño o silueta sin también dañar hueso sano) y proyectan sombra (*dark streaking*) sobre el hueso vecino, generando huecos visibles en la reconstrucción. Se documenta aquí y se debe repetir en el model card final (sección de limitaciones del entregable).
+1. **Silueta corporal:** componente conectado más grande de la máscara `HU > -300`, con huecos internos rellenos. La camilla y los cables quedan fuera porque están separados del paciente por aire.
+2. **Umbral óseo:** intersección de la silueta con `HU > 250`.
+3. **Filtro de tamaño:** se descartan componentes conectados de menos de 3000 vóxeles (motas y rayas de *beam hardening*).
+4. **Filtro de profundidad:** se descartan los componentes pequeños (< 50 000 vóxeles) que tocan la zona a menos de 10 mm de la piel (cinturones, electrodos o cables que rozan la silueta). El esqueleto y los fémures se conservan siempre. El resultado de los pasos 1–4 es el **esqueleto limpio**.
+5. **Recuperación de hueso tenue:** desde el esqueleto limpio se crece hacia vóxeles de 150–250 HU conectados a él, solo a ≥ 10 mm de la piel. Después, un cierre morfológico (radio 2) sella grietas de la cortical y se rellenan las cavidades 3D encerradas (el interior esponjoso), también solo en profundidad.
 
-Acepta `case_id` por línea de comandos. Probado en `001`, `025` y `068` → `outputs/figures/volumen_3d_<id>.html`.
+Sin `spacing_zyx` la función se comporta como la versión original (solo pasos 1–3), lo que permite reproducir los diagnósticos anteriores.
+
+### 8.2 Decisión inicial: apertura morfológica descartada
+
+Se probó primero con apertura morfológica (erosión + dilatación) para limpiar cables y rayas delgadas, pero **se descartó**: a este spacing (~0.7–0.8 mm/vóxel) el hueso cortical real solo tiene 2–3 vóxeles de grosor, el mismo grosor que el ruido, así que la erosión perforaba y fragmentaba hueso sano (crestas ilíacas rotas, sacro deshecho). El filtro por tamaño de componente conectado es más seguro porque es una decisión de todo-o-nada por bloque completo, nunca le quita una capa a una estructura que sobrevive. Se mantiene `opening_iterations=0` por defecto.
+
+### 8.3 Cómo se llegó a la limpieza final (paso a paso)
+
+Al volver a ejecutar el V1 se detectaron dos problemas: **islas flotantes** alrededor de la pelvis en el caso 001 y **hueso incompleto** en el caso 025. Todas las reglas que se probaron se evaluaron como reglas únicas para los 100 casos, nunca como ajustes para un caso puntual. Cada decisión se tomó con un script de diagnóstico reproducible.
+
+**Paso 1 — Descartar el downsample** (`volumen_3d_visualizer.py` con `DOWNSAMPLE_FACTOR = 1`). Se sospechó que el submuestreo del visualizador (se salta un vóxel de cada dos) creaba la franja punteada. Con factor 1 la imagen quedó igual, así que se descartó.
+
+**Paso 2 — Identificar las islas** (`diag_islas.py`, `diag_islas2.py`). En el caso 001 la máscara tenía 3 componentes: el esqueleto (1 340 208 vóxeles) y dos islas de 11 962 y 10 174 vóxeles. Las islas superaban el filtro de 3000 vóxeles, por eso sobrevivían. Contra las etiquetas de los expertos, las dos islas tenían **0 %** de hueso etiquetado.
+
+**Paso 3 — Descartar subir el tamaño mínimo y filtrar por forma** (`diag_islas3.py`, 20 casos). Fragmentos reales pequeños pesaban 12–15 mil vóxeles, igual que la basura (hasta 14 481), así que subir `MIN_NOISE_VOXELS` borraría fragmentos verdaderos. Se probó el "llenado" (vóxeles del componente / volumen de su caja): los fragmentos reales salieron con llenado bajo (0.033–0.095) y la basura en un rango amplio (0.002–0.528), así que tampoco separa. Los componentes de más de 70 000 vóxeles con 0 % etiquetado resultaron ser fémures (hueso real no incluido en la taxonomía del proyecto), por eso se fijó el umbral de 50 000 vóxeles para no tocarlos nunca.
+
+**Paso 4 — Descartar la distancia al esqueleto** (`diag_islas4.py`, `diag_islas5.py`). Los fragmentos reales estaban a 1.6–2.6 mm del esqueleto, pero dos islas basura estaban a 2.6 y 2.8 mm, así que no separaba. Además, midiendo sobre las etiquetas, **el 7 % de los 59 fragmentos está a más de 3.5 mm de su hueso principal (máximo 73.9 mm)**. Esos fragmentos desplazados son justo los que el proyecto pide medir, y una regla de distancia los habría borrado. El HU medio tampoco separaba (rangos traslapados).
+
+**Paso 5 — Adoptar la profundidad bajo la piel** (`diag_islas5.py`). Las islas del 001 estaban a **1.6 mm** de la piel; todos los demás componentes pequeños (fragmentos reales y hueso no etiquetado) estaban a **36 mm o más**. Justificación anatómica: un fragmento óseo queda rodeado de tejido blando, mientras que un objeto externo que roza la silueta queda en la superficie. Se eligió 10 mm, dentro del hueco y con margen hacia conservar hueso. **Validación en 20 casos no usados** (`diag_islas6.py`, casos 002–097 de 5 en 5): el filtro removió 7 componentes en 4 casos (007, 012, 022, 097), todos con 0 % de hueso etiquetado, y no hizo nada en los otros 16.
+
+**Paso 6 — Medir el problema del hueso incompleto** (`diag_umbral.py`, 22 casos). Con el umbral de 250 HU la máscara capturaba en mediana solo el **57 %** del hueso etiquetado (rango 0.27–0.86). El problema no era exclusivo del 025 (0.31, HU mediano 140): también el 026 (0.27, HU 114), el 066 (0.34, HU 153) y el 001 (0.39, HU 173). En muchos pacientes el hueso esponjoso está por debajo de 250 HU. Se compararon candidatos (`diag_relleno.py`):
+
+| Candidato | Recall (mediana) | Proxy de precisión (mediana) |
+|---|---|---|
+| Umbral 250 HU | 0.57 | 0.71 |
+| Histéresis 150/250 | 0.80 | 0.71 |
+| 250 + cierre + relleno | 0.68 | 0.73 |
+| **Histéresis 150/250 + cierre + relleno** | **0.92** | **0.72** |
+
+Bajar el umbral a 150 daba casi el mismo recall que la histéresis, sin aportar más. La combinación de histéresis con relleno fue la única que recuperó el interior esponjoso.
+
+**Paso 7 — Error de validación y corrección del orden.** La primera integración aplicaba la recuperación **antes** de la limpieza. Al correr el visualizador, el caso 001 pasó a 3 616 886 vóxeles y aparecieron arcos grandes alrededor de todo el cuerpo. Causa: `diag_relleno.py` recortaba el volumen alrededor de las etiquetas (15 vóxeles de margen), así que nunca vio lo que había lejos de la pelvis. La recuperación fusionó esos arcos con el esqueleto, y el filtro de profundidad (que solo actúa sobre componentes pequeños) dejó de poder borrarlos. Se reordenó la función: **primero limpiar, después recuperar**, creciendo solo desde el esqueleto limpio y solo a ≥ 10 mm de la piel. Así la máscara final siempre contiene al esqueleto limpio y nada de lo borrado puede volver a entrar.
+
+**Paso 8 — Validación final sobre volumen completo** (`diag_final_v1.py`, 22 casos, sin recorte).
+
+- Recall mediano: **0.57 → 0.92**. 18 de 22 casos quedan en 0.80 o más.
+- Fuga (vóxeles agregados a más de 25 mm del esqueleto limpio): **0.0 % en 21 casos, 0.1 % en el 021**. 25 mm supera el radio de cualquier estructura ósea de la pelvis o del fémur (la cabeza femoral tiene ~23 mm de radio). Esta métrica no detecta fugas pequeñas pegadas al hueso.
+- Se verificó en todos los casos que la máscara final contiene al esqueleto limpio.
+- Revisión visual en 001, 025 y 068: sin islas flotantes y sin tejido extraño visible. Conteos finales: 001 = 3 144 617, 025 = 1 120 961, 068 = 2 935 372 vóxeles.
+
+### 8.4 Caso 025: CLAHE y V1 son cosas distintas
+
+La hipótesis original (fijador externo ortopédico, por el HU máximo de 12 939) **se descartó en asesoría con el profesor**: si fuera metal no se vería la parte superior de la cresta ilíaca, y el diagnóstico contra los 100 casos (`data/eda_intensidades_detalle.csv`) confirma que el HU máximo y el volumen de metal del caso 025 **no son estadísticamente atípicos** (z-score < 2). Lo atípico real es `hueso_media` y `hueso_p50` (z ≈ −2.1), es decir, el histograma óseo está corrido y comprimido ~150–250 HU por debajo de lo típico — probablemente por diferencia de kernel de reconstrucción entre instituciones, no por metal.
+
+- **Para el modelo** se corrigió con CLAHE dentro de `pengwin_io.window_hu` (sección 6). Detalle de por qué se descartaron gamma y ecualización global en `IA_USAGE.md`.
+- **Para el V1** CLAHE no tiene efecto, porque el visualizador trabaja sobre HU reales y nunca llama a `window_hu`. Por eso el 025 seguía incompleto después de agregar CLAHE. Se mejoró con la recuperación de hueso tenue (sección 8.3, pasos 6–8): recall de 0.31 a 0.51.
+
+### 8.5 Limitaciones conocidas del V1 (para el model card)
+
+- Casos con hueso de muy baja densidad siguen incompletos: 025 (0.51), 026 (0.48) y 066 (0.54).
+- Estructuras densas conectadas directamente al hueso (p. ej. artefactos que nacen de un implante) no se separan con filtros de tamaño ni de profundidad.
+- La recuperación no actúa a menos de 10 mm de la piel, así que zonas óseas superficiales de baja densidad pueden quedar con huecos.
+- La máscara es **solo visual**: el cierre morfológico puede unir huesos separados por un espacio fino o tapar una línea de fractura. No se usa para medir distancias ni alimenta el modelo.
 
 ## 9. EDA de fragmentos (`eda_fragments.py`)
 
@@ -173,6 +247,8 @@ Fragmentos pequenos (<5 cortes o <500 mm3): 2 de 575 (0.3%)
 
 Riesgo bajo: solo el 0.3 % de los fragmentos son pequeños.
 
+**Hallazgo complementario (sección 8.3, paso 4):** el 7 % de los fragmentos (muestra de 59, 20 casos) está a más de 3.5 mm de su fragmento principal, con un máximo de 73.9 mm. Es un primer indicio del rango de distancias de separación que medirá la semana 10.
+
 Salidas: `data/eda_fragmentos_individuales.csv`, `data/eda_fragmento_principal_resumen.csv`, `outputs/eda/hist_tamano_fragmentos_mm3.png`, `outputs/eda/hist_cortes_por_fragmento.png`.
 
 ## 11. `requirements.txt`
@@ -196,6 +272,22 @@ Todos los comandos se corren **desde la raíz del repo**.
 | 7 | EDA fragmento principal | `python src/eda_fragmento_principal_y_tamano.py` | `data/eda_fragmentos_individuales.csv` + `outputs/eda/*` |
 
 Orden obligatorio: el paso 1 va primero (2, 3, 6 y 7 leen `data/manifest.csv`).
+
+**Diagnósticos de la limpieza del V1 (opcionales, evidencia de la sección 8.3).** Imprimen en consola; algunos tardan varios minutos porque abren 20–22 volúmenes.
+
+| Script | Qué verifica |
+|---|---|
+| `python src/diag_islas.py` | Componentes de la máscara del caso 001 y su posición |
+| `python src/diag_islas2.py` | % de cada componente dentro del hueso etiquetado (001) |
+| `python src/diag_islas3.py` | Tamaño y "llenado" de componentes secundarios (20 casos) |
+| `python src/diag_islas4.py` | Distancia al esqueleto y HU medio (20 casos) |
+| `python src/diag_islas5.py` | Profundidad bajo la piel y distancia real de fragmentos (20 casos) |
+| `python src/diag_islas6.py` | Validación del filtro de profundidad en 20 casos no usados |
+| `python src/diag_umbral.py` | Recall del umbral de 250 HU frente a etiquetas (22 casos) |
+| `python src/diag_relleno.py` | Comparación de candidatos de recuperación (22 casos, en caja) |
+| `python src/diag_final_v1.py` | Validación final en volumen completo: recall, fuga y tiempo (22 casos) |
+
+> `diag_islas.py` a `diag_islas5.py` llaman a `clean_bone_mask` sin `spacing_zyx`, así que reproducen el estado anterior a los filtros nuevos. `diag_islas6.py` se ejecutó antes de agregar la recuperación de hueso tenue; la validación con la versión final es `diag_final_v1.py`.
 
 ## 13. Cómo ejecutarlo desde cero
 
@@ -237,7 +329,7 @@ python src/eda_fragments.py
 python src/eda_fragmento_principal_y_tamano.py
 ```
 
-**5. Verificar:** el manifest debe reportar 100/100 válidos, los splits 70/15/15 (semilla fija = reproducible byte a byte), y el EDA de fragmento principal debe reportar 300/300 (100 %).
+**5. Verificar:** el manifest debe reportar 100/100 válidos, los splits 70/15/15 (semilla fija = reproducible byte a byte), el EDA de fragmento principal debe reportar 300/300 (100 %) y `python src/diag_final_v1.py` debe dar recall mediano 0.92 con fuga máxima 0.1 %.
 
 ## 14. Estado de la Semana 8 y pendientes
 
@@ -249,12 +341,16 @@ python src/eda_fragmento_principal_y_tamano.py
 - [x] EDA de tamaño de fragmento (mm³, cortes) y validación del fragmento principal.
 - [x] `requirements.txt` curado y probado en Windows sin GPU.
 - [x] `hu windowing check.py` renombrado a `hu_windowing_check.py`.
-- [ ] Llenar `README.md` e `IA_USAGE.md` (bitácora crítica, no volcado de prompts).
+- [x] V1 sin islas flotantes: filtro de profundidad bajo la piel, validado en 20 casos no usados.
+- [x] V1 con hueso completo: recuperación de hueso tenue, recall mediano 0.57 → 0.92 sin fuga detectable (22 casos).
+- [x] Verificado que la máscara del V1 no alimenta al modelo.
+- [ ] Llenar `README.md` e `IA_USAGE.md` (bitácora crítica, no volcado de prompts; incluir la secuencia de la sección 8.3 con los errores).
+- [ ] Pasar las limitaciones de la sección 8.5 al model card.
 - [ ] Pull request de `continuacion_semana08` → `main` con revisión por pares.
 
 ## Archivos generados hasta ahora
 
-- `src/`: `build_manifest.py`, `check_hu_outliers.py`, `make_splits.py`, `hu_windowing_check.py`, `pengwin_io.py`, `volumen_3d_visualizer.py`, `eda_fragments.py`, `eda_fragmento_principal_y_tamano.py`
+- `src/`: `build_manifest.py`, `check_hu_outliers.py`, `make_splits.py`, `hu_windowing_check.py`, `pengwin_io.py`, `volumen_3d_visualizer.py`, `eda_fragments.py`, `eda_fragmento_principal_y_tamano.py`, `diagnostico_normalizacion_caso025.py`, `verificar_clahe_casos_ejemplo.py`, `diag_islas.py`, `diag_islas2.py`, `diag_islas3.py`, `diag_islas4.py`, `diag_islas5.py`, `diag_islas6.py`, `diag_umbral.py`, `diag_relleno.py`, `diag_final_v1.py`
 - `data/`: `manifest.csv`, `splits.json`, `eda_fragments_detalle.csv`, `eda_fragmentos_individuales.csv`, `eda_fragmento_principal_resumen.csv`
 - `outputs/figures/`: `hu_window_check_{001,068,080}.png`, `volumen_3d_{001,025,068}.html`
-- `outputs/eda/`: `resumen_estadistico.csv`, `hist_fragmentos_totales.png`, `barras_fragmentos_por_region.png`, `boxplot_volumen_hueso_mm3.png`, `hist_tamano_fragmentos_mm3.png`, `hist_cortes_por_fragmento.png`
+- `outputs/eda/`: `resumen_estadistico.csv`, `hist_fragmentos_totales.png`, `barras_fragmentos_por_region.png`, `boxplot_volumen_hueso_mm3.png`, `hist_tamano_fragmentos_mm3.png`, `hist_cortes_por_fragmento.png`, `diagnostico_normalizacion_caso025.png`, `verificacion_clahe_casos_ejemplo.png`

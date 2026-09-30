@@ -3,11 +3,13 @@
 #   pip install -r requirements.txt
 
 SimpleITK
-numpy
-pandas
-matplotlib
+# Familia compatible con torch 2.2 en macOS x86_64. Torch 2.2 se distribuye
+# contra NumPy 1.x; fijar también sus extensiones evita incompatibilidades ABI.
+numpy<2
+pandas<3
+matplotlib<3.10
 tqdm
-scipy
-scikit-image
+scipy<1.15
+scikit-image<0.25
 plotly
 torch
