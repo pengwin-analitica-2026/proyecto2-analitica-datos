@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
@@ -51,12 +52,29 @@ class UpsampleBlock(nn.Module):
         return self.block(x)
 
 
+INSTANCE_MODES = {"ids": 31, "primary": 7}
+"""Canales de la salida de instancia según la formulación.
+
+- ``ids``: 31 canales, un canal por ID PENGWIN 0..30 (formulación original).
+- ``primary``: 7 canales, fondo + (primario, secundario) por región. Sigue la
+  formulación primario/secundario del challenge PENGWIN 2024: el ID de un
+  fragmento secundario es arbitrario entre pacientes (solo indica orden por
+  tamaño), así que se pide a la red distinguir únicamente "fragmento principal"
+  vs "resto" dentro de cada hueso, y los secundarios se separan después por
+  componentes conectados (ver instance_postprocess.primary_secondary_to_instances).
+"""
+
+
 class SegmentationHead(nn.Module):
-    """Decoder común con salida semántica y salida de IDs de fragmento."""
+    """Decoder común con salida semántica y salida de instancia."""
 
     def __init__(self, in_channels: int, semantic_classes: int = 4,
-                 instance_classes: int = 31):
+                 instance_classes: int = 31, instance_mode: str = "ids"):
         super().__init__()
+        if instance_mode not in INSTANCE_MODES:
+            raise ValueError(f"instance_mode debe ser uno de {sorted(INSTANCE_MODES)}")
+        self.instance_mode = instance_mode
+        instance_classes = INSTANCE_MODES[instance_mode]
         c1 = max(in_channels // 2, 8)
         c2 = max(in_channels // 4, 8)
         c3 = max(in_channels // 8, 8)
@@ -93,13 +111,15 @@ class SegmentationHead(nn.Module):
 class PengwinMultiTaskModel(nn.Module):
     """Backbone+CBAM compartido y tres cabezas requeridas por el proyecto."""
 
-    def __init__(self, base_channels: int = 8):
+    def __init__(self, base_channels: int = 8, instance_mode: str = "ids", in_channels: int = 1):
         super().__init__()
-        self.backbone = FundidoraBackbone(base_channels=base_channels)
+        self.in_channels = in_channels
+        self.backbone = FundidoraBackbone(in_channels=in_channels, base_channels=base_channels)
         channels = self.backbone.out_channels
+        self.instance_mode = instance_mode
         self.classification_head = ClassificationHead(channels)
         self.detection_head = GridDetectionHead(channels)
-        self.segmentation_head = SegmentationHead(channels)
+        self.segmentation_head = SegmentationHead(channels, instance_mode=instance_mode)
 
     def forward(self, x: Tensor) -> dict[str, Tensor]:
         features, skips = self.backbone.forward_with_skips(x)
@@ -124,6 +144,63 @@ def labels_to_semantic(labels: Tensor) -> Tensor:
     return semantic
 
 
+def labels_to_primary_secondary(labels: Tensor) -> Tensor:
+    """IDs PENGWIN 0..30 → 7 clases: fondo + (primario, secundario) por región.
+
+    0 fondo · 1 sacro primario · 2 sacro secundario · 3 coxal izq primario ·
+    4 coxal izq secundario · 5 coxal der primario · 6 coxal der secundario.
+    El primario es el ID 1/11/21, que la Semana 8 verificó como el fragmento
+    de mayor volumen en 300/300 casos-región.
+    """
+    target = torch.zeros_like(labels, dtype=torch.long)
+    for region, start in enumerate((1, 11, 21)):
+        primary = labels == start
+        secondary = (labels > start) & (labels <= start + 9)
+        target[primary] = 2 * region + 1
+        target[secondary] = 2 * region + 2
+    return target
+
+
+def flip_sagittal(images: Tensor, labels: Tensor) -> tuple[Tensor, Tensor]:
+    """Espejo izquierda↔derecha del corte axial con intercambio de coxales.
+
+    Aumento de datos usado por los equipos del challenge PENGWIN 2024: un
+    corte espejado sigue siendo una pelvis válida si los IDs del coxal
+    izquierdo (11..20) pasan a ser del derecho (21..30) y viceversa. El sacro
+    (1..10) no cambia. Duplica el conjunto de entrenamiento sin nuevos datos.
+    """
+    flipped_images = torch.flip(images, dims=(-1,))
+    flipped_labels = torch.flip(labels, dims=(-1,)).clone()
+    left = (flipped_labels >= 11) & (flipped_labels <= 20)
+    right = (flipped_labels >= 21) & (flipped_labels <= 30)
+    flipped_labels[left] += 10
+    flipped_labels[right] -= 10
+    return flipped_images, flipped_labels
+
+
+def fracture_distance_weight(labels: Tensor, strength: float = 4.0,
+                             sigma: float = 3.0) -> Tensor:
+    """Mapa de pesos 1 + strength·exp(-d²/2σ²) con d = distancia (px) a una
+    frontera entre fragmentos distintos del mismo hueso.
+
+    Idea de FracSegNet (baseline del challenge): dar más importancia a los
+    píxeles junto a la línea de fractura, que es donde la semántica fusiona
+    fragmentos en contacto. Con strength=0 la pérdida vuelve a la original.
+    """
+    if strength <= 0:
+        return torch.ones_like(labels, dtype=torch.float32)
+    from scipy import ndimage as ndi
+    boundary = fragment_boundary_target(labels).cpu().numpy() > 0
+    weight = torch.ones(labels.shape, dtype=torch.float32)
+    for bi in range(labels.shape[0]):
+        if not boundary[bi].any():
+            continue
+        distance = ndi.distance_transform_edt(~boundary[bi])
+        weight[bi] = 1.0 + strength * torch.from_numpy(
+            np.exp(-(distance ** 2) / (2 * sigma ** 2))).float()
+    return weight.to(labels.device)
+
+
 def labels_to_presence(labels: Tensor) -> Tensor:
     """Target multietiqueta [B,3] para regiones visibles en cada corte."""
     return torch.stack([
@@ -144,6 +221,8 @@ class MultiTaskLossWeights:
     centers: float = 1.0
     offsets: float = 1.0
     instance_dice: float = 1.0
+    fracture_weight: float = 0.0  # >0 activa el peso por distancia a la fractura
+    secondary_weight: float = 1.0  # peso CE de las clases 'secundario' (modo primary)
 
 
 def multiclass_foreground_dice_loss(logits: Tensor, target: Tensor) -> Tensor:
@@ -223,9 +302,15 @@ def instance_dice_loss(logits: Tensor, labels: Tensor) -> Tensor:
 
 def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
                    labels: Tensor, weights: MultiTaskLossWeights | None = None,
-                   detection_weights: DetectionLossWeights | None = None
+                   detection_weights: DetectionLossWeights | None = None,
+                   fracture: Tensor | None = None
                    ) -> tuple[Tensor, dict[str, float]]:
-    """Pérdida compuesta con lambdas explícitas y registrables."""
+    """Pérdida compuesta con lambdas explícitas y registrables.
+
+    ``fracture`` permite pasar el mapa de peso por distancia a la fractura ya
+    calculado (se precomputa una vez por corte en el entrenamiento; el mapa
+    depende solo de las etiquetas).
+    """
     weights = weights or MultiTaskLossWeights()
     det, det_parts = detection_loss(outputs["detection"], detection_target,
                                     detection_weights)
@@ -237,11 +322,28 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
     semantic = F.cross_entropy(outputs["semantic"], semantic_target,
                                weight=semantic_weights)
     semantic_dice = multiclass_foreground_dice_loss(outputs["semantic"], semantic_target)
-    instance_weights = torch.ones(31, device=labels.device)
+    if fracture is None:
+        fracture = fracture_distance_weight(labels, weights.fracture_weight)
+    if weights.fracture_weight > 0:
+        # Reponderación por píxel de la CE semántica (FracSegNet).
+        semantic = (F.cross_entropy(outputs["semantic"], semantic_target,
+                                    weight=semantic_weights, reduction="none")
+                    * fracture).sum() / fracture.sum()
+    instance_channels = outputs["instance"].shape[1]
+    if instance_channels == INSTANCE_MODES["primary"]:
+        instance_target = labels_to_primary_secondary(labels)
+    else:
+        instance_target = labels.long()
+    instance_weights = torch.ones(instance_channels, device=labels.device)
     instance_weights[0] = 0.1
-    instance = F.cross_entropy(outputs["instance"], labels.long(),
-                               weight=instance_weights)
-    instance_dice = instance_dice_loss(outputs["instance"], labels)
+    if instance_channels == INSTANCE_MODES["primary"]:
+        # Los secundarios son ~24 % de los fragmentos pero una fracción mucho
+        # menor de los píxeles; sin reponderar, la CE favorece predecir "primario".
+        instance_weights[[2, 4, 6]] = weights.secondary_weight
+    instance = F.cross_entropy(outputs["instance"], instance_target,
+                               weight=instance_weights, reduction="none")
+    instance = (instance * fracture).sum() / fracture.sum()
+    instance_dice = instance_dice_loss(outputs["instance"], instance_target)
     boundary_target = fragment_boundary_target(labels)
     boundary_probability = torch.sigmoid(outputs["boundary"].squeeze(1))
     boundary_bce = F.binary_cross_entropy_with_logits(
@@ -278,3 +380,103 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
         "det_classification": det_parts["classification"],
     }
     return total, parts
+
+
+# ---------------------------------------------------------------------------
+# Segundo pase por región (Step 2 de FracSegNet, Liu et al. Front. Med. 2025):
+# recortar la caja de cada hueso, enmascarar con su región anatómica y volver a
+# segmentar fragmentos a mayor resolución efectiva. La misma red se entrena con
+# cortes completos y con recortes, así el segundo pase no cambia de dominio.
+# ---------------------------------------------------------------------------
+
+def _region_box(mask: Tensor, margin: float) -> tuple[int, int, int, int] | None:
+    ys, xs = torch.nonzero(mask, as_tuple=True)
+    if len(ys) == 0:
+        return None
+    height, width = mask.shape
+    y0, y1, x0, x1 = int(ys.min()), int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+    my, mx = int((y1 - y0) * margin) + 2, int((x1 - x0) * margin) + 2
+    return max(0, y0 - my), min(height, y1 + my), max(0, x0 - mx), min(width, x1 + mx)
+
+
+def _dilate(mask: Tensor, radius: int) -> Tensor:
+    if radius <= 0:
+        return mask
+    kernel = 2 * radius + 1
+    return F.max_pool2d(mask.float()[None, None], kernel, stride=1, padding=radius)[0, 0] > 0
+
+
+def region_crops(images: Tensor, labels: Tensor, semantic: Tensor | None = None,
+                 margin: float = 0.10, dilate: int = 3, size: int | None = None,
+                 min_pixels: int = 32) -> tuple[Tensor, Tensor, list[tuple[int, int, int, int, int, int]]]:
+    """Recorta cada región anatómica presente y la reescala a ``size``.
+
+    ``semantic`` (fondo/sacro/izq/der) define la región; si es None se deriva
+    de ``labels`` (entrenamiento). Fuera de la región dilatada la imagen se
+    pone a 0, como en FracSegNet. Devuelve imágenes [N,1,S,S], labels [N,S,S]
+    con los IDs de la región y la lista (índice, región, y0, y1, x0, x1).
+    """
+    size = size or images.shape[-1]
+    if semantic is None:
+        semantic = labels_to_semantic(labels)
+    crops, crop_labels, boxes = [], [], []
+    for bi in range(images.shape[0]):
+        for region in (1, 2, 3):
+            mask = semantic[bi] == region
+            if int(mask.sum()) < min_pixels:
+                continue
+            box = _region_box(mask, margin)
+            if box is None:
+                continue
+            y0, y1, x0, x1 = box
+            keep = _dilate(mask, dilate)[y0:y1, x0:x1]
+            image = images[bi, :, y0:y1, x0:x1] * keep.to(images.dtype)
+            label = labels[bi, y0:y1, x0:x1].clone()
+            start = 10 * (region - 1) + 1
+            label[(label < start) | (label > start + 9)] = 0
+            crops.append(F.interpolate(image[None], size=(size, size), mode="bilinear",
+                                       align_corners=False)[0])
+            crop_labels.append(F.interpolate(label[None, None].float(), size=(size, size),
+                                             mode="nearest")[0, 0].long())
+            boxes.append((bi, region, y0, y1, x0, x1))
+    if not crops:
+        empty = images[:0]
+        return empty, labels[:0], []
+    return torch.stack(crops), torch.stack(crop_labels), boxes
+
+
+def two_pass_instances(model: nn.Module, images: Tensor, semantic: Tensor,
+                       margin: float = 0.10, dilate: int = 3) -> Tensor:
+    """Mapa primario/secundario (7 clases) refinado con un segundo pase por región.
+
+    Para cada región presente en ``semantic`` recorta, enmascara, reescala,
+    vuelve a pasar por la red y pega de vuelta solo las clases de esa región.
+    Donde no hay recorte se conserva el primer pase.
+    """
+    model.eval()
+    with torch.inference_mode():
+        first = model(images)["instance"].argmax(1)
+        output = first.clone()
+        size = images.shape[-1]
+        dummy = torch.zeros_like(semantic)
+        crops, _, boxes = region_crops(images, dummy, semantic, margin, dilate, size)
+        if not boxes:
+            return output
+        preds = []
+        for start in range(0, len(crops), 16):
+            preds.append(model(crops[start:start + 16])["instance"].argmax(1))
+        preds = torch.cat(preds)
+        for pred, (bi, region, y0, y1, x0, x1) in zip(preds, boxes):
+            local = F.interpolate(pred[None, None].float(), size=(y1 - y0, x1 - x0),
+                                  mode="nearest")[0, 0].long()
+            primary, secondary = 2 * region - 1, 2 * region
+            inside = semantic[bi, y0:y1, x0:x1] == region
+            view = output[bi, y0:y1, x0:x1]
+            # Dentro de la región: lo que diga el segundo pase (si es de esta región).
+            take = inside & ((local == primary) | (local == secondary))
+            view[inside] = 0
+            view[take] = local[take]
+            # Píxeles de la región que el recorte no clasificó → primario (evita huecos).
+            hole = inside & (view == 0)
+            view[hole] = primary
+    return output

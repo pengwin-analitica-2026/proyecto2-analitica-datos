@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import numpy as np
+
+# NumPy 2 renombró trapz → trapezoid; se acepta cualquiera de las dos versiones.
+_trapezoid = getattr(np, "trapezoid", None) or getattr(np, "trapz")
 import torch
 
 from week9_detection import box_iou_xyxy
@@ -88,7 +91,7 @@ def _ap_for_class(predictions: list[list[dict]], truths: list[list[dict]], cls: 
     recall = np.r_[0.0, recall, 1.0]
     precision = np.r_[1.0, precision, 0.0]
     precision = np.maximum.accumulate(precision[::-1])[::-1]
-    return float(np.trapz(precision, recall))
+    return float(_trapezoid(precision, recall))
 
 
 def detection_metrics(predictions: list[list[dict]], truths: list[list[dict]]) -> dict[str, float]:
