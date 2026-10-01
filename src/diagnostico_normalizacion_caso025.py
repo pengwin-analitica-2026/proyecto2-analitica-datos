@@ -25,6 +25,15 @@ Requisitos:
 
 Uso (desde la raíz del repo):
     python src/diagnostico_normalizacion_caso025.py
+
+NOTA HISTÓRICA (asesoría de semana 9): este diagnóstico eligió CLAHE, que
+después se retiró. Su comparación de gamma usó g=0.7 (< 1), que ACLARA los
+grises oscuros: es la dirección contraria a la que necesita una ventana ósea,
+porque realza el tejido blando. Por eso gamma salió perdiendo aquí. El
+barrido de src/experimento_normalizacion.py probó gamma > 1 (comprime el
+tejido blando, expande el hueso) y fue lo que ganó; pengwin_io.window_hu
+usa ahora gamma = 1.5. Se conserva este script como registro de la decisión
+anterior.
 """
 
 import sys
@@ -47,7 +56,7 @@ GAMMA = 0.7  # <1 aclara las zonas oscuras (donde cayó el hueso corrido)
 def corte_central_con_hueso(caso_id: str) -> np.ndarray:
     """Corte axial ventaneado [0,1] con más vóxeles de hueso (más informativo que el central geométrico)."""
     caso = load_case(caso_id)
-    ventaneado = window_hu(caso.image)
+    ventaneado = window_hu(caso.image, gamma=1.0)  # ventaneo lineal, sin realce
     if caso.label is not None:
         vox_por_corte = (caso.label > 0).reshape(caso.label.shape[0], -1).sum(axis=1)
         idx = int(vox_por_corte.argmax())

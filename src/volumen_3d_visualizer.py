@@ -24,8 +24,10 @@ Limpieza aplicada (clean_bone_mask de pengwin_io.py):
    menos de 10 mm de la piel (cinturones, electrodos o cables que rozan la
    silueta) se descartan. Un fragmento oseo real queda rodeado de tejido
    blando. Los componentes grandes (esqueleto, femures) se conservan siempre.
-4. Recuperacion de hueso tenue (150-250 HU) y relleno del interior esponjoso,
-   partiendo de la mascara ya limpia y solo a >= 10 mm de la piel.
+4. (Desactivado desde la asesoria de semana 9.) La recuperacion de hueso
+   tenue 150-250 HU con cierre morfologico quedo fuera del camino por defecto:
+   el cierre puede sellar lineas de fractura. Por eso el hueso esponjoso de
+   baja densidad puede verse hueco, sobre todo en el caso 025.
 
 Si aun asi se ve algun cable pegado al cuerpo o falta hueso muy periferico,
 ajusta BODY_HU_THRESHOLD, MIN_NOISE_VOXELS o MIN_SURFACE_DEPTH_MM en
@@ -93,7 +95,7 @@ def render_html(verts, faces, case_id: str, n_voxels_finales: int, n_voxels_tota
             f"Caso {case_id} — Volumen crudo (V1), solo hueso "
             f"(umbral {BONE_HU_THRESHOLD} HU)<br>"
             f"<sub>{n_voxels_finales:,} voxeles oseos tras limpieza por silueta y "
-            f"profundidad y recuperacion de hueso tenue — sin intervencion del modelo</sub>"
+            f"profundidad — sin intervencion del modelo</sub>"
         ),
         scene=dict(
             xaxis_title="x (mm)", yaxis_title="y (mm)", zaxis_title="z (mm)",
