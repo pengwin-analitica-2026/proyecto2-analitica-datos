@@ -317,9 +317,14 @@ def nms(boxes: Tensor, scores: Tensor, iou_threshold: float = 0.5) -> Tensor:
 
 def decode_predictions(pred: Tensor, confidence: float = 0.25,
                        iou_threshold: float = 0.5) -> list[list[dict[str, object]]]:
-    """Decodifica la salida y aplica NMS independiente por clase."""
+    """Decodifica la salida y aplica NMS independiente por clase.
+
+    Es solo inferencia: se desconecta del grafo para no arrastrar gradientes
+    (y evitar el aviso de PyTorch al convertir tensores con grad a float).
+    """
     if pred.ndim != 4:
         raise ValueError("pred debe tener forma [B,grid_y,grid_x,5+C]")
+    pred = pred.detach()
     b, gh, gw, channels = pred.shape
     num_classes = channels - 5
     result: list[list[dict[str, object]]] = []
