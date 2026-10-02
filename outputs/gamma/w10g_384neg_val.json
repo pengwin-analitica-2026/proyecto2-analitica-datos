@@ -1,0 +1,15 @@
+{
+  "classification_f1_macro": 0.9474076099648269,
+  "classification_auc_macro": 0.9779055459351881,
+  "detection_iou_mean": 0.8370573400119066,
+  "detection_map50": 0.8180700231557996,
+  "detection_map50_95": 0.7260890694341033,
+  "segmentation_dice_macro": 0.9524275876926898,
+  "segmentation_iou_macro": 0.9097326910501334,
+  "instance_dice_matched": 0.8111858360535805,
+  "instance_iou_matched": 0.7314939728746254,
+  "instance_semantic_cc_dice_matched": 0.7616524550753382,
+  "instance_semantic_cc_iou_matched": 0.7022166364320339,
+  "instance_direct_dice_matched": 0.8111858360535805,
+  "instance_direct_iou_matched": 0.7314939728746254
+}

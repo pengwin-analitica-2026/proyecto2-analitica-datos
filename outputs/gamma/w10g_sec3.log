@@ -1,0 +1,21 @@
+Precomputando mapas de distancia a la fractura...
+epoch 001 loss=0.6217 dice=0.9488 map50=0.9301 iou_bbox=0.9008
+epoch 010 loss=0.5739 dice=0.9497 map50=0.9183 iou_bbox=0.8908
+epoch 020 loss=0.5499 dice=0.9511 map50=0.9148 iou_bbox=0.8841
+epoch 030 loss=0.5387 dice=0.9512 map50=0.9180 iou_bbox=0.8810
+Mejores métricas de validación: {
+  "classification_f1_macro": 0.9944994499449945,
+  "classification_auc_macro": 0.9757927862503026,
+  "detection_iou_mean": 0.900793213382741,
+  "detection_map50": 0.9300773535685313,
+  "detection_map50_95": 0.8250005175682958,
+  "segmentation_dice_macro": 0.9488069251875054,
+  "segmentation_iou_macro": 0.9035099149148748,
+  "instance_dice_matched": 0.8027708997998378,
+  "instance_iou_matched": 0.7310981407714088,
+  "instance_semantic_cc_dice_matched": 0.7614759539491044,
+  "instance_semantic_cc_iou_matched": 0.7036410359452399,
+  "instance_direct_dice_matched": 0.8027708997998378,
+  "instance_direct_iou_matched": 0.7310981407714088
+}
+Checkpoint: outputs/w10g_sec3.pth
