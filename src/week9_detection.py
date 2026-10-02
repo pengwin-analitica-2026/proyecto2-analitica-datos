@@ -316,12 +316,24 @@ def nms(boxes: Tensor, scores: Tensor, iou_threshold: float = 0.5) -> Tensor:
 
 
 def decode_predictions(pred: Tensor, confidence: float = 0.25,
-                       iou_threshold: float = 0.5) -> list[list[dict[str, object]]]:
+                       iou_threshold: float = 0.5,
+                       max_por_clase: int | None = None) -> list[list[dict[str, object]]]:
     """Decodifica la salida y aplica NMS independiente por clase.
 
     Es solo inferencia: se desconecta del grafo para no arrastrar gradientes
     (y evitar el aviso de PyTorch al convertir tensores con grad a float).
+
+    max_por_clase: tope de cajas por clase y por corte tras el NMS (se quedan
+    las de mayor puntaje). El NMS solo elimina cajas que se SOLAPAN (IoU >
+    iou_threshold); dos cajas de la misma clase que cubren mitades distintas
+    del coxal se solapan poco y sobreviven las dos, sin importar que una tenga
+    0.95 y la otra 0.45. Como cada region (sacro, coxal izq., coxal der.)
+    aparece una sola vez por corte y su caja real es una sola
+    (boxes_from_label), con max_por_clase=1 toda caja extra se descarta.
+    None conserva el comportamiento anterior (todas las que pasan el NMS).
     """
+    if max_por_clase is not None and max_por_clase < 1:
+        raise ValueError("max_por_clase debe ser >= 1 o None")
     if pred.ndim != 4:
         raise ValueError("pred debe tener forma [B,grid_y,grid_x,5+C]")
     pred = pred.detach()
@@ -350,7 +362,10 @@ def decode_predictions(pred: Tensor, confidence: float = 0.25,
                 continue
             boxes = torch.stack([r["box"] for r in candidates])
             scores = torch.stack([r["score"] for r in candidates])
-            for idx in nms(boxes, scores, iou_threshold).tolist():
+            keep = nms(boxes, scores, iou_threshold).tolist()  # ya ordenado por puntaje
+            if max_por_clase is not None:
+                keep = keep[:max_por_clase]
+            for idx in keep:
                 item = candidates[idx].copy()
                 item["box"] = boxes[idx].detach().cpu().tolist()
                 item["score"] = float(scores[idx].detach())

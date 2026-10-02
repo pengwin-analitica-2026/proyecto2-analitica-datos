@@ -33,6 +33,9 @@ def main() -> None:
     parser.add_argument("--cache", default="data/cache/week9_detection_slices.npz")
     parser.add_argument("--checkpoint", default="outputs/week9_detection_initial.pth")
     parser.add_argument("--case-id", default=None, help="caso de validación; omitir para el primero")
+    parser.add_argument("--confidence", type=float, default=0.40,
+                        help="umbral de confianza; 0.40 es el calibrado sobre validacion "
+                             "(ver notebooks/03_semana9_deteccion.ipynb)")
     parser.add_argument("--all-predictions", action="store_true",
                         help="muestra todas las propuestas posteriores a NMS")
     parser.add_argument("--output", default="outputs/figures/week9_detection_validation.png")
@@ -53,7 +56,7 @@ def main() -> None:
     model.load_state_dict(checkpoint["model"])
     model.eval()
     with torch.no_grad():
-        predicted = decode_predictions(model(image), confidence=.20)[0]
+        predicted = decode_predictions(model(image), confidence=args.confidence)[0]
     if not args.all_predictions:
         # El visualizador de avance muestra una sola hipótesis legible por
         # región. La evaluación conserva todas las propuestas con NMS.
@@ -70,7 +73,7 @@ def main() -> None:
         cls = int(item["class_id"])
         draw(ax, item, f"Pred {REGION_NAMES[cls]} {item['score']:.2f}", "dashed")
     ax.set_title(f"Validación — caso {ids[index]}, corte {int(data['z_indices'][index])}\n"
-                 "GT sólida; predicción discontinua")
+                 f"GT sólida; predicción discontinua (confianza ≥ {args.confidence:.2f})")
     ax.axis("off")
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, dpi=180, bbox_inches="tight")

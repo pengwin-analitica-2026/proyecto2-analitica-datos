@@ -178,9 +178,15 @@ def window_hu(volume: np.ndarray, center: int = WINDOW_CENTER, width: int = WIND
     es la garantia de pipeline identico en entrenamiento e inferencia.
 
     LIMITACION CONOCIDA: gamma es global, la misma curva para todos los
-    casos, asi que NO corrige el histograma corrido del caso 025 (sigue
-    siendo el de hueso mas oscuro, 0.221 contra 0.267-0.350). Eso requiere
-    una normalizacion por caso, pendiente.
+    casos, asi que no iguala el brillo entre escaneres. Entre los 5 casos del
+    experimento, el 025 queda con el hueso mas oscuro (0.221 contra
+    0.267-0.350), pero en la revision de los 100 casos no es atipico: el
+    brillo medio del hueso va de 0.188 (caso 034) a 0.398 (caso 076), media
+    0.296, y los atipicos (|z| > 2) son 013, 026, 027, 034 y 095 (oscuros) y
+    076 (claro). Ver notebooks/03_semana9_deteccion.ipynb, seccion 1.1.
+    Por decision del equipo NO se normaliza por caso: un ajuste a medida no
+    se puede aplicar a un caso nuevo sin verlo. Si la diferencia afecta la
+    deteccion, se aborda con aumento de intensidad en el entrenamiento.
 
     Se aplica a la imagen ya en [0,1], nunca al HU crudo: bone_mask,
     body_mask y clean_bone_mask siguen operando sobre el volumen sin tocar,

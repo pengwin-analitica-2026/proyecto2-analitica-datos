@@ -112,6 +112,23 @@ class Week9DetectionTests(unittest.TestCase):
             self.assertTrue(torch.allclose(torch.tensor(candidate["box"]),
                                            torch.tensor(gt["box"]), atol=1e-4))
 
+    def test_max_por_clase_descarta_duplicadas_que_el_nms_no_ve(self) -> None:
+        """Dos cajas de la misma clase que casi no se solapan: el NMS deja las
+        dos; con max_por_clase=1 queda solo la de mayor puntaje."""
+        pred = torch.full((1, 16, 16, 8), -12.0)
+        for (i, j), obj in (((3, 3), 3.0), ((12, 12), 0.5)):   # puntajes ~0.95 y ~0.62
+            pred[0, i, j, 0] = obj
+            pred[0, i, j, 1:3] = 0.0                            # centro de la celda
+            pred[0, i, j, 3:5] = logit(torch.tensor([0.15, 0.15]))
+            pred[0, i, j, 5] = 12.0                             # clase 0 (sacro)
+        todas = decode_predictions(pred, confidence=0.3)[0]
+        self.assertEqual(len(todas), 2)
+        una = decode_predictions(pred, confidence=0.3, max_por_clase=1)[0]
+        self.assertEqual(len(una), 1)
+        self.assertAlmostEqual(una[0]["score"], max(p["score"] for p in todas), places=6)
+        with self.assertRaises(ValueError):
+            decode_predictions(pred, max_por_clase=0)
+
     def test_nms_suppresses_overlapping_lower_score(self) -> None:
         boxes = torch.tensor([[0.1, 0.1, 0.6, 0.6],
                               [0.12, 0.12, 0.58, 0.58],

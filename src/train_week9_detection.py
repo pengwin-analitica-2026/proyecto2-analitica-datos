@@ -43,7 +43,8 @@ def seed_everything(seed: int = 42) -> None:
 
 def evaluar_deteccion(model: DetectionModel, images: torch.Tensor, labels: torch.Tensor,
                       device: torch.device, confidence: float = 0.20,
-                      iou_threshold: float = 0.5) -> dict[str, float]:
+                      iou_threshold: float = 0.5,
+                      max_por_clase: int | None = None) -> dict[str, float]:
     """Metricas de deteccion sobre validacion, tras NMS y por clase.
 
     iou_medio  mejor IoU por caja real (0 si no se detecto). Se conserva para
@@ -52,6 +53,9 @@ def evaluar_deteccion(model: DetectionModel, images: torch.Tensor, labels: torch
     precision  de las cajas predichas, cuantas aciertan una real (IoU >= 0.5).
     recall     de las cajas reales, cuantas fueron encontradas.
     f1         media armonica de las dos: criterio de seleccion.
+
+    max_por_clase se pasa a decode_predictions (None = todas las cajas tras
+    NMS, que es como se seleccionaron los checkpoints de la semana 9).
     """
     model.eval()
     acumulado = {"tp": 0.0, "fp": 0.0, "fn": 0.0, "n_gt": 0.0,
@@ -59,7 +63,8 @@ def evaluar_deteccion(model: DetectionModel, images: torch.Tensor, labels: torch
     with torch.no_grad():
         for start in range(0, len(images), 16):
             x = images[start:start + 16].to(device)
-            predictions = decode_predictions(model(x), confidence=confidence)
+            predictions = decode_predictions(model(x), confidence=confidence,
+                                             max_por_clase=max_por_clase)
             truths = boxes_from_label(labels[start:start + 16])
             for predicted, truth in zip(predictions, truths):
                 for clave, valor in match_detections(predicted, truth, iou_threshold).items():
