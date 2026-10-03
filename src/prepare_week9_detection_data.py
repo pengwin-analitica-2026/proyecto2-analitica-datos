@@ -15,7 +15,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pengwin_io import load_case, resize_label_slice, resize_slice, window_hu
+from pengwin_io import GAMMA, load_case, resize_label_slice, resize_slice, window_hu
 
 
 def choose_slices(label: np.ndarray, count: int, extent: tuple[float, float] = (0.15, 0.85),
@@ -54,6 +54,9 @@ def main() -> None:
                         help="Cortes sin hueso por caso (ejemplos de ausencia para clasificación).")
     parser.add_argument("--context", type=int, default=0,
                         help="Entrada 2.5D: K cortes vecinos a cada lado como canales (0 = 2D).")
+    parser.add_argument("--gamma", type=float, default=GAMMA,
+                        help=f"correccion gamma de la entrada (por defecto {GAMMA}, la de produccion); "
+                             "1.0 = solo ventaneo, para comparar preprocesamientos")
     parser.add_argument("--max-test-cases", type=int, default=0,
                         help="Incluye test solo para evaluación final; 0 conserva el cache de entrenamiento.")
     args = parser.parse_args()
@@ -74,7 +77,7 @@ def main() -> None:
             for z in choose_slices(case.label, args.slices_per_case, tuple(args.extent),
                                    args.negatives_per_case):
                 depth = case.image.shape[0]
-                stack = [resize_slice(window_hu(case.image[min(max(z + d, 0), depth - 1)]),
+                stack = [resize_slice(window_hu(case.image[min(max(z + d, 0), depth - 1)], gamma=args.gamma),
                                       args.size).astype(np.float16)
                          for d in range(-args.context, args.context + 1)]
                 images.append(np.stack(stack))  # (2K+1, S, S); K=0 → (1, S, S)
@@ -91,9 +94,9 @@ def main() -> None:
         images=np.stack(images), labels=np.stack(labels),
         case_ids=np.array(case_ids), z_indices=np.array(z_indices),
         split_names=np.array(split_names), size=np.array(args.size),
-        context=np.array(args.context),
+        context=np.array(args.context), gamma=np.array(args.gamma),
     )
-    print(f"Cache: {out} | cortes={len(images)} | train={sum(s == 'train' for s in split_names)} "
+    print(f"Cache: {out} | gamma={args.gamma} | cortes={len(images)} | train={sum(s == 'train' for s in split_names)} "
           f"| val={sum(s == 'val' for s in split_names)} | test={sum(s == 'test' for s in split_names)}")
 
 

@@ -85,11 +85,27 @@ class FundidoraBackbone(nn.Module):
     use_cbam=False sustituye CBAM por nn.Identity y deja el resto de la red
     intacta. Es la rama de control de la ablación con y sin atención que pide
     el documento del proyecto; no es una configuración de entrega.
+
+    cbam_stages=3 agrega CBAM también tras los bloques 2 y 3 (mapas /4 y /8),
+    además del final (/16). learnable_gamma=True mezcla cada módulo con su
+    entrada mediante un escalar aprendible por etapa,
+
+        salida = x + gamma * (CBAM(x) - x),   gamma inicial = 0,
+
+    para medir cuánto aporta la atención en cada capa (asesoría semana 9):
+    gamma = 0 es "sin atención", gamma = 1 es CBAM completo. Con los valores
+    por defecto (1 etapa, sin gamma) el modelo y sus nombres de parámetros son
+    idénticos a los de antes, así que los checkpoints viejos cargan igual.
     """
 
+    ETAPAS = {1: "etapa_4", 2: "etapa_8", 3: "etapa_16"}   # índice de bloque -> nombre
+
     def __init__(self, in_channels: int = 1, base_channels: int = 32,
-                 use_cbam: bool = True):
+                 use_cbam: bool = True, cbam_stages: int = 1,
+                 learnable_gamma: bool = False):
         super().__init__()
+        if cbam_stages not in (1, 3):
+            raise ValueError("cbam_stages debe ser 1 o 3")
         c = base_channels
         self.features = nn.Sequential(
             ConvBlock(in_channels, c, 2),
@@ -98,19 +114,48 @@ class FundidoraBackbone(nn.Module):
             ConvBlock(c * 4, c * 8, 2),
         )
         self.use_cbam = use_cbam
+        self.cbam_stages = cbam_stages if use_cbam else 0
+        self.learnable_gamma = bool(learnable_gamma and use_cbam)
         self.cbam = CBAM(c * 8) if use_cbam else nn.Identity()
+        canales = {1: c * 2, 2: c * 4}
+        self.cbam_intermedios = nn.ModuleDict(
+            {str(i): CBAM(canales[i]) for i in (1, 2)} if use_cbam and cbam_stages == 3 else {})
+        if self.learnable_gamma:
+            activos = [3] + [int(k) for k in self.cbam_intermedios]
+            self.gammas = nn.ParameterDict({self.ETAPAS[i]: nn.Parameter(torch.zeros(1))
+                                            for i in sorted(activos)})
         self.out_channels = c * 8
 
+    def _atencion(self, indice: int, modulo: nn.Module, x: Tensor) -> Tensor:
+        y = modulo(x)
+        if self.learnable_gamma:
+            gamma = self.gammas[self.ETAPAS[indice]]
+            return x + gamma * (y - x)
+        return y
+
+    def _pasar(self, x: Tensor, skips: list[Tensor] | None = None) -> Tensor:
+        for i, block in enumerate(self.features):
+            x = block(x)
+            if str(i) in self.cbam_intermedios:
+                x = self._atencion(i, self.cbam_intermedios[str(i)], x)
+            if skips is not None:
+                skips.append(x)
+        return self._atencion(3, self.cbam, x) if self.use_cbam else self.cbam(x)
+
     def forward(self, x: Tensor) -> Tensor:
-        return self.cbam(self.features(x))
+        return self._pasar(x)
 
     def forward_with_skips(self, x: Tensor) -> tuple[Tensor, list[Tensor]]:
         """Retorna bottleneck con CBAM y mapas /2, /4, /8 para segmentación."""
-        skips = []
-        for block in self.features:
-            x = block(x)
-            skips.append(x)
-        return self.cbam(x), skips[:-1]
+        skips: list[Tensor] = []
+        out = self._pasar(x, skips)
+        return out, skips[:-1]
+
+    def valores_gamma(self) -> dict[str, float]:
+        """gamma aprendido por etapa (vacío si learnable_gamma=False)."""
+        if not self.learnable_gamma:
+            return {}
+        return {k: float(v.detach()) for k, v in self.gammas.items()}
 
 
 class GridDetectionHead(nn.Module):
@@ -140,15 +185,32 @@ class DetectionModel(nn.Module):
     """
 
     def __init__(self, num_classes: int = NUM_CLASSES, base_channels: int = 32,
-                 use_cbam: bool = True):
+                 use_cbam: bool = True, cbam_stages: int = 1,
+                 learnable_gamma: bool = False):
         super().__init__()
-        self.backbone = FundidoraBackbone(base_channels=base_channels, use_cbam=use_cbam)
+        self.backbone = FundidoraBackbone(base_channels=base_channels, use_cbam=use_cbam,
+                                          cbam_stages=cbam_stages,
+                                          learnable_gamma=learnable_gamma)
         self.detection_head = GridDetectionHead(self.backbone.out_channels, num_classes)
         self.num_classes = num_classes
         self.use_cbam = use_cbam
 
     def forward(self, x: Tensor) -> Tensor:
         return self.detection_head(self.backbone(x))
+
+
+def detection_model_from_checkpoint(checkpoint: dict) -> "DetectionModel":
+    """Reconstruye el modelo con la configuración guardada y carga sus pesos.
+
+    Los checkpoints anteriores (sin cbam_stages ni learnable_gamma) cargan
+    como CBAM de una etapa sin gamma, que es lo que eran.
+    """
+    model = DetectionModel(base_channels=checkpoint["base_channels"],
+                           use_cbam=checkpoint.get("use_cbam", True),
+                           cbam_stages=checkpoint.get("cbam_stages", 1),
+                           learnable_gamma=checkpoint.get("learnable_gamma", False))
+    model.load_state_dict(checkpoint["model"])
+    return model
 
 
 @dataclass

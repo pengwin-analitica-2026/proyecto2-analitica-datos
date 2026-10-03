@@ -94,10 +94,16 @@ def main() -> None:
     parser.add_argument("--base-channels", type=int, default=32)
     parser.add_argument("--no-cbam", dest="use_cbam", action="store_false",
                         help="rama de control de la ablacion: reemplaza CBAM por Identity")
+    parser.add_argument("--cbam-stages", type=int, choices=(1, 3), default=1,
+                        help="3 = CBAM tras los bloques /4, /8 y /16 (asesoria semana 9)")
+    parser.add_argument("--learnable-gamma", action="store_true",
+                        help="mezcla cada CBAM con su entrada con un gamma aprendible por etapa")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="semilla de pesos iniciales y orden de los lotes")
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--output", default="outputs/week9_detection_initial.pth")
     args = parser.parse_args()
-    seed_everything()
+    seed_everything(args.seed)
     torch.set_num_threads(args.threads)
 
     data = np.load(args.cache)
@@ -114,13 +120,16 @@ def main() -> None:
     print(f"Codificacion del target: {codificacion.get('reubicadas', 0)} regiones reubicadas "
           f"por colision de celda, {codificacion.get('descartadas', 0)} descartadas")
     print(f"Modelo: {args.base_channels} canales base, CBAM "
-          f"{'si' if args.use_cbam else 'no (rama de ablacion)'}\n")
+          f"{'si' if args.use_cbam else 'no (rama de ablacion)'}"
+          + (f", {args.cbam_stages} etapas" if args.use_cbam else "")
+          + (", gamma aprendible" if args.use_cbam and args.learnable_gamma else "") + "\n")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loader = DataLoader(TensorDataset(train_x, train_target), batch_size=args.batch_size,
-                        shuffle=True, generator=torch.Generator().manual_seed(42))
-    model = DetectionModel(base_channels=args.base_channels,
-                           use_cbam=args.use_cbam).to(device)
+                        shuffle=True, generator=torch.Generator().manual_seed(args.seed))
+    model = DetectionModel(base_channels=args.base_channels, use_cbam=args.use_cbam,
+                           cbam_stages=args.cbam_stages,
+                           learnable_gamma=args.learnable_gamma).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     historial: list[dict] = []
@@ -135,7 +144,8 @@ def main() -> None:
             optimizer.step()
             losses.append(float(loss.detach()))
         metrics = evaluar_deteccion(model, val_x, val_y, device)
-        historial.append({"epoch": epoch, "train_loss": float(np.mean(losses)), **metrics})
+        gammas = {f"gamma_{k}": v for k, v in model.backbone.valores_gamma().items()}
+        historial.append({"epoch": epoch, "train_loss": float(np.mean(losses)), **metrics, **gammas})
 
         # F1 manda; el IoU medio solo desempata.
         mejora = (metrics["f1"] > best_f1 or
@@ -148,21 +158,27 @@ def main() -> None:
             print(f"epoch {epoch:03d} train_loss={np.mean(losses):.4f} "
                   f"F1={metrics['f1']:.3f} P={metrics['precision']:.3f} "
                   f"R={metrics['recall']:.3f} FP={int(metrics['falsos_positivos'])} "
-                  f"iou={metrics['iou_medio']:.3f}" + ("  <- mejor" if mejora else ""))
+                  f"iou={metrics['iou_medio']:.3f}"
+                  + "".join(f" {k}={v:+.3f}" for k, v in gammas.items())
+                  + ("  <- mejor" if mejora else ""))
 
     model.load_state_dict(best_state)
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"model": model.state_dict(), "base_channels": args.base_channels,
                 "input_size": int(data["size"]), "cache": str(args.cache),
-                "use_cbam": args.use_cbam, "best_epoch": best_epoch,
+                "use_cbam": args.use_cbam, "cbam_stages": args.cbam_stages,
+                "learnable_gamma": args.learnable_gamma, "best_epoch": best_epoch,
                 "best_val_f1": best_f1, "best_val_iou": best_iou,
                 "val_metrics": best_metrics, "target_encoding": codificacion}, out)
     historial_path = out.with_suffix(".json")
     historial_path.write_text(json.dumps({
         "config": {"base_channels": args.base_channels, "use_cbam": args.use_cbam,
+                   "cbam_stages": args.cbam_stages, "learnable_gamma": args.learnable_gamma,
                    "epochs": args.epochs, "lr": args.lr, "batch_size": args.batch_size,
-                   "seed": 42, "criterio_seleccion": "f1@iou0.5"},
+                   "seed": args.seed, "cache": str(args.cache),
+                   "gamma_cache": float(data["gamma"]) if "gamma" in data.files else None,
+                   "criterio_seleccion": "f1@iou0.5"},
         "mejor_epoca": best_epoch,
         "historial": historial,
     }, indent=2))

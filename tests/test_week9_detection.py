@@ -9,6 +9,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from week9_detection import (CBAM, DetectionModel, boxes_from_label,
                               decode_predictions, detection_loss,
+                              detection_model_from_checkpoint,
                               labels_to_grid, match_detections, nms)
 
 
@@ -128,6 +129,29 @@ class Week9DetectionTests(unittest.TestCase):
         self.assertAlmostEqual(una[0]["score"], max(p["score"] for p in todas), places=6)
         with self.assertRaises(ValueError):
             decode_predictions(pred, max_por_clase=0)
+
+    def test_gamma_cero_equivale_a_sin_atencion(self) -> None:
+        """Con gamma = 0 (su valor inicial) el modelo de tres etapas calcula lo
+        mismo que el de control sin CBAM: la atención entra solo si gamma crece."""
+        torch.manual_seed(0)
+        con = DetectionModel(base_channels=8, cbam_stages=3, learnable_gamma=True).eval()
+        sin = DetectionModel(base_channels=8, use_cbam=False).eval()
+        sin.load_state_dict({k: v for k, v in con.state_dict().items()
+                             if k in sin.state_dict()})
+        x = torch.rand(1, 1, 64, 64)
+        self.assertTrue(torch.allclose(con(x), sin(x), atol=1e-6))
+        self.assertEqual(set(con.backbone.valores_gamma()), {"etapa_4", "etapa_8", "etapa_16"})
+        # gamma recibe gradiente: se puede aprender.
+        con.train(); con(x).sum().backward()
+        self.assertIsNotNone(con.backbone.gammas["etapa_16"].grad)
+
+    def test_checkpoint_viejo_carga_igual(self) -> None:
+        """Los valores por defecto no cambian los nombres de parámetros."""
+        model = DetectionModel(base_channels=8)
+        ck = {"base_channels": 8, "use_cbam": True, "model": model.state_dict()}
+        cargado = detection_model_from_checkpoint(ck)
+        self.assertEqual(set(cargado.state_dict()), set(model.state_dict()))
+        self.assertEqual(cargado.backbone.valores_gamma(), {})
 
     def test_nms_suppresses_overlapping_lower_score(self) -> None:
         boxes = torch.tensor([[0.1, 0.1, 0.6, 0.6],

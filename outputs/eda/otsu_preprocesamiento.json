@@ -1,0 +1,63 @@
+{
+  "casos": [
+    "004",
+    "015",
+    "036",
+    "082",
+    "095"
+  ],
+  "cortes_por_caso": 5,
+  "seed": 42,
+  "resumen": {
+    "ventaneo": {
+      "dice": 0.48027769565425804,
+      "precision": 0.5135287504499333,
+      "recall": 0.6839581665367406,
+      "dice_optimo": 0.6704365884371826,
+      "dice_sin_hueso_no_etiquetado": 0.5261733322466587,
+      "dice_min": 0.12969759248385201
+    },
+    "gamma 1.5 (elegido)": {
+      "dice": 0.4859198462016095,
+      "precision": 0.6709962237790039,
+      "recall": 0.4460396481585491,
+      "dice_optimo": 0.6704365884371826,
+      "dice_sin_hueso_no_etiquetado": 0.5519304055746347,
+      "dice_min": 0.1483050847457627
+    },
+    "gamma 2.0": {
+      "dice": 0.4220557061746989,
+      "precision": 0.6849583377917858,
+      "recall": 0.3487127413833522,
+      "dice_optimo": 0.6704365884371826,
+      "dice_sin_hueso_no_etiquetado": 0.49143351209136527,
+      "dice_min": 0.02471169686985173
+    },
+    "CLAHE": {
+      "dice": 0.22336010336321543,
+      "precision": 0.13279220530031785,
+      "recall": 0.905373696334335,
+      "dice_optimo": 0.5950824273057281,
+      "dice_sin_hueso_no_etiquetado": 0.22692782270102316,
+      "dice_min": 0.09137089766726823
+    },
+    "CLAHE + gamma 1.5": {
+      "dice": 0.2882782181401771,
+      "precision": 0.20099162656724615,
+      "recall": 0.8804648590348845,
+      "dice_optimo": 0.6162854219464137,
+      "dice_sin_hueso_no_etiquetado": 0.26615778231246745,
+      "dice_min": 0.09626421604873067
+    },
+    "ecualización global": {
+      "dice": 0.23026263026166585,
+      "precision": 0.13519061873668722,
+      "recall": 0.9519121061874495,
+      "dice_optimo": 0.6704365884371826,
+      "dice_sin_hueso_no_etiquetado": 0.23762656816687902,
+      "dice_min": 0.09588272427579435
+    }
+  },
+  "mejor_otsu": "gamma 1.5 (elegido)",
+  "mejor_optimo": "ventaneo = gamma 1.5 (elegido) = gamma 2.0 = ecualización global"
+}
