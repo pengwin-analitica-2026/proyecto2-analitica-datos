@@ -43,6 +43,7 @@ class EnsembleTTA(nn.Module):
         self.models = nn.ModuleList(models)
         self.tta = tta
         self.instance_mode = models[0].instance_mode
+        self.in_channels = getattr(models[0], "in_channels", 1)
         self.two_pass = False
 
     def forward(self, x):

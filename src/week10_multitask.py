@@ -69,7 +69,8 @@ class SegmentationHead(nn.Module):
     """Decoder común con salida semántica y salida de instancia."""
 
     def __init__(self, in_channels: int, semantic_classes: int = 4,
-                 instance_classes: int = 31, instance_mode: str = "ids"):
+                 instance_classes: int = 31, instance_mode: str = "ids",
+                 deep_supervision: bool = False):
         super().__init__()
         if instance_mode not in INSTANCE_MODES:
             raise ValueError(f"instance_mode debe ser uno de {sorted(INSTANCE_MODES)}")
@@ -96,35 +97,63 @@ class SegmentationHead(nn.Module):
         self.boundary = nn.Conv2d(c3, 1, 1)
         self.centers = nn.Conv2d(c3, 3, 1)
         self.offsets = nn.Conv2d(c3, 2, 1)
+        # Supervisión profunda (E5): salidas auxiliares en las tres primeras etapas
+        # del decodificador (/8, /4, /2). Solo existen y se calculan si se pide.
+        self.deep_supervision = deep_supervision
+        if deep_supervision:
+            stage_channels = (c1, c2, c3)
+            self.aux_semantic = nn.ModuleList(
+                [nn.Conv2d(c, semantic_classes, 1) for c in stage_channels])
+            self.aux_instance = nn.ModuleList(
+                [nn.Conv2d(c, instance_classes, 1) for c in stage_channels])
 
-    def forward(self, features: Tensor, skips: list[Tensor] | None = None
-                ) -> tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    def forward(self, features: Tensor, skips: list[Tensor] | None = None,
+                return_aux: bool = False):
         decoded = features
+        aux_semantic, aux_instance = [], []
         for index, block in enumerate(self.decoder):
             decoded = block(decoded)
             if skips is not None and index < 3:
                 decoded = decoded + self.skip_projections[index](skips[-1 - index])
-        return (self.semantic(decoded), self.instance(decoded), self.boundary(decoded),
-                self.centers(decoded), torch.tanh(self.offsets(decoded)))
+            if return_aux and self.deep_supervision and index < 3:
+                aux_semantic.append(self.aux_semantic[index](decoded))
+                aux_instance.append(self.aux_instance[index](decoded))
+        outputs = (self.semantic(decoded), self.instance(decoded), self.boundary(decoded),
+                   self.centers(decoded), torch.tanh(self.offsets(decoded)))
+        if return_aux:
+            return outputs, aux_semantic, aux_instance
+        return outputs
 
 
 class PengwinMultiTaskModel(nn.Module):
     """Backbone+CBAM compartido y tres cabezas requeridas por el proyecto."""
 
-    def __init__(self, base_channels: int = 8, instance_mode: str = "ids", in_channels: int = 1):
+    def __init__(self, base_channels: int = 8, instance_mode: str = "ids", in_channels: int = 1,
+                 use_cbam: bool = True, cbam_stages: int = 1, learnable_gamma: bool = False,
+                 deep_supervision: bool = False):
         super().__init__()
         self.in_channels = in_channels
-        self.backbone = FundidoraBackbone(in_channels=in_channels, base_channels=base_channels)
+        self.deep_supervision = deep_supervision
+        self.backbone = FundidoraBackbone(in_channels=in_channels, base_channels=base_channels,
+                                          use_cbam=use_cbam, cbam_stages=cbam_stages,
+                                          learnable_gamma=learnable_gamma)
         channels = self.backbone.out_channels
         self.instance_mode = instance_mode
         self.classification_head = ClassificationHead(channels)
         self.detection_head = GridDetectionHead(channels)
-        self.segmentation_head = SegmentationHead(channels, instance_mode=instance_mode)
+        self.segmentation_head = SegmentationHead(channels, instance_mode=instance_mode,
+                                                  deep_supervision=deep_supervision)
 
     def forward(self, x: Tensor) -> dict[str, Tensor]:
         features, skips = self.backbone.forward_with_skips(x)
-        semantic, instance, boundary, centers, offsets = self.segmentation_head(features, skips)
-        return {
+        use_aux = self.deep_supervision and self.training
+        if use_aux:
+            (semantic, instance, boundary, centers, offsets), aux_s, aux_i = \
+                self.segmentation_head(features, skips, return_aux=True)
+        else:
+            semantic, instance, boundary, centers, offsets = self.segmentation_head(features, skips)
+        extra = {"aux_semantic": aux_s, "aux_instance": aux_i} if use_aux else {}
+        return {**extra,
             "classification": self.classification_head(features),
             "detection": self.detection_head(features),
             "semantic": semantic,
@@ -223,6 +252,9 @@ class MultiTaskLossWeights:
     instance_dice: float = 1.0
     fracture_weight: float = 0.0  # >0 activa el peso por distancia a la fractura
     secondary_weight: float = 1.0  # peso CE de las clases 'secundario' (modo primary)
+    focal_gamma: float = 0.0       # >0: CE de instancia focal (E4)
+    tversky_beta: float = 0.0      # >0: pérdida de instancia Tversky con peso beta a los falsos negativos (E4)
+    deep_supervision: float = 0.0  # peso de las salidas auxiliares del decodificador (E5)
 
 
 def multiclass_foreground_dice_loss(logits: Tensor, target: Tensor) -> Tensor:
@@ -278,7 +310,7 @@ def fragment_geometry_targets(labels: Tensor) -> tuple[Tensor, Tensor, Tensor]:
     return centers, offsets, valid
 
 
-def instance_dice_loss(logits: Tensor, labels: Tensor) -> Tensor:
+def instance_dice_loss(logits: Tensor, labels: Tensor, tversky_beta: float = 0.0) -> Tensor:
     """Dice medio por ID de fragmento presente, excluyendo fondo.
 
     A diferencia de CE, cada fragmento visible contribuye por igual, incluso
@@ -293,9 +325,18 @@ def instance_dice_loss(logits: Tensor, labels: Tensor) -> Tensor:
             continue
         predicted = probabilities[:, fragment_id]
         truth_float = truth.float()
+        present = truth.sum(dim=(-2, -1)) > 0
+        if tversky_beta > 0:
+            # Tversky: alfa = 1 - beta pesa los falsos positivos y beta los falsos
+            # negativos; con beta > 0.5 se castiga más omitir fragmento pequeño.
+            tp = (predicted * truth_float).sum(dim=(-2, -1))
+            fp = (predicted * (1 - truth_float)).sum(dim=(-2, -1))
+            fn = ((1 - predicted) * truth_float).sum(dim=(-2, -1))
+            score = (tp + 1.0) / (tp + (1 - tversky_beta) * fp + tversky_beta * fn + 1.0)
+            losses.append(1 - score[present].mean())
+            continue
         numerator = 2 * (predicted * truth_float).sum(dim=(-2, -1)) + 1.0
         denominator = predicted.sum(dim=(-2, -1)) + truth_float.sum(dim=(-2, -1)) + 1.0
-        present = truth.sum(dim=(-2, -1)) > 0
         losses.append(1 - (numerator[present] / denominator[present]).mean())
     return torch.stack(losses).mean() if losses else logits.sum() * 0.0
 
@@ -342,8 +383,13 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
         instance_weights[[2, 4, 6]] = weights.secondary_weight
     instance = F.cross_entropy(outputs["instance"], instance_target,
                                weight=instance_weights, reduction="none")
+    if weights.focal_gamma > 0:
+        # Focal (Lin et al.): (1 - p_t)^gamma baja el peso de los píxeles ya fáciles.
+        plain = F.cross_entropy(outputs["instance"], instance_target, reduction="none")
+        instance = instance * (1 - torch.exp(-plain)).clamp(min=0).pow(weights.focal_gamma)
     instance = (instance * fracture).sum() / fracture.sum()
-    instance_dice = instance_dice_loss(outputs["instance"], instance_target)
+    instance_dice = instance_dice_loss(outputs["instance"], instance_target,
+                                       weights.tversky_beta)
     boundary_target = fragment_boundary_target(labels)
     boundary_probability = torch.sigmoid(outputs["boundary"].squeeze(1))
     boundary_bce = F.binary_cross_entropy_with_logits(
@@ -364,6 +410,17 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
     total = (total + weights.semantic_dice * semantic_dice + weights.boundary * boundary +
              weights.centers * centers + weights.offsets * offsets)
     total = total + weights.instance_dice * instance_dice
+    deep = None
+    if weights.deep_supervision > 0 and outputs.get("aux_semantic"):
+        deep = 0.0
+        size = labels.shape[-2:]
+        for aux_s, aux_i in zip(outputs["aux_semantic"], outputs["aux_instance"]):
+            aux_s = F.interpolate(aux_s, size=size, mode="bilinear", align_corners=False)
+            aux_i = F.interpolate(aux_i, size=size, mode="bilinear", align_corners=False)
+            deep = deep + F.cross_entropy(aux_s, semantic_target, weight=semantic_weights)
+            deep = deep + F.cross_entropy(aux_i, instance_target, weight=instance_weights)
+        deep = deep / len(outputs["aux_semantic"])
+        total = total + weights.deep_supervision * deep
     parts = {
         "total": float(total.detach()),
         "detection": float(det.detach()),
@@ -375,6 +432,7 @@ def multitask_loss(outputs: dict[str, Tensor], detection_target: Tensor,
         "centers": float(centers.detach()),
         "offsets": float(offsets.detach()),
         "instance_dice": float(instance_dice.detach()),
+        "deep_supervision": float(deep.detach()) if deep is not None else 0.0,
         "det_objectness": det_parts["objectness"],
         "det_box": det_parts["box"],
         "det_classification": det_parts["classification"],
