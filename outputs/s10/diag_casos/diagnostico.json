@@ -1,0 +1,378 @@
+{
+  "012": {
+    "cortes": 265,
+    "cortes_con_hueso": 207,
+    "intensidad_media_u8": 14.7,
+    "intensidad_p99_u8": 83.0,
+    "fraccion_pixeles_hueso_real": 0.0141,
+    "dice_semantico": {
+      "sacro": 0.756,
+      "coxal_izq": 0.763,
+      "coxal_der": 0.832
+    },
+    "confusion_real_x_pred (filas real, columnas pred)": {
+      "fondo": {
+        "fondo": 38510441,
+        "sacro": 3601,
+        "coxal_izq": 4520,
+        "coxal_der": 4381
+      },
+      "sacro": {
+        "fondo": 43454,
+        "sacro": 93933,
+        "coxal_izq": 9164,
+        "coxal_der": 2458
+      },
+      "coxal_izq": {
+        "fondo": 7300,
+        "sacro": 2,
+        "coxal_izq": 133951,
+        "coxal_der": 62199
+      },
+      "coxal_der": {
+        "fondo": 6561,
+        "sacro": 1985,
+        "coxal_izq": 0,
+        "coxal_der": 191890
+      }
+    },
+    "hueso_real_predicho_fondo": 0.104,
+    "prediccion_sobre_fondo_real": 0.025,
+    "hueso_asignado_a_otra_region": 0.137,
+    "dice_instancias": 0.692,
+    "dice_primario": 0.729,
+    "fragmentos_predichos_sobrantes": 558,
+    "peores_cortes": [
+      [
+        34,
+        0.0,
+        1,
+        0
+      ],
+      [
+        233,
+        0.02531645569620253,
+        2,
+        0
+      ],
+      [
+        236,
+        0.03664921465968586,
+        2,
+        0
+      ],
+      [
+        234,
+        0.04918032786885246,
+        2,
+        0
+      ],
+      [
+        235,
+        0.07205240174672489,
+        2,
+        0
+      ],
+      [
+        215,
+        0.17956685472965483,
+        4,
+        3
+      ],
+      [
+        232,
+        0.18567251461988304,
+        2,
+        0
+      ],
+      [
+        212,
+        0.2053712644684208,
+        4,
+        3
+      ]
+    ]
+  },
+  "039": {
+    "cortes": 392,
+    "cortes_con_hueso": 265,
+    "intensidad_media_u8": 32.7,
+    "intensidad_p99_u8": 108.0,
+    "fraccion_pixeles_hueso_real": 0.0347,
+    "dice_semantico": {
+      "sacro": 0.92,
+      "coxal_izq": 0.836,
+      "coxal_der": 0.852
+    },
+    "confusion_real_x_pred (filas real, columnas pred)": {
+      "fondo": {
+        "fondo": 55690494,
+        "sacro": 32855,
+        "coxal_izq": 41638,
+        "coxal_der": 30879
+      },
+      "sacro": {
+        "fondo": 42782,
+        "sacro": 474425,
+        "coxal_izq": 3111,
+        "coxal_der": 1295
+      },
+      "coxal_izq": {
+        "fondo": 47631,
+        "sacro": 230,
+        "coxal_izq": 637800,
+        "coxal_der": 58202
+      },
+      "coxal_der": {
+        "fondo": 23568,
+        "sacro": 1687,
+        "coxal_izq": 99140,
+        "coxal_der": 617015
+      }
+    },
+    "hueso_real_predicho_fondo": 0.057,
+    "prediccion_sobre_fondo_real": 0.053,
+    "hueso_asignado_a_otra_region": 0.082,
+    "dice_instancias": 0.71,
+    "dice_primario": 0.803,
+    "fragmentos_predichos_sobrantes": 1236,
+    "peores_cortes": [
+      [
+        98,
+        0.30210166527610643,
+        5,
+        2
+      ],
+      [
+        99,
+        0.3180497968141766,
+        5,
+        3
+      ],
+      [
+        100,
+        0.3347633435872618,
+        5,
+        3
+      ],
+      [
+        171,
+        0.3680891505765258,
+        5,
+        9
+      ],
+      [
+        170,
+        0.36861724916553046,
+        5,
+        10
+      ],
+      [
+        139,
+        0.37096987316728675,
+        4,
+        11
+      ],
+      [
+        162,
+        0.3744837612797125,
+        5,
+        9
+      ],
+      [
+        169,
+        0.3940904448572494,
+        5,
+        11
+      ]
+    ]
+  },
+  "087": {
+    "cortes": 312,
+    "cortes_con_hueso": 265,
+    "intensidad_media_u8": 25.4,
+    "intensidad_p99_u8": 137.0,
+    "fraccion_pixeles_hueso_real": 0.0397,
+    "dice_semantico": {
+      "sacro": 0.941,
+      "coxal_izq": 0.978,
+      "coxal_der": 0.983
+    },
+    "confusion_real_x_pred (filas real, columnas pred)": {
+      "fondo": {
+        "fondo": 44101053,
+        "sacro": 31553,
+        "coxal_izq": 27364,
+        "coxal_der": 19103
+      },
+      "sacro": {
+        "fondo": 16337,
+        "sacro": 386658,
+        "coxal_izq": 225,
+        "coxal_der": 20
+      },
+      "coxal_izq": {
+        "fondo": 3875,
+        "sacro": 266,
+        "coxal_izq": 695329,
+        "coxal_der": 226
+      },
+      "coxal_der": {
+        "fondo": 4971,
+        "sacro": 51,
+        "coxal_izq": 47,
+        "coxal_der": 719194
+      }
+    },
+    "hueso_real_predicho_fondo": 0.014,
+    "prediccion_sobre_fondo_real": 0.041,
+    "hueso_asignado_a_otra_region": 0.0,
+    "dice_instancias": 0.768,
+    "dice_primario": 0.857,
+    "fragmentos_predichos_sobrantes": 584,
+    "peores_cortes": [
+      [
+        291,
+        0.0,
+        2,
+        3
+      ],
+      [
+        292,
+        0.0,
+        1,
+        2
+      ],
+      [
+        290,
+        0.4491525423728814,
+        2,
+        2
+      ],
+      [
+        133,
+        0.45598192585642494,
+        5,
+        1
+      ],
+      [
+        134,
+        0.4571271534968018,
+        5,
+        1
+      ],
+      [
+        132,
+        0.46045375299921554,
+        5,
+        1
+      ],
+      [
+        137,
+        0.4608004689431612,
+        5,
+        3
+      ],
+      [
+        136,
+        0.46716145690182265,
+        5,
+        0
+      ]
+    ]
+  },
+  "078": {
+    "cortes": 388,
+    "cortes_con_hueso": 271,
+    "intensidad_media_u8": 22.6,
+    "intensidad_p99_u8": 119.0,
+    "fraccion_pixeles_hueso_real": 0.0333,
+    "dice_semantico": {
+      "sacro": 0.964,
+      "coxal_izq": 0.977,
+      "coxal_der": 0.981
+    },
+    "confusion_real_x_pred (filas real, columnas pred)": {
+      "fondo": {
+        "fondo": 55228507,
+        "sacro": 27304,
+        "coxal_izq": 27168,
+        "coxal_der": 22186
+      },
+      "sacro": {
+        "fondo": 4691,
+        "sacro": 433398,
+        "coxal_izq": 3,
+        "coxal_der": 10
+      },
+      "coxal_izq": {
+        "fondo": 6859,
+        "sacro": 123,
+        "coxal_izq": 732096,
+        "coxal_der": 0
+      },
+      "coxal_der": {
+        "fondo": 5988,
+        "sacro": 1,
+        "coxal_izq": 0,
+        "coxal_der": 724594
+      }
+    },
+    "hueso_real_predicho_fondo": 0.009,
+    "prediccion_sobre_fondo_real": 0.039,
+    "hueso_asignado_a_otra_region": 0.0,
+    "dice_instancias": 0.789,
+    "dice_primario": 0.888,
+    "fragmentos_predichos_sobrantes": 461,
+    "peores_cortes": [
+      [
+        353,
+        0.33858267716535434,
+        2,
+        0
+      ],
+      [
+        342,
+        0.3569580962234868,
+        2,
+        2
+      ],
+      [
+        341,
+        0.3683431952662722,
+        2,
+        3
+      ],
+      [
+        343,
+        0.3696109358569926,
+        2,
+        2
+      ],
+      [
+        344,
+        0.3746616134271792,
+        2,
+        2
+      ],
+      [
+        345,
+        0.38953811908736785,
+        2,
+        2
+      ],
+      [
+        340,
+        0.3943320494122633,
+        2,
+        0
+      ],
+      [
+        346,
+        0.4009190120620333,
+        2,
+        2
+      ]
+    ]
+  }
+}

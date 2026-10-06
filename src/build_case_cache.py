@@ -175,10 +175,18 @@ def write_index(rows: list[dict], out_dir: Path) -> Path:
     return path
 
 
-def load_case_cache(cache_dir: str | Path, case_id: str) -> dict:
-    """Lee el caché de un caso. ``images`` sigue en uint8; usar ``from_uint8``."""
+def load_case_cache(cache_dir: str | Path, case_id: str, canonical: bool = False) -> dict:
+    """Lee el caché de un caso. ``images`` sigue en uint8; usar ``from_uint8``.
+
+    ``canonical=True`` deja el caso en la orientación común (ver ``orientacion.py``).
+    """
     with np.load(Path(cache_dir) / f"{str(case_id).zfill(3)}.npz") as data:
-        return {key: data[key] for key in data.files}
+        case = {key: data[key] for key in data.files}
+    if canonical:
+        from orientacion import to_canonical
+        case["images"] = to_canonical(case["images"], case_id)
+        case["labels"] = to_canonical(case["labels"], case_id)
+    return case
 
 
 def main() -> None:

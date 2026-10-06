@@ -41,6 +41,8 @@ import sys
 import time
 from pathlib import Path
 
+import math
+
 import numpy as np
 import torch
 
@@ -62,7 +64,7 @@ def read_split(cache_root: Path) -> dict[str, list[str]]:
 
 
 def load_slices(cache_dir: Path, case_ids: list[str], margin: int, stride: int = 1,
-                keep_negatives: bool = True) -> dict[str, np.ndarray]:
+                keep_negatives: bool = True, canonical: bool = False) -> dict[str, np.ndarray]:
     """Carga los cortes de interés de cada caso: extensión ósea ± ``margin``.
 
     Devuelve arrays uint8 concatenados y un vector ``has_bone`` para muestrear.
@@ -70,7 +72,7 @@ def load_slices(cache_dir: Path, case_ids: list[str], margin: int, stride: int =
     images, labels, bone, case_of, lows, highs, secondary = [], [], [], [], [], [], []
     total = 0
     for case_id in case_ids:
-        data = load_case_cache(cache_dir, case_id)
+        data = load_case_cache(cache_dir, case_id, canonical=canonical)
         has_bone = (data["labels"] != 0).any(axis=(1, 2))
         where = np.flatnonzero(has_bone)
         if len(where) == 0:
@@ -98,6 +100,60 @@ def to_batch(images_u8: np.ndarray, labels_u8: np.ndarray) -> tuple[torch.Tensor
         x = x.unsqueeze(1)
     y = torch.from_numpy(labels_u8.astype(np.int64))
     return x, y
+
+
+def random_affine(x: torch.Tensor, y: torch.Tensor, strength: float = 1.0,
+                  probability: float = 0.8, wide_rotation: float = 0.0,
+                  rotation_degrees: float = 12.0) -> tuple[torch.Tensor, torch.Tensor]:
+    """Aumento geométrico por muestra: escala, proporción, rotación y traslación.
+
+    Los volúmenes de PENGWIN llegan con campos de visión, espaciados y proporciones distintas
+    (36 de 100 casos no son 512x512), y el caché los estira a un cuadrado. Con 70 pacientes de
+    entrenamiento la red memoriza esa geometría: la pérdida de entrenamiento sigue bajando
+    mientras la validación se estanca. Este aumento expone a la red a esa variación.
+
+    ``strength`` = 1: escala 0.80-1.25, proporción 0.85-1.18, rotación +-``rotation_degrees``
+    (12 por defecto), traslación +-8 % del lado. ``wide_rotation`` es la fracción de muestras con rotación libre (+-180 grados). La imagen se remuestrea bilineal y la etiqueta con vecino más cercano, así
+    los IDs de fragmento no se mezclan. Las cajas de detección se derivan después de la etiqueta.
+    """
+    n = x.shape[0]
+    scale = torch.exp((torch.rand(n) * 2 - 1) * 0.22 * strength)
+    aspect = torch.exp((torch.rand(n) * 2 - 1) * 0.16 * strength)
+    angle = (torch.rand(n) * 2 - 1) * math.radians(rotation_degrees) * strength
+    shift = (torch.rand(n, 2) * 2 - 1) * 0.16 * strength
+    if wide_rotation > 0:
+        # Pacientes girados en el escáner (decúbito lateral, prono): cualquier ángulo. Una rotación
+        # conserva la lateralidad, así que los IDs de coxal izquierdo y derecho no cambian.
+        wide = torch.rand(n) < wide_rotation
+        angle[wide] = (torch.rand(int(wide.sum())) * 2 - 1) * math.pi
+    keep = torch.rand(n) >= probability            # muestras que quedan sin tocar
+    scale[keep], aspect[keep], angle[keep], shift[keep] = 1.0, 1.0, 0.0, 0.0
+    sx, sy = scale * aspect, scale / aspect
+    cos, sin = torch.cos(angle), torch.sin(angle)
+    theta = torch.zeros(n, 2, 3)
+    theta[:, 0, 0], theta[:, 0, 1], theta[:, 0, 2] = cos / sx, -sin / sy, shift[:, 0]
+    theta[:, 1, 0], theta[:, 1, 1], theta[:, 1, 2] = sin / sx, cos / sy, shift[:, 1]
+    grid = torch.nn.functional.affine_grid(theta, list(x.shape), align_corners=False)
+    x_out = torch.nn.functional.grid_sample(x, grid, mode="bilinear", padding_mode="zeros", align_corners=False)
+    y_out = torch.nn.functional.grid_sample(y[:, None].float(), grid, mode="nearest", padding_mode="zeros",
+                                            align_corners=False)[:, 0].long()
+    return x_out, y_out
+
+
+def random_lowres(x: torch.Tensor, probability: float, max_factor: float = 2.6) -> torch.Tensor:
+    """Simula cortes de baja resolución: reduce por un factor distinto en cada eje y vuelve a ampliar.
+
+    Algunos volúmenes vienen con pocas filas o espaciado grueso y el caché los amplía hasta 2.5
+    veces; se ven borrosos. Es el aumento de "baja resolución simulada" de nnU-Net.
+    """
+    height, width = x.shape[-2:]
+    for i in torch.nonzero(torch.rand(x.shape[0]) < probability).flatten().tolist():
+        fy = 1.0 + torch.rand(1).item() * (max_factor - 1.0)
+        fx = 1.0 + torch.rand(1).item() * (max_factor - 1.0) * 0.5
+        small = torch.nn.functional.interpolate(x[i:i + 1], size=(max(int(height / fy), 8), max(int(width / fx), 8)),
+                                                mode="bilinear", align_corners=False)
+        x[i:i + 1] = torch.nn.functional.interpolate(small, size=(height, width), mode="bilinear", align_corners=False)
+    return x
 
 
 def gather_context(data: dict, idx: np.ndarray, context: int) -> np.ndarray:
@@ -180,6 +236,18 @@ def main() -> None:
     parser.add_argument("--deep-supervision-weight", type=float, default=0.0)
     parser.add_argument("--ema", type=float, default=0.0, help="Decaimiento del promedio móvil (0 = apagado).")
     parser.add_argument("--secondary-oversample", type=float, default=1.0)
+    parser.add_argument("--canonical", action="store_true",
+                        help="Lleva los 34 casos guardados en LPI a la orientación común (orientacion.py).")
+    parser.add_argument("--aug-geo", type=float, default=0.0,
+                        help="Fuerza del aumento geométrico (escala, proporción, rotación, traslación); 0 = apagado.")
+    parser.add_argument("--aug-rot-deg", type=float, default=12.0,
+                        help="Amplitud de la rotación del aumento geométrico, en grados (con --aug-geo).")
+    parser.add_argument("--aug-rot-wide", type=float, default=0.0,
+                        help="Fracción de muestras con rotación libre de +-180 grados (requiere --aug-geo).")
+    parser.add_argument("--aug-lowres", type=float, default=0.0,
+                        help="Probabilidad de simular baja resolución por muestra; 0 = apagado.")
+    parser.add_argument("--aug-gamma", type=float, default=0.0,
+                        help="Amplitud log del aumento de gamma por muestra; 0 = apagado.")
     parser.add_argument("--backbone-init", default=None)
     args = parser.parse_args()
 
@@ -190,8 +258,8 @@ def main() -> None:
     cache_dir = root / cache_dir_name(args.size, args.mode)
     splits = read_split(root)
     print(f"Casos: train={len(splits['train'])} val={len(splits['val'])} | {cache_dir}", flush=True)
-    train = load_slices(cache_dir, splits["train"], args.margin)
-    val = load_slices(cache_dir, splits["val"], args.margin)
+    train = load_slices(cache_dir, splits["train"], args.margin, canonical=args.canonical)
+    val = load_slices(cache_dir, splits["val"], args.margin, canonical=args.canonical)
     # Un corte de cada val_stride por caso; los vecinos del contexto salen de todos los cortes.
     val_pick = np.concatenate([np.flatnonzero(val["case_lo"] == lo)[::args.val_stride]
                                for lo in np.unique(val["case_lo"])])
@@ -272,8 +340,8 @@ def main() -> None:
         return {"model": state, "base_channels": args.base_channels, "instance_mode": args.instance_mode,
                 "in_channels": in_channels, "context": args.context,
                 "deep_supervision": args.deep_supervision_weight > 0, "ema": args.ema,
-                "use_cbam": use_cbam, "cbam_stages": cbam_stages,
-                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "cosine": args.cosine,
+                "use_cbam": use_cbam, "cbam_stages": cbam_stages, "canonical": args.canonical,
+                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "cosine": args.cosine,
                 "input_size": args.size, "mode": args.mode, "seed": args.seed,
                 "fracture_weight": args.fracture_weight, "secondary_weight": args.secondary_weight,
                 "best_validation": metrics, "args": vars(args)}
@@ -296,6 +364,14 @@ def main() -> None:
                 gain = 1.0 + 0.1 * (torch.rand(x.shape[0], 1, 1, 1) - 0.5)
                 bias = 0.05 * (torch.rand(x.shape[0], 1, 1, 1) - 0.5)
                 x = (x * gain + bias).clamp(0.0, 1.0)
+            if args.aug_geo > 0:
+                x, y = random_affine(x, y, strength=args.aug_geo, wide_rotation=args.aug_rot_wide,
+                                     rotation_degrees=args.aug_rot_deg)
+            if args.aug_lowres > 0:
+                x = random_lowres(x, args.aug_lowres)
+            if args.aug_gamma > 0:
+                gamma = torch.exp((torch.rand(x.shape[0], 1, 1, 1) * 2 - 1) * args.aug_gamma)
+                x = x.clamp(0.0, 1.0) ** gamma
             if args.fracture_weight > 0:
                 w = fracture_distance_weight(y, args.fracture_weight)
             target = labels_to_grid(y)

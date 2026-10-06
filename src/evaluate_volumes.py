@@ -33,6 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_case_cache import from_uint8, load_case_cache
@@ -264,9 +265,10 @@ def load_model(checkpoints: list[str], device: torch.device, tta: bool) -> tuple
     """Carga checkpoints de la Semana 10 anterior (``week10_multitask``)."""
     from evaluate_week10 import EnsembleTTA
     from week10_multitask import PengwinMultiTaskModel
-    models, two_pass = [], False
+    models, two_pass, canonical = [], False, []
     for path in checkpoints:
         checkpoint = torch.load(path, map_location="cpu")
+        canonical.append(bool(checkpoint.get("canonical", False)))
         model = PengwinMultiTaskModel(base_channels=int(checkpoint["base_channels"]),
                                       instance_mode=str(checkpoint.get("instance_mode", "ids")),
                                       in_channels=int(checkpoint.get("in_channels", 1)),
@@ -277,9 +279,43 @@ def load_model(checkpoints: list[str], device: torch.device, tta: bool) -> tuple
         model.load_state_dict(checkpoint["model"])
         models.append(model.to(device).eval())
         two_pass = two_pass or bool(checkpoint.get("two_pass", False))
-    if len(models) > 1 or tta:
-        return EnsembleTTA(models, tta).to(device), False
-    return models[0], two_pass
+    if len(set(canonical)) > 1:
+        raise ValueError("No se pueden mezclar checkpoints entrenados con y sin orientación canónica")
+    model = EnsembleTTA(models, tta).to(device) if len(models) > 1 or tta else models[0]
+    model.canonical = canonical[0]     # el evaluador orienta los casos igual que en el entrenamiento
+    return model, (False if len(models) > 1 or tta else two_pass)
+
+
+def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str) -> tuple[np.ndarray, np.ndarray]:
+    """Deforma un volumen de validación para medir robustez sin tocar test.
+
+    ``spec`` combina claves separadas por coma: ``rot=60`` (grados), ``scale=0.7``,
+    ``aspect=1.6`` (estira el eje vertical y encoge el horizontal), ``shift=0.15`` (fracción del
+    lado, hacia la derecha) y ``lowres=2.5`` (reduce filas por ese factor y vuelve a ampliar).
+    Imagen bilineal, etiqueta con vecino más cercano.
+    """
+    import math
+    opts = {k: float(v) for k, v in (item.split("=") for item in spec.split(",") if item)}
+    angle = math.radians(opts.get("rot", 0.0))
+    scale, aspect, shift = opts.get("scale", 1.0), opts.get("aspect", 1.0), opts.get("shift", 0.0)
+    sx, sy = scale / aspect, scale * aspect
+    theta = torch.tensor([[math.cos(angle) / sx, -math.sin(angle) / sy, -2 * shift],
+                          [math.sin(angle) / sx, math.cos(angle) / sy, 0.0]], dtype=torch.float32)
+    out_i, out_l = [], []
+    for start in range(0, len(images_u8), 64):
+        x = torch.from_numpy(images_u8[start:start + 64].astype(np.float32))[:, None]
+        y = torch.from_numpy(labels[start:start + 64].astype(np.float32))[:, None]
+        grid = F.affine_grid(theta[None].expand(len(x), 2, 3), list(x.shape), align_corners=False)
+        x = F.grid_sample(x, grid, mode="bilinear", padding_mode="zeros", align_corners=False)
+        y = F.grid_sample(y, grid, mode="nearest", padding_mode="zeros", align_corners=False)
+        if opts.get("lowres", 1.0) > 1.0:
+            h, w = x.shape[-2:]
+            x = F.interpolate(F.interpolate(x, size=(int(h / opts["lowres"]), int(w / (1 + (opts["lowres"] - 1) / 3))),
+                                            mode="bilinear", align_corners=False),
+                              size=(h, w), mode="bilinear", align_corners=False)
+        out_i.append(x[:, 0].round().clamp(0, 255).numpy().astype(np.uint8))
+        out_l.append(y[:, 0].numpy().astype(np.uint8))
+    return np.concatenate(out_i), np.concatenate(out_l)
 
 
 def cases_of_split(cache_dir: Path, split: str) -> list[str]:
@@ -315,6 +351,8 @@ def main() -> None:
     parser.add_argument("--confidence", type=float, default=0.10)
     parser.add_argument("--output", default=None)
     parser.add_argument("--save-records", default=None, help="Guarda los registros por corte (pickle).")
+    parser.add_argument("--stress", default=None,
+                        help="Deformación de robustez sobre validación, p. ej. rot=60 o aspect=1.6,lowres=2.5.")
     parser.add_argument("--save-predictions", default=None,
                         help="Carpeta donde guardar semántica e instancias predichas por caso.")
     args = parser.parse_args()
@@ -331,7 +369,11 @@ def main() -> None:
     records: list[SliceRecord] = []
     started = time.time()
     for number, case_id in enumerate(case_ids, 1):
-        case = load_case_cache(cache_dir, case_id)
+        case = load_case_cache(cache_dir, case_id, canonical=getattr(model, "canonical", False))
+        if args.stress:
+            if args.split == "test":
+                raise SystemExit("La prueba de estrés es solo para validación.")
+            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress)
         case_records, predictions = evaluate_case(
             model, case_id, case["images"], case["labels"], device, args.batch_size,
             args.confidence, two_pass, keep_predictions=bool(args.save_predictions))
@@ -345,7 +387,7 @@ def main() -> None:
 
     seconds = time.time() - started
     result = {"checkpoint": args.checkpoint, "cache_dir": str(cache_dir), "split": args.split,
-              "cases": case_ids, "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
+              "cases": case_ids, "stress": args.stress, "canonical": bool(getattr(model, "canonical", False)), "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
               "device": str(device), "seconds": round(seconds, 1),
               "ms_per_slice": round(1000 * seconds / max(len(records), 1), 1),
               "subsets": {name: summarize(records, name) for name in SUBSETS},

@@ -92,7 +92,7 @@ def main() -> None:
 
     cases = []
     for number, case_id in enumerate(case_ids, 1):
-        case = load_case_cache(cache_dir, case_id)
+        case = load_case_cache(cache_dir, case_id, canonical=getattr(model, "canonical", False))
         started = time.time()
         _, pred = evaluate_case(model, case_id, case["images"], case["labels"], device,
                                 args.batch_size, two_pass=two_pass, keep_predictions=True)
