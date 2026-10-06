@@ -13,3 +13,5 @@ scipy<1.15
 scikit-image<0.25
 plotly
 torch
+streamlit
+pillow

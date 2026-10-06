@@ -345,3 +345,114 @@ instancia, entrenamiento) con prioridades y un orden de ejecución por fases.
 - Hasta esta entrada no se ha escrito ni ejecutado código nuevo del modelo.
 
 ---
+
+## 12. Plan de la Semana 11: visualizadores y dashboard
+
+**Prompt exacto:**
+
+> Necesito hacer el visualizador para este proyecto. Miremos a ver si ya tenemos todo para hacerlo, sí, al menos con algunos modelos que mejor han tenido resultado, y damos el visualizador, ¿sí? Como él lo pone ahí             O sea, deberíamos poder terminar la semana 11, sí. Terminar la semana 11. Entonces, armemos un plan y revisemos si ya tenemos lo necesario, al menos, para poder hacer esta semana 11, que es el visualizador.    hagamos el plan
+
+**Qué propuso la IA:** un inventario del repo frente a la sección 3.4 del enunciado y
+`docs/plan_semana11.md`. Conclusión: el lado del modelo alcanza para los visualizadores 2 y
+3 (checkpoint c2, inferencia por volumen, NMS, post-proceso 3D, distancias en mm), pero no
+existe nada del lado de la aplicación. Propone separar exportación (lenta, una vez por
+caso) de dashboard (solo lee), Streamlit, selector de modelo con c2, c1 y B1, y desarrollar
+con casos de validación dejando test para después de congelar el modelo.
+
+**Qué se aceptó:** Streamlit (página web propia como segunda fase opcional), demo en el Mac
+con túnel de Cloudflare, visualizador 1 con MIP e isosuperficie, y avance el miércoles 7 de
+octubre con entrega la semana siguiente.
+
+**Análisis crítico:**
+
+- La IA no ejecutó el modelo ni el post-proceso 3D en esta sesión: desde su entorno no
+  puede usar el `.venv` del Mac. Que el post-proceso 3D funciona sobre casos reales sale de
+  leer el código y sus pruebas, no de una corrida; por eso el bloque 0 del plan lo comprueba.
+- La primera versión del plan decía que los pesos del candidato con EMA no estaban en disco
+  y usaba c2. Era cierto al leer el repo, pero los resultados se sincronizaron minutos
+  después (`d5_ema_*`, `decisiones_semana10.md`). La versión 2 usa D5 como modelo principal.
+- La versión 1 daba por buena la distancia en mm. `decisiones_semana10.md` muestra que la
+  distancia predicha sale 0.0 mm en los 41 fragmentos secundarios de validación por el
+  relleno del post-proceso 3D. La IA lo incorporó en la versión 2 como primer bloqueo; la
+  corrección (`fill_unlabeled`) todavía no está en `src/` de este repo.
+- El visualizador 1 actual es una isosuperficie, no la MIP que nombra el enunciado. La IA
+  propone mostrar las dos; es su lectura y conviene confirmarla con el profesor.
+- Faltan en este registro las entradas de las sesiones de experimentos del 5 de octubre
+  (corridas B, C y D de la Semana 10).
+
+---
+
+## 13. Semana 11: construcción del dashboard (visualizadores 1, 2 y 3)
+
+**Prompt exacto:**
+
+> Sí, ahí ya tenemos los modelos locales, los .pth. La corrección de distancia es necesaria para esto. No, la otra sección de Claude está trabajando en eso. Empecemos con lo que podamos ir construyendo, ¿vale?
+>
+> De bueno, ahí sería bueno crear una nueva rama tipo semana 11 para esta vaina, listo para hacer esta vaina. No sé si ahora o después, porque estamos esperando los cambios de que haga la otra sesión de Claude.
+
+**Qué propuso la IA y qué se construyó:** `src/predict_volume.py` (inferencia sobre un volumen
+crudo sin ground truth), `src/demo_export.py` (exporta por caso volumen de IDs, distancias en mm,
+comparación con el ground truth, mallas y vista cruda), `src/demo_render.py` (visualizadores 2 y
+3), `src/raw_view.py` (MIP e isosuperficie del visualizador 1), `src/measure_latency.py`,
+`app/dashboard.py` (Streamlit) y 15 pruebas nuevas. Guía en `docs/semana11_dashboard.md`.
+
+**Qué se aceptó:** construir solo archivos nuevos mientras la otra sesión corrige la distancia, y
+dejar la rama de la Semana 11 para después (la crea el equipo a mano desde el commit donde llegue
+esa corrección).
+
+**Análisis crítico:**
+
+- La corrección `fill_unlabeled` no estaba en `src/`. La IA no la escribió: usó una versión
+  provisional dentro de `demo_export.py` y la dejó marcada en `meta.json` y en el dashboard.
+- La primera exportación del caso 024 daba 0.0 mm para el fragmento real a 19.0 mm. La causa no
+  era el modelo (Dice 3D 0.90) sino una fuga de 7 vóxeles: `postprocess_3d` absorbe en el principal
+  los pedazos menores a `min_voxels` y quedaban sueltos junto al fragmento. La IA lo encontró
+  contando las componentes conexas del principal y lo corrigió dejando solo la mayor. Con eso la
+  distancia predicha del fragmento es 19.0 mm, y 3.9 mm para el de 3.2 mm. Son dos fragmentos de un
+  solo caso: no es una estimación del error.
+- El modelo predice 28 fragmentos en el 024 contra 9 reales, casi todos diminutos. El dashboard
+  los oculta por debajo de un volumen mínimo ajustable (1000 mm³ por defecto). Es un filtro de
+  presentación y no mejora el modelo; la métrica sigue siendo la de la tabla de comparación.
+- La IA no corrió nada en el Mac del equipo: la ejecución y las capturas de pantalla se hicieron en
+  su propio entorno, con CPU de 2 núcleos. La latencia que se ve (185 ms por corte sin TTA) no vale
+  para el informe; hay que medirla con `src/measure_latency.py` en el Mac y en una GPU.
+- En el primer intento las pruebas de fuga de vóxeles estaban mal armadas (el bloque suelto tocaba
+  el fragmento y `postprocess_3d` lo fusionaba, que es el comportamiento esperado). Se corrigió la
+  prueba, no el código, y se comprobó que sin la limpieza la prueba sí falla.
+
+---
+
+## 14. Semana 11: despliegue (Streamlit Cloud + API en AWS) y CI/CD
+
+**Prompts exactos:**
+
+> Y si subimos el modelo AWS que yo tengo en AWS y el Streamlit lo deployamos en Streamlit Cloud
+
+> Pero vení, o sea, ¿crees que en un lambda está bien? Porque creo que hay que poner con GPU y sin GPU. No hay un mejor servicio en, en AWS para esto, no sé, SageMaker, Bedrock, no sé. O, o qué se usa normalmente en estos casos..
+
+> No, las pruebas deberían correrse. Cuando se hace un PR a main, debería correrse este pipeline. Cuando se haga el match, ya cuando estén haciendo cambios en main.
+
+**Qué propuso la IA y qué se construyó:** Hugging Face Spaces se descartó porque en cuentas gratis el
+SDK Docker y CPU Basic están como "Paid". Se separó el dashboard (Streamlit Cloud, sin torch) de la
+inferencia en vivo (`api/server.py`, FastAPI en una imagen de contenedor para AWS Lambda). Se agregó
+`deploy/build_streamlit_cloud.py`, la guía `docs/despliegue_aws_streamlit.md` y dos flujos de GitHub
+Actions: `ci.yml` (pruebas en cada pull request a main y en cada cambio de main) y `deploy-api.yml`
+(construye la imagen, la sube a ECR y actualiza la Lambda al cambiar main). Guía en
+`docs/cicd_github_actions.md`.
+
+**Qué se aceptó y qué no:** Lambda en CPU para la demo, en lugar de SageMaker. SageMaker Serverless no
+tiene GPU y los endpoints en tiempo real con GPU no se apagan solos; el modelo (2.74 M de parámetros)
+no necesita GPU para la demo. La latencia en GPU se mide con `src/measure_latency.py` en Kaggle o
+Colab, sin desplegar nada.
+
+**Análisis crítico:**
+
+- Nada de AWS ni de GitHub Actions se ha ejecutado: se probaron la API y el dashboard en el entorno de
+  la IA (con `import torch` bloqueado en el dashboard) y las 87 pruebas en un Python 3.11 limpio sobre
+  el último commit más estos archivos. Los workflows, la imagen y la Lambda quedan por probar.
+- El remoto es el repositorio de una compañera; los secretos de AWS solo los puede crear un
+  administrador y cualquier colaborador con escritura podría leerlos desde un workflow. Se documentó
+  el uso de un entorno con revisores y la alternativa de un repositorio propio.
+- Los costos de AWS no se verificaron.
+
+---
