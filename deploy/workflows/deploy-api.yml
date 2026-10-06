@@ -68,4 +68,4 @@ jobs:
       - name: Prueba de humo (/health)
         run: |
           URL=$(aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION" --query FunctionUrl --output text)
-          curl -fsS --retry 6 --retry-delay 15 --retry-all-errors --max-time 120 "${URL%/}/health"
+          curl -fsS --retry 4 --retry-delay 15 --retry-all-errors --max-time 150 "${URL%/}/health?deep=1"
