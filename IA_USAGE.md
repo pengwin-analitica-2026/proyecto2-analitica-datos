@@ -218,3 +218,130 @@ reentrenar.
   de que quedara como limitación permanente en el model card.
 
 ---
+
+# Semana 10 — planeación
+
+**Integrante:** Gustavo
+**Herramienta:** Claude (Anthropic), app de escritorio en modo Cowork. Modelos configurados
+en la sesión: `claude-sonnet-5-5` y `claude-opus-5-5`.
+**Fecha:** 4 de octubre de 2026. **Rama:** `unificado_semana09`.
+
+Las entradas 8 a 11 las redactó la IA a pedido de Gustavo, con los prompts copiados tal
+cual. El análisis crítico es un borrador: el equipo debe revisarlo y corregirlo.
+
+---
+
+## 8. Auditoría del repositorio frente al enunciado
+
+**Prompt exacto:**
+
+> entendamos el repositorio y que tiene y mira lo que tenemos que hacer , y miremos en que punto estamos
+
+**Qué propuso la IA:** leyó el enunciado, el README, los resúmenes de las semanas 8 a 10 y
+los JSON de métricas, y entregó una tabla de objetivos contra resultados de `w10g_384neg`
+más la lista de entregables que faltan (SAM, visualizadores 2 y 3, dashboard, latencia,
+model card, distancias sobre volúmenes).
+
+**Qué se aceptó:** la lista de faltantes y la observación de que el Dice por fragmento
+(0.817) es el único objetivo sin cumplir.
+
+**Análisis crítico:**
+
+- En esta primera respuesta la IA presentó el mAP@0.50 de 0.901 como objetivo cumplido,
+  tomando el JSON al pie de la letra. Solo al leer `evaluate()` en la segunda pasada
+  encontró que esas cajas están refinadas con la máscara semántica y que la cabeza grid
+  cruda nunca se midió. Un JSON de métricas no basta: hay que leer cómo se calculó.
+- La IA no pudo correr las pruebas (su entorno no tenía `pytest` ni PyTorch) y lo dijo;
+  todo el diagnóstico sale de leer código y resultados guardados, no de ejecutarlos.
+- Al correr `git status` dejó un `index.lock` vacío en `.git`. Lo renombró a
+  `.git/claude_stale_index.lock.txt` y lo reportó.
+
+---
+
+## 9. Diagnóstico de la Semana 10 y árbol de decisiones
+
+**Prompt exacto:**
+
+> Listo, pero antes de hacer visualizadores y dashboard y todo eso, primero tenemos que hacer eh, un... Tenemos que hacer un notebook o, lo que, o los archivos.py, eh, preferiblemente un notebook que podamos eh, cumplir con todo lo que nos piden, tanto en métricas como en todo. Entonces, ahí, ¿qué podríamos hacer? ¿Sí? Digamos que la idea es que hagamos las cosas... con el notebook número, número 3, que ya es lo que, ahí ya termina la semana 9. Y volvamos a mirar cómo hacemos para, para, para llegar a las métricas, ¿sí? Si se puede hacer un, un notebook, que nos vayamos paso a paso, o a la podemos hacer un árbol de decisiones que tengamos que tomar para poder entrenar esto de acuerdo a lo que encontremos o lo que hemos encontrado y demás. Eso sería eh, importante. Entonces, creo que esa vaina es importante. Que vayamos mirando si, si ya terminamos semana 9, o si hay algo más que podamos agregar o hacer, y pues avancemos con la semana 10.
+
+**Qué propuso la IA:** que la Semana 9 está cerrada; seis hallazgos sobre la Semana 10
+(mAP medido sobre cajas refinadas, entrenamiento con 12 de ~244 cortes por caso, modelo sin
+las opciones de CBAM de la Semana 9, Dice por fragmento por debajo del objetivo, test
+evaluado con tres checkpoints, distancias y SAM sin hacer); un árbol de decisiones que
+empieza midiendo la línea base sin entrenar; y la estructura del notebook 04.
+
+**Qué se aceptó:** dejar el plan escrito en `docs/plan_semana10.md` antes de tocar código.
+
+**Análisis crítico:**
+
+- La IA propuso el flip sagital como remedio nuevo para la confusión de lados, cuando ya
+  estaba en la receta de la Semana 10 (`--augment`). Lo corrigió al verificar el código
+  antes de guardar el documento.
+- El equipo respondió que entrenaría en el Mac. La IA revisó el `.venv` y encontró PyTorch
+  2.2.2 para x86_64, lo que indica un Mac Intel sin GPU de Apple. Es una inferencia a
+  partir del entorno, pendiente de confirmar con `torch.backends.mps.is_available()`.
+
+---
+
+## 10. Carpeta del curso y reinicio de la Semana 10
+
+**Prompt exacto:**
+
+> yo quiero volver a trabajar la semana 10 desde 0 , que tengamos como referencia lo que se habia adelantado ahi , pero      ahi te paso la carpeta de lo que hemos hecho con el profe por si sirve
+>
+> igual guiame y dime las preguntas que consideres para hacerles a los companeros   y como iniciamos para que vamos avanzando con la semana 10
+
+**Qué propuso la IA:** que `FundidoraBackbone` del repo no tiene la misma estructura que
+FundidoraPC del curso (bloques de dos convoluciones con SiLU frente a Conv-BN-ReLU-MaxPool),
+así que sus pesos no cargan directamente; que en la carpeta del curso no hay pesos de
+FundidoraPC guardados, solo los de la Chimera de la semana 5; y una lista de preguntas para
+el equipo y para el profesor.
+
+**Qué se aceptó:** `unificado_semana09` como rama base y que el registro de IA lo lleven
+Gustavo y la IA.
+
+**Análisis crítico:**
+
+- La IA no pudo abrir los `.pth` de la Chimera (sin PyTorch en su entorno). Lo que dice de
+  esos pesos sale del informe del grupo y de `chimera_blocks.py`, no de inspeccionarlos.
+- Que no haya pesos de FundidoraPC es cierto para esa carpeta. Pueden existir en Colab o
+  Drive de algún integrante.
+
+---
+
+## 11. Plan v2: explorar todo dentro de las restricciones
+
+**Prompt exacto:**
+
+> 3.unificado_semana09
+>
+> el registro de IA usemoslo nosotros ,
+>
+> en cuanto a estas preguntas
+>
+> * ¿El Dice "por fragmento" se mide emparejando fragmentos o basta el Dice semántico por región?
+> * ¿Se permite refinar las cajas con la máscara semántica, o la detección debe medirse con la cabeza grid pura?
+> * ¿Aceptaría 384 px si la recomendación es 224–256?
+> * ¿Con qué variante y pesos de SAM debemos hacer el baseline?
+>
+> Avancemos con todo lo que podamos , armemos un plan donde exploremos todo , lo que nos pueda ayudar , solo siguiendo las restricciones del profe , mas la recomendaciones da igual , por que al final son recomendaciones
+>
+> y entonces actualicemos el plan , para empezar
+
+**Qué propuso la IA:** la versión 2 de `docs/plan_semana10.md`: separa restricciones de
+recomendaciones del enunciado, resuelve las cuatro dudas reportando las dos lecturas, y
+arma un mapa de exploración por frentes (datos, backbone, transfer learning, detección,
+instancia, entrenamiento) con prioridades y un orden de ejecución por fases.
+
+**Qué se aceptó:** pendiente de revisión por el equipo.
+
+**Análisis crítico:**
+
+- La IA dejó cuatro opciones como zona gris en vez de incluirlas (backbone estándar con
+  ImageNet, preentrenamiento autosupervisado sobre PENGWIN, datos externos de pelvis, red
+  3D). El enunciado no las prohíbe con esas palabras; es su lectura y conviene confirmarla.
+- La estimación de tiempo de entrenamiento en CPU es gruesa: sale de una latencia medida
+  en Kaggle, no de cronometrar en el Mac.
+- Hasta esta entrada no se ha escrito ni ejecutado código nuevo del modelo.
+
+---

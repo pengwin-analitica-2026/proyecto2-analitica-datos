@@ -10,3 +10,11 @@ data/cache/
 .venv/
 
 .env
+# Herramientas de asistente de IA y credenciales (no se suben)
+.claude/
+CLAUDE.md
+.claude-cuenta2/
+.agents/
+kaggle.json
+.kaggle/
+*.token
