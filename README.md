@@ -3,63 +3,65 @@
 Proyecto Integrador Corte 2 — Analítica de Datos, Universidad Autónoma de Occidente (2026-2).
 Profesor: Carlos Ferro.
 
-Sistema propio (sin frameworks de detección/segmentación de alto nivel) para localizar
-regiones óseas pélvicas en tomografía computarizada, segmentar y clasificar sus fragmentos
-por hueso de pertenencia, y medir la distancia de separación de cada fragmento conminuto
-respecto al fragmento principal, usando el dataset [PENGWIN](https://pengwin.grand-challenge.org/)
-(MICCAI 2024–2026).
+Sistema propio, sin frameworks de detección ni segmentación de alto nivel, que en tomografías de
+pelvis localiza las regiones óseas (sacro, coxal izquierdo, coxal derecho), segmenta y clasifica sus
+fragmentos de fractura, y mide en milímetros la distancia de cada fragmento al fragmento principal
+de su hueso. Usa el dataset [PENGWIN 2024](https://pengwin.grand-challenge.org/).
 
-> **Uso exclusivamente académico.** Este sistema no es un dispositivo médico, no ha sido
-> validado clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
+> **Uso exclusivamente académico.** Este sistema no es un dispositivo médico, no ha sido validado
+> clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
 
-## Estado actual
+> **Pendientes antes de entregar (borrar este bloque al cerrar):**
+> - Confirmar el comando del túnel de Cloudflare y probar el acceso desde un celular.
+> - Cuando la demo lea la orientación de la cabecera, quitar la advertencia de la sección "Demo".
+> - Confirmar con `--help` el parámetro de split de `sam_baseline.py`.
 
-Semana 8 completa: dataset curado, splits fijos reproducibles, módulo de preprocesamiento
-unificado, visualizador 1 (reconstrucción 3D del volumen crudo) y EDA de fragmentos.
+## Resultado final
 
-Semana 9 completa: backbone convolucional propio con CBAM, cabeza de detección por grid,
-NMS propio y prueba de overfit intencional sobre un batch pequeño. El código está en
-`src/week9_detection.py` y `src/train_overfit_detection.py`; el resultado visual está en
-`outputs/figures/week9_detection_overfit.png`.
+El modelo entregado es **H6** (`outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`): backbone
+propio de 32 canales con CBAM, tres cabezas (clasificación, detección con grid y NMS propios,
+segmentación semántica e instancia), orientación canónica de los volúmenes según su cabecera,
+aumento geométrico con rotación de ±35° y pesos EMA.
 
-Semana 10 completa: modelo propio de tres cabezas (clasificación, detección por grid con NMS
-propio, segmentación semántica y de instancia) sobre un backbone compartido con CBAM, pérdida
-multitarea, post-proceso 3D y distancia de separación en mm. Modelo final **H6**
-(`outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`, 2.74 M de parámetros).
-
-| Métrica en test (15 casos) | Objetivo | Resultado |
+| Métrica en test (15 casos, H6 semilla 42) | Objetivo | Resultado |
 |---|---|---|
-| F1 / AUC de clasificación | 0.85 | 0.990 / 0.999 |
+| F1 / AUC de clasificación | 0.85 / 0.85 | 0.990 / 0.999 |
 | IoU medio / mAP50 / mAP50:95 de detección | 0.65 / 0.65 / 0.40 | 0.943 / 0.961 / 0.902 |
 | Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.971 / 0.943 |
 | Dice / IoU por fragmento | 0.85 / 0.70 | 0.875 / 0.816 |
 
-Estas cifras son de una segunda evaluación en test, hecha después de analizar los fallos de la
-primera (0.845 en Dice por fragmento con la configuración congelada de antemano). Resumen en
-[`docs/resumen_semana10.md`](docs/resumen_semana10.md), bitácora de decisiones en
-[`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) y tablas de experimentos en
-[`outputs/s10/resumen_experimentos.md`](outputs/s10/resumen_experimentos.md).
+Las tres semillas (42, 43 y 44) dan 0.875, 0.875 y 0.876 de Dice por fragmento.
 
-Semana 11 en curso: dashboard con los tres visualizadores y demo desplegada. Ver
-[`docs/semana11_dashboard.md`](docs/semana11_dashboard.md).
+Estas cifras son una **segunda evaluación en test, posterior al análisis de fallos**; la primera
+evaluación oficial fue D5 (Dice por fragmento 0.845). Cómo se eligió H6, las ablaciones, la
+robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 
-Detalle de la Semana 8 en [`docs/resumen_semana8.md`](docs/resumen_semana8.md).
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [`MODEL_CARD.md`](MODEL_CARD.md) | Modelo, datos, métricas, ablaciones, protocolo de test y limitaciones |
+| [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
+| [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
+| [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |
+| [`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) | Bitácora de experimentos de la Semana 10, de la línea base a H6, y las dos evaluaciones en test |
+| [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Dashboard con los tres visualizadores |
+| `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles |
 
 ## Estructura del repositorio
 
 ```
-src/            scripts y módulos (ver comandos abajo)
-tests/          pruebas automáticas (python -m unittest discover -s tests -v)
-data/           manifest, splits, CSVs de EDA (data/raw/ y data/cache/ NO se versionan)
-outputs/
-  figures/      visualizaciones individuales (PNG, HTML)
-  eda/          gráficos y tablas del análisis exploratorio
-  s10/          resultados de la Semana 10 (JSON por corrida, checkpoint final, figuras)
-  demo/         casos exportados para el dashboard
-notebooks/      notebooks de seguimiento por semana
-docs/           resúmenes, planes y bitácora de decisiones
-kaggle/         lanzadores de entrenamiento en Kaggle
-app/, api/      dashboard (Streamlit) y API de inferencia de la Semana 11
+src/        scripts y módulos (ver los comandos abajo)
+tests/      pruebas automáticas
+notebooks/  notebooks de seguimiento por semana
+kaggle/     kernels de entrenamiento en GPU (uno por receta)
+app/        dashboard Streamlit
+api/        API de inferencia
+deploy/     scripts de despliegue
+data/       manifest, splits y CSVs del EDA (data/raw/ y data/cache/ NO se versionan)
+outputs/    figuras (figures/), EDA (eda/), resultados y checkpoints de la Semana 10 (s10/)
+            y casos exportados para el dashboard (demo/)
+docs/       resúmenes y bitácoras de avance
 ```
 
 ## Instalación
@@ -67,22 +69,22 @@ app/, api/      dashboard (Streamlit) y API de inferencia de la Semana 11
 Requiere Python 3.11 o 3.12.
 
 ```bash
-git clone https://github.com/mariavalencia30/proyecto2-analitica-datos.git
+git clone https://github.com/pengwin-analitica-2026/proyecto2-analitica-datos.git
 cd proyecto2-analitica-datos
 python -m venv .venv
-.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
+source .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**Equipos sin GPU NVIDIA (Windows):** instalar `torch` aparte antes de `requirements.txt`,
-o la build CUDA por defecto de pip falla al importar por falta de drivers:
+**Windows sin GPU NVIDIA:** instalar `torch` aparte antes de `requirements.txt`; la build CUDA
+por defecto falla al importar si no hay drivers.
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
 
-**Equipos con GPU NVIDIA:**
+**Con GPU NVIDIA:**
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu121
@@ -90,9 +92,9 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121
 
 ## Datos
 
-Los volúmenes CT (formato `.mha`, no NIfTI — ver `docs/resumen_semana8.md` sección 2) se
-descargan de [Zenodo](https://doi.org/10.5281/zenodo.10927452) y **no se versionan**
-(`data/raw/` está en `.gitignore`). Descomprimir dejando exactamente esta estructura:
+Los volúmenes están en formato `.mha` (no NIfTI; el profesor aprobó este formato). Se descargan de
+[Zenodo](https://doi.org/10.5281/zenodo.10927452) y **no se versionan**. Descomprimir con esta
+estructura exacta:
 
 ```
 data/raw/
@@ -101,69 +103,182 @@ data/raw/
 └── PENGWIN_CT_train_labels/         001.mha … 100.mha
 ```
 
-## Uso
+Todos los comandos se corren **desde la raíz del repo**, con el entorno activo.
 
-Correr **desde la raíz del repo**, en este orden (los pasos 2, 3, 6 y 7 dependen de
-`data/manifest.csv` generado en el paso 1):
+## 1. Datos y EDA (Semana 8)
+
+El paso 1 va primero: los pasos 2, 3, 6 y 7 leen `data/manifest.csv`.
 
 ```bash
-python src/build_manifest.py              # data/manifest.csv
-python src/check_hu_outliers.py           # diagnóstico de valores HU atípicos
-python src/make_splits.py                 # data/splits.json (70/15/15, seed 42)
-python src/hu_windowing_check.py          # outputs/figures/hu_window_check_*.png
-python src/volumen_3d_visualizer.py       # outputs/figures/volumen_3d_<id>.html
-python src/eda_fragments.py               # data/eda_fragments_detalle.csv + outputs/eda/
-python src/eda_fragmento_principal_y_tamano.py   # data/eda_fragmentos_individuales.csv + outputs/eda/
-python src/train_overfit_detection.py --case-id 001 --epochs 150  # prueba Semana 9
-python src/visualize_overfit_detection.py --case-id 001  # cajas GT vs. predicción
-python src/prepare_week9_detection_data.py              # cache de cortes train/val
-python src/train_week9_detection.py                      # primer entrenamiento multi-paciente
-python src/visualize_week9_validation.py --case-id 014  # validación cualitativa
-python -m unittest discover -s tests -v                 # pruebas Semanas 9-10
+python src/build_manifest.py                      # 1. data/manifest.csv
+python src/check_hu_outliers.py                   # 2. diagnóstico de HU atípicos
+python src/make_splits.py                         # 3. data/splits.json (70/15/15, seed 42)
+python src/hu_windowing_check.py                  # 4. outputs/figures/hu_window_check_*.png
+python src/volumen_3d_visualizer.py               # 5. Visualizador 1 (3D): outputs/figures/volumen_3d_<id>.html
+python src/eda_fragments.py                       # 6. data/eda_fragments_detalle.csv + outputs/eda/
+python src/eda_fragmento_principal_y_tamano.py    # 7. data/eda_fragmentos_individuales.csv + outputs/eda/
 ```
 
-Semana 10 (el entrenamiento necesita GPU; la evaluación corre también en CPU):
+El MIP del Visualizador 1 (`src/raw_view.py`) se ve en la sección 6.1 del notebook 01 y en el
+dashboard.
+
+`src/pengwin_io.py` es el módulo que centraliza la carga y el preprocesamiento (clip, ventana ósea,
+gamma, resize y máscara ósea limpia). No se corre directo, salvo como prueba de humo:
+`python src/pengwin_io.py 001`.
+
+## 2. Detección (Semana 9)
 
 ```bash
-python src/build_case_cache.py --sizes 384   # caché a 384 px por caso en data/cache/s10/cache_384
-python src/train_s10.py --cache-root data/cache/s10 --size 384 --epochs 60 --base-channels 32 \
-    --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 16 --per-epoch 2500 --ema 0.999 \
-    --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical \
-    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth          # modelo final H6
+python src/train_overfit_detection.py --case-id 001 --epochs 150   # overfit intencional
+python src/visualize_overfit_detection.py --case-id 001            # cajas GT contra predicción
+python src/prepare_week9_detection_data.py                          # caché de cortes train/val
+python src/train_week9_detection.py                                 # primer entrenamiento multi-paciente
+python src/visualize_week9_validation.py --case-id 014              # validación cualitativa
+```
+
+## 3. Modelo final H6 (Semana 10)
+
+### 3.1 Caché por caso
+
+Guarda cada corte de cada caso a 384 px (ventana ósea + gamma) en `data/cache/s10/`:
+
+```bash
+python src/build_case_cache.py --sizes 384 --modes stretch --workers 4
+```
+
+Deja `data/cache/s10/cache_384/<caso>.npz`, `labels_native/` e `index.csv`.
+
+### 3.2 Entrenamiento
+
+Requiere GPU (en el proyecto se usó Kaggle; `kaggle/gpu/h6_auggeo_rot35_canon_ema_w32_e60_s42.py`
+es el kernel exacto):
+
+```bash
+python src/train_s10.py --cache-root data/cache/s10 \
+    --size 384 --epochs 60 --base-channels 32 --cbam 1 --secondary-weight 3 \
+    --augment --cosine --batch-size 16 --per-epoch 2500 --max-minutes 170 --eval-every 10 \
+    --ema 0.999 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical \
+    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth
+```
+
+`--canonical` endereza los 34 volúmenes guardados en orientación LPI (ver `src/orientacion.py`).
+Queda registrado en el checkpoint, así que la evaluación lo aplica sola. Las semillas 43 y 44 se
+obtienen cambiando `--seed` y el nombre de salida.
+
+El checkpoint entregado ya está en el repo, así que este paso se puede saltar.
+
+### 3.3 Evaluación sobre el volumen completo
+
+```bash
 python src/evaluate_volumes.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
-    --cache-dir data/cache/s10/cache_384 --split val --tta                   # las nueve métricas
+    --cache-dir data/cache/s10/cache_384 --split val --tta \
+    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42_val.json
+```
+
+Para el post-proceso 3D y la distancia de separación en mm por fragmento (también sobre el ground
+truth):
+
+```bash
 python src/infer_volume.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
     --cache-dir data/cache/s10/cache_384 --split val --tta --distance-nofill --surface-metrics
-                                                                             # 3D y distancia en mm
 ```
 
-El modelo H6 espera los volúmenes en orientación canónica: los que la cabecera del `.mha` marca
-como girados 180° se enderezan con `src/orientacion.py` antes de predecir. `evaluate_volumes.py` e
-`infer_volume.py` lo hacen solos según lo que diga el checkpoint.
+H6 espera los volúmenes en orientación canónica: `evaluate_volumes.py` e `infer_volume.py` los
+enderezan solos según lo que indica el checkpoint.
 
-`src/pengwin_io.py` no se corre directo (salvo como prueba de humo, `python src/pengwin_io.py <case_id>`):
-es el módulo que centraliza la carga y el preprocesamiento (clip, ventaneo HU, resize,
-máscara ósea limpia) para que entrenamiento, inferencia y visualizadores usen siempre la
-misma función.
+Resultado esperado en validación: Dice por fragmento 0.869 (puede variar en la tercera cifra según
+el hardware). Reporta la detección cruda (cabeza grid) y la refinada, y separa el Dice en
+fragmento primario y secundario.
 
-La prueba de Semana 9 usa las máscaras de referencia solo para construir las cajas de
-entrenamiento. Predice una caja por región visible y por corte: sacro, coxal izquierdo y
-coxal derecho. La cabeza usa una celda de grid por objeto, calcula la pérdida multitarea y
-aplica NMS implementado en `week9_detection.py`, sin YOLO, torchvision o Detectron2.
+**Test:** el protocolo es evaluar una sola vez con la configuración congelada. La configuración y el
+comando exactos de la evaluación entregada están en `docs/decisiones_semana10.md`, sección 12.4, y
+sus resultados en `outputs/s10/TEST2_h6_*.json`. No se recomienda volver a correr test para ajustar
+nada.
+
+### 3.4 Línea base SAM (solo comparación)
+
+SAM ViT-B no forma parte del sistema: recibe como prompt la caja que predice nuestro detector y se
+compara con nuestra máscara semántica. Pesos: `sam_vit_b_01ec64.pth`, del repositorio oficial de
+Segment Anything.
+
+```bash
+python src/sam_baseline.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+    --sam-checkpoint <ruta>/sam_vit_b_01ec64.pth --cache-dir data/cache/s10/cache_384 \
+    --stride 3 --output outputs/s10/sam_baseline_test.json
+```
+
+El enunciado pide la comparación sobre test; revisar con `python src/sam_baseline.py --help` cómo
+se elige el split.
+
+### 3.5 Pruebas automáticas
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## 4. Demo y visualizadores (Semana 11)
+
+`demo_export.py` corre el pipeline completo una vez por caso (unos 4 minutos en CPU con TTA) y deja
+todo en `outputs/demo/<modelo>/<caso>/`. El dashboard solo lee esos archivos.
+
+```bash
+python src/demo_export.py --case 024 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+streamlit run app/dashboard.py
+```
+
+| Visualizador | Qué muestra |
+|---|---|
+| 1. Volumen crudo | MIP axial, coronal y sagital del hueso (umbral de 250 HU, sin camilla ni cables) e isosuperficie 3D. Sin modelo |
+| 2. Corte por corte | Cajas, máscaras por hueso, ground truth opcional e ID y distancia en mm de cada fragmento |
+| 3. Reconstrucción 3D | Una malla por fragmento, con su ID y su distancia en mm al principal |
+
+> **Advertencia:** por ahora la demo no endereza los volúmenes LPI (ver la limitación 1 del model
+> card). Para la presentación, usar casos que no estén en `LPI_CASES` de `src/orientacion.py`, como
+> el 024.
+
+### Latencia por imagen
+
+```bash
+python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+    --volume outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/volume.npz \
+    --device cpu --device cuda
+```
+
+Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
+`outputs/demo/latency.json`, que el dashboard muestra. Si no hay GPU, omite `cuda` y lo avisa.
+
+### Despliegue
+
+El enunciado pide el dashboard en vivo mediante un **túnel de Cloudflare**, accesible desde un
+computador y un celular. Con el dashboard corriendo en otra terminal:
+
+```bash
+streamlit run app/dashboard.py            # terminal 1: queda en http://localhost:8501
+cloudflared tunnel --url http://localhost:8501   # terminal 2: imprime una URL pública trycloudflare.com
+```
+
+`cloudflared` se instala con `brew install cloudflared` (macOS) o desde la página de Cloudflare.
+Como extra, el equipo dejó documentada una alternativa con Streamlit Cloud y una API en AWS Lambda
+(`docs/despliegue_aws_streamlit.md`, CI en `docs/cicd_github_actions.md`).
 
 ## Verificación de reproducibilidad
 
-Con la semilla fija (42), `data/splits.json` debe salir idéntico al versionado en el repo,
-y `data/manifest.csv` debe reportar 100/100 casos válidos.
+- Con la semilla 42, `data/splits.json` sale idéntico al versionado, y `data/manifest.csv` reporta
+  100 de 100 casos válidos.
+- La evaluación de la sección 3.3 sobre el checkpoint entregado debe reproducir el JSON de
+  validación versionado en `outputs/s10/`.
 
 ## Restricciones del proyecto
 
-Prohibido usar YOLO, Detectron2, Mask R-CNN preentrenado o frameworks de detección/segmentación
-de alto nivel como arquitectura entregada. Transfer learning permitido únicamente en el
-backbone; las cabezas se entrenan desde cero. SAM solo como baseline de comparación
-zero-shot, nunca en el pipeline. Detalle completo en el enunciado oficial del curso
-(`Proyecto_Corte2_PENGWIN.docx`, compartido por el profesor).
+Prohibido usar YOLO, Detectron2, Mask R-CNN preentrenado o frameworks de detección o segmentación de
+alto nivel. Transfer learning solo en el backbone; las cabezas se entrenan desde cero. SAM solo
+como línea base zero-shot, nunca en el pipeline. Detalle en el enunciado oficial del curso.
 
 ## Equipo
 
-Ver commits y Pull Requests del repositorio.
+| Integrante | Código |
+|---|---|
+| Gustavo Adolfo Chipantiza | 2222022 |
+| Federico Gonzales Cárdenas | 2225657 |
+| Juan Jacobo Delgado Melo | 2230110 |
+| María de los Ángeles Valencia Hurtado | 2235112 |
