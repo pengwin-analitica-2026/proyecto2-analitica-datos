@@ -456,3 +456,175 @@ Colab, sin desplegar nada.
 - Los costos de AWS no se verificaron.
 
 ---
+
+# Semana 10 — ejecución y cierre
+
+**Integrante:** Gustavo
+**Herramienta:** Claude (Anthropic), app de escritorio en modo Cowork. Modelos configurados en la
+sesión: `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5`.
+**Fechas:** 5 y 6 de octubre de 2026. **Ramas:** `semana10-multiples-pruebas-working` y
+`semana11-visualizadores`.
+
+Las entradas 15 a 18 las redactó la IA a pedido de Gustavo. El análisis crítico es un borrador: el
+equipo debe revisarlo y corregirlo. El registro técnico completo de esas sesiones es
+`docs/decisiones_semana10.md`.
+
+---
+
+## 15. Semana 10: campaña de experimentos (familias B a F)
+
+**Prompts:** no se conservó el texto exacto de los prompts del 5 de octubre (quedaron en una parte
+de la sesión que ya no se puede recuperar). Lo pedido, en resumen: rehacer la Semana 10 desde cero
+siguiendo `docs/plan_semana10.md`, lanzar los entrenamientos en Kaggle y Colab, probar un cambio a
+la vez y llevar una bitácora de decisiones.
+
+**Qué propuso la IA y qué se construyó:** `src/build_case_cache.py` (caché por caso a 384 px),
+`src/train_s10.py`, `src/evaluate_volumes.py` (las nueve métricas sobre el volumen completo, con
+caja cruda y refinada), `src/volume_postprocess.py` e `src/infer_volume.py` (post-proceso 3D y
+distancias), los lanzadores de `kaggle/` y unas 25 corridas: ancho del backbone (8, 16, 32, 48
+canales), CBAM (ninguno, 1 etapa, 3 etapas), peso a secundarios, contexto 2.5D, pérdida focal,
+Tversky, supervisión profunda, EMA, sobremuestreo, preentrenamiento en Intel Image y λ.
+
+**Qué se aceptó y qué no:** se aceptó la regla de aceptar un cambio solo si supera el ruido medido
+con tres semillas (±0.004 en Dice de instancia). Con esa regla entraron el ancho 32 y EMA; se
+descartaron 2.5D, focal, Tversky, supervisión profunda, sobremuestreo, ancho 48, λ ×2 y la
+instancia con 31 clases.
+
+**Análisis crítico:**
+
+- Casi todo lo que la IA propuso probar no sirvió: de unos quince cambios sobre la receta, solo dos
+  pasaron el ruido. La lista de ideas era razonable, pero ninguna atacaba la causa real del
+  problema, que apareció después (entrada 17).
+- `evaluate_volumes.py` fallaba cuando el último lote de un volumen tenía un solo corte. Afectaba a
+  1 de 5 047 cortes; se corrigió.
+- Las ablaciones obligatorias (CBAM, transfer learning, λ) quedaron medidas con una o dos semillas.
+  La de transfer learning cambia de signo entre semillas, así que la conclusión honesta es "sin
+  ganancia consistente", no "no sirve".
+- La IA no vio ninguna imagen en esta etapa: todas las decisiones salieron de tablas de métricas.
+
+---
+
+## 16. Semana 10: distancia en mm, latencia, SAM y primera evaluación en test
+
+**Prompts exactos:**
+
+> Listo, pues demolea eso. Empecemos.  Recuerda actualizar también la bitácora que tenemos de las decisiones que vamos tomando, ¿vale?
+
+> corrres : benchmark_latency tu?  y      Siii , dale descargalo , dale
+
+> manda commit , y   siii dale vamos con lo que falta
+
+> Dale, dale, sí, con uno o dos piensas que, que nos puede ir bien, bien. Dale. Igual, pues, no sé si estamos dándole test a un solo modelo. Y deberíamos darle como a todos los que pasaron el umbral. Darle test a todos los que pasaron el umbral. No sé cómo lo es. Sí.
+
+**Qué propuso la IA y qué se construyó:** `--distance-nofill` en `infer_volume.py` y
+`fill_unlabeled` en `volume_postprocess.py`; `src/benchmark_latency.py`; `src/sam_baseline.py`
+(SAM ViT-B zero-shot con la caja predicha como prompt); congelar la configuración por escrito antes
+de tocar test (D5 semilla 42, un modelo con TTA) y evaluar una sola vez.
+
+**Qué se aceptó y qué no:** se aceptó congelar antes de evaluar. Gustavo pidió además dar test a
+todos los checkpoints que pasaban el umbral en validación; la IA lo hizo con la condición, escrita
+antes de correrlos, de que sirvieran para medir la variación y no para elegir modelo.
+
+**Análisis crítico:**
+
+- La distancia en mm estaba mal y la IA no lo notó hasta abrir el detalle: el error medio salía
+  1.153 mm, idéntico en dos modelos distintos. La distancia predicha era 0.0 mm en todos los
+  fragmentos que la tenían (38 de 41), porque el post-proceso rellenaba el hueco entre fragmentos. Una cifra que parece
+  buena puede ser la de un predictor que siempre dice cero.
+- El resultado en test fue 0.845 en Dice de instancia: el único objetivo sin cumplir, por 0.005. Se
+  reportó tal cual.
+- En la tabla de test de la bitácora la IA puso en la columna de validación las cifras del ensamble
+  en vez de las del modelo evaluado. Se corrigió al revisar contra los JSON.
+- De los checkpoints adicionales evaluados en test solo se guardaron dos JSON; los otros tres
+  números se leyeron en pantalla y el archivo se perdió al cerrarse la máquina de Colab.
+- SAM se midió sobre validación, no sobre test como pide el enunciado. Se repitió sobre test al
+  cerrar la semana (entrada 18).
+- La IA escribió a mano en el terminal de Colab un texto codificado en base64 y lo corrompió dos
+  veces. Desde ahí todo el código viaja por un dataset privado y se verifica con md5.
+
+---
+
+## 17. Semana 10: diagnóstico tras test, serie H y segunda evaluación
+
+**Prompts exactos:**
+
+> Hola, hola. Listo. Pues sí, o sea, hagamos lo, lo que sea necesario y corramos a otro modelo o lo que sea para que eh, lo hagamos real. Y analicemos, o sea, analicemos fotos o analicemos métricas, o sea, pensemos, sentémonos a pensar un momentico eh, y miremos qué puede ser para que nos funcione, para que logremos todas las métricas en test.
+
+> ¿Cómo puedo hacer para ver esos casos yo visualmente, tanto el 12 como el 39?  Y bueno, los 87 y 78 quedan da cero.            podemos ver todo esto en un notebook y revisar qué se puede hacer ahí             por ejemplo, una que tú dices que el paciente está girado en el escáner. Pues se pone bien, ¿no? ¿Se gira como debe estar o qué, o qué se puede hacer en esos casos?        Un preprocesamiento de imagen, ¿no? ¿O qué? ¿Se gira o qué?        ¿Se validan como ese tipo de imágenes antes de que entren al modelo y se giran, o qué no sé? Aquí qué hacemos.
+
+> y simplemente como preprocesar esa foto no sirve como de, de alguna forma detectarlo con código algorítmicamente que está rota la foto y, y rotarla nosotros mismos no no podríamos hacer eso eh, entrenamiento o en inferencia no sé cómo lo ves
+
+> Siiii corramos test , o ya corrimos?
+
+> corramoslo varias en paralelo y corramoslo en  GPU ,
+
+**Qué propuso la IA y qué se construyó:** un análisis de fallos por caso
+(`src/analisis_instancias.py`, `src/diagnostico_casos.py`, notebook `05_casos_dificiles`), que
+encontró que el test lo hundían dos casos: el 012 (paciente girado unos 26°) y el 039. De ahí
+salieron el aumento geométrico (`--aug-geo`, `--aug-rot-deg`), la orientación canónica según la
+cabecera del `.mha` (`src/orientacion.py`, `--canonical`), la prueba de estrés sobre validación
+(`--stress`) y los modelos H1 a H6. La idea de Gustavo de detectar el giro con código se implementó
+como `orientacion.estimate_angle`.
+
+**Qué se aceptó y qué no:** se aceptó H6 como modelo final, elegido solo con validación y estrés, y
+una segunda evaluación en test con la configuración escrita de antemano. Se descartaron el detector
+geométrico de giro, los filtros de post-proceso y el ensamble como modelo principal.
+
+**Análisis crítico:**
+
+- El 0.875 de la segunda evaluación no es una estimación limpia: el diagnóstico miró los casos 012
+  y 039, que son de test. La cifra obtenida sin mirar test sigue siendo 0.845. Lo que respalda el
+  0.875 es que el modelo se eligió con validación (que sube de 0.851 a 0.869), que las reglas de
+  decisión se escribieron antes de ver cada número y que las tres semillas dan lo mismo.
+- Los hallazgos importantes eran visibles desde la Semana 8 y nadie los buscó, tampoco la IA: un
+  tercio de los volúmenes está guardado girado 180° (lo dice la cabecera) y el entrenamiento no
+  tenía ningún aumento geométrico. Se gastó un día probando pérdidas y arquitecturas antes de mirar
+  los datos.
+- El detector geométrico de giro parecía funcionar (recuperaba giros sintéticos con error de 0 a 4°)
+  y la primera versión tenía el signo al revés. Al revisar a ojo los 16 casos que marcaba como
+  inclinados, 13 eran pacientes bien colocados. Se descartó; una prueba con datos sintéticos no
+  reemplaza mirar los casos reales.
+- La máquina de Colab se cerró al cumplir 24 horas con cuatro evaluaciones en curso, que se
+  perdieron y hubo que repetir. Un proceso en segundo plano del entorno de la IA también murió al
+  terminar su turno. Desde ahí cada resultado se sube apenas sale.
+- El token de Kaggle lo pegó siempre Gustavo en un campo oculto; la IA no lo vio ni lo guardó, y
+  borró el archivo del token al terminar.
+- Las ablaciones de CBAM, transfer learning y λ no se repitieron sobre H6. Vale porque H6 comparte
+  arquitectura y pérdida con D5, pero hay que decirlo en el informe.
+- En un mensaje la IA reportó F1 0.991 para H6 en test; el valor es 0.990. Lo corrigió al contrastar
+  con el JSON.
+
+---
+
+## 18. Semana 10: cierre, notebook 04 y documentos
+
+**Prompts exactos:**
+
+> ya terminamos semana 10?   que faltaria para semana 11? y que nos falta actualizar
+
+> Listo, entonces quiero que me respondas primero estas preguntas. Luego quiero que vamos por lo que falta en la semana 10 para dejar todo listo. Listo, listo, y también, si quieres    Dame un texto para ponerle a la otra sesión en la que estoy trabajando. Dame un texto para ponérselo a la sesión en la que estoy terminando, la de la semana 11, ¿vale? También, en donde tienen que documentar lo que hagamos en la semana 11. Acá, actualicemos los archivos y los que dices que están desactualizados. Actualicémoslos, por favor.
+
+**Qué propuso la IA y qué se construyó:** el notebook
+`notebooks/04_semana10_pipeline_multitarea.ipynb`, que lee los resultados guardados;
+`src/resumen_s10.py` e `src/informe_test.py` (tablas, matriz de confusión y los cinco peores casos
+de test); y la actualización de `README.md`, `docs/resumen_semana10.md`, `docs/plan_semana10.md`,
+`outputs/s10/resumen_experimentos.md` y este registro.
+
+**Qué se aceptó y qué no:** Gustavo pidió no tocar la demo ni el dashboard, que siguen con D5; el
+paso a H6 queda para la sesión de la Semana 11.
+
+**Análisis crítico:**
+
+- Para sacar la matriz de confusión hubo que repetir la inferencia sobre test, porque la evaluación
+  original no guardó las predicciones. Es la misma configuración y da las mismas cifras; no es una
+  evaluación nueva.
+- El notebook 04 no reentrena nada: muestra lo que hay en los JSON. Reproducir los entrenamientos
+  exige GPU y los comandos de `docs/resumen_semana10.md`.
+- SAM se repitió sobre test con H6 (Dice 0.889 frente a 0.934 nuestro). `sam_baseline.py` cargaba
+  los volúmenes sin enderezar; con un modelo de orientación canónica eso habría dado cifras malas
+  sin avisar. Se corrigió antes de correrlo.
+- Queda sin hacer la latencia en el Mac.
+- Estas cuatro entradas las escribió la IA sobre su propio trabajo. Conviene que alguien del equipo
+  las lea con la bitácora al lado.
+
+---

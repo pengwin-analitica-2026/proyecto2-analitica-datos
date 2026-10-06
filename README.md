@@ -22,21 +22,44 @@ NMS propio y prueba de overfit intencional sobre un batch pequeño. El código e
 `src/week9_detection.py` y `src/train_overfit_detection.py`; el resultado visual está en
 `outputs/figures/week9_detection_overfit.png`.
 
-Semana 10 en desarrollo: modelo de tres cabezas sobre el backbone compartido, pérdida
-multitarea y medición física de separación entre fragmentos ya implementados y cubiertos
-por pruebas automáticas. Ver `docs/resumen_semana10.md`.
-Detalle completo en [`docs/resumen_semana8.md`](docs/resumen_semana8.md).
+Semana 10 completa: modelo propio de tres cabezas (clasificación, detección por grid con NMS
+propio, segmentación semántica y de instancia) sobre un backbone compartido con CBAM, pérdida
+multitarea, post-proceso 3D y distancia de separación en mm. Modelo final **H6**
+(`outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`, 2.74 M de parámetros).
+
+| Métrica en test (15 casos) | Objetivo | Resultado |
+|---|---|---|
+| F1 / AUC de clasificación | 0.85 | 0.990 / 0.999 |
+| IoU medio / mAP50 / mAP50:95 de detección | 0.65 / 0.65 / 0.40 | 0.943 / 0.961 / 0.902 |
+| Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.971 / 0.943 |
+| Dice / IoU por fragmento | 0.85 / 0.70 | 0.875 / 0.816 |
+
+Estas cifras son de una segunda evaluación en test, hecha después de analizar los fallos de la
+primera (0.845 en Dice por fragmento con la configuración congelada de antemano). Resumen en
+[`docs/resumen_semana10.md`](docs/resumen_semana10.md), bitácora de decisiones en
+[`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) y tablas de experimentos en
+[`outputs/s10/resumen_experimentos.md`](outputs/s10/resumen_experimentos.md).
+
+Semana 11 en curso: dashboard con los tres visualizadores y demo desplegada. Ver
+[`docs/semana11_dashboard.md`](docs/semana11_dashboard.md).
+
+Detalle de la Semana 8 en [`docs/resumen_semana8.md`](docs/resumen_semana8.md).
 
 ## Estructura del repositorio
 
 ```
-src/            scripts y módulos (ver tabla de comandos abajo)
-data/           manifest, splits, CSVs de EDA (data/raw/ con los volúmenes NO se versiona)
+src/            scripts y módulos (ver comandos abajo)
+tests/          pruebas automáticas (python -m unittest discover -s tests -v)
+data/           manifest, splits, CSVs de EDA (data/raw/ y data/cache/ NO se versionan)
 outputs/
   figures/      visualizaciones individuales (PNG, HTML)
   eda/          gráficos y tablas del análisis exploratorio
-notebooks/      notebooks de seguimiento (EDA)
-docs/           resúmenes de avance por semana
+  s10/          resultados de la Semana 10 (JSON por corrida, checkpoint final, figuras)
+  demo/         casos exportados para el dashboard
+notebooks/      notebooks de seguimiento por semana
+docs/           resúmenes, planes y bitácora de decisiones
+kaggle/         lanzadores de entrenamiento en Kaggle
+app/, api/      dashboard (Streamlit) y API de inferencia de la Semana 11
 ```
 
 ## Instalación
@@ -98,6 +121,25 @@ python src/train_week9_detection.py                      # primer entrenamiento 
 python src/visualize_week9_validation.py --case-id 014  # validación cualitativa
 python -m unittest discover -s tests -v                 # pruebas Semanas 9-10
 ```
+
+Semana 10 (el entrenamiento necesita GPU; la evaluación corre también en CPU):
+
+```bash
+python src/build_case_cache.py --sizes 384   # caché a 384 px por caso en data/cache/s10/cache_384
+python src/train_s10.py --cache-root data/cache/s10 --size 384 --epochs 60 --base-channels 32 \
+    --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 16 --per-epoch 2500 --ema 0.999 \
+    --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical \
+    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth          # modelo final H6
+python src/evaluate_volumes.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+    --cache-dir data/cache/s10/cache_384 --split val --tta                   # las nueve métricas
+python src/infer_volume.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+    --cache-dir data/cache/s10/cache_384 --split val --tta --distance-nofill --surface-metrics
+                                                                             # 3D y distancia en mm
+```
+
+El modelo H6 espera los volúmenes en orientación canónica: los que la cabecera del `.mha` marca
+como girados 180° se enderezan con `src/orientacion.py` antes de predecir. `evaluate_volumes.py` e
+`infer_volume.py` lo hacen solos según lo que diga el checkpoint.
 
 `src/pengwin_io.py` no se corre directo (salvo como prueba de humo, `python src/pengwin_io.py <case_id>`):
 es el módulo que centraliza la carga y el preprocesamiento (clip, ventaneo HU, resize,

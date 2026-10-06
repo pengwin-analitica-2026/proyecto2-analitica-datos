@@ -82,7 +82,7 @@ ambigüedad de las etiquetas de fragmentos pequeños.
 - E1 (Intel sin EMA): instancias 0.847, secundarios 0.683; la detección cruda sube
   (mAP50 0.905 vs 0.875).
 - E2 (Intel + EMA): con semilla 42 secundarios 0.714 (+0.011 vs EMA solo); con semilla 43 0.717
-  (−0.007 vs EMA solo). **Sin ganancia consistente.**
+  (−0.008 vs EMA solo). **Sin ganancia consistente.**
 - **Decisión:** el candidato no usa preentrenamiento; Intel queda documentado como ablación.
 
 ### 3.6 Familia A/F: ablaciones obligatorias
@@ -135,7 +135,7 @@ Resultados con el post-proceso original (validación, 15 casos):
 ### Hallazgo: la distancia en mm estaba mal medida
 
 - El error medio de distancia salía 1.153 mm en C2 y en D5, idéntico. Al abrir el detalle:
-  **la distancia predicha fue 0.0 mm en los 41 fragmentos secundarios**, y solo 5 de los 41 están
+  **la distancia predicha fue 0.0 mm en los 38 fragmentos que la tenían** (de 41 secundarios), y solo 5 de los 41 están
   separados en el GT (entre 3.2 y 19.0 mm). Un predictor que siempre diga 0 obtiene el mismo
   error; la cifra no demostraba capacidad de medir.
 - Causa: `postprocess_3d` asignaba al fragmento principal cualquier vóxel de la región sin
@@ -237,6 +237,28 @@ nuestras cajas, por lo que la comparación favorece a SAM en localización; (2) 
 sobre la región completa, porque SAM no segmenta ni clasifica fragmentos, que es justamente lo
 que aporta nuestro sistema (Dice de instancias 0.85); (3) es validación de una sola semilla,
 sin ruido medido para SAM.
+
+### SAM sobre test, con el modelo final (06-oct)
+
+El enunciado pide la comparación sobre test. Se repitió con H6 s42 (las cajas del prompt y la
+máscara propia salen de H6; volúmenes en orientación canónica), 1 de cada 3 cortes con hueso:
+1 181 cortes y 3 002 pares corte-región en test. Se corrió además sobre validación con H6 para
+tener las dos particiones con el mismo modelo. Archivos: `outputs/s10/sam_baseline_test_h6.json`
+y `sam_baseline_val_h6.json`.
+
+| Región (test) | SAM Dice / IoU | Nuestro Dice / IoU |
+|---|---|---|
+| Sacro | 0.792 / 0.690 | 0.884 / 0.820 |
+| Coxal izquierdo | 0.915 / 0.859 | 0.947 / 0.905 |
+| Coxal derecho | 0.930 / 0.879 | 0.957 / 0.921 |
+| **Global test** | **0.889 / 0.823** | **0.934 / 0.889** |
+| Global validación (H6) | 0.859 / 0.781 | 0.914 / 0.859 |
+
+Mismo patrón que con D5: el sistema propio supera a SAM en las tres regiones (+0.046 en Dice
+global en test) y la mayor brecha está en el sacro (+0.092). Con las cajas de H6, SAM también
+sube frente a la medición con D5 (0.847 → 0.859 en validación): mejores cajas, mejor prompt. El
+tiempo de SAM de estos dos archivos (unos 500 ms por corte) no vale como latencia: las dos
+corridas compartieron la GPU; la cifra medida a solas es 259 ms.
 
 ## 10. Congelación de la configuración y evaluación en test
 
@@ -654,7 +676,7 @@ secundarios, y mejora en 13 de los 15 casos. Los dos que hundían el test:
 | 039 | 0.710 | 0.784 | RAI con aspecto de LPI; H6 usa orientación canónica |
 
 El 039 mejora pero sigue siendo el peor caso de test. Bajan dos casos: 054 (−0.005) y 061
-(−0.017). El centro del volumen da 0.886 y los extremos 0.842.
+(−0.017). El centro del volumen da 0.885 y los extremos 0.842.
 
 **Las otras dos semillas y el ensamble sobre test** (declarados en 12.4 antes de correr; se
 reportan sin elegir, la cifra que cuenta es la de H6 s42). Corridos en GPU en una máquina nueva
@@ -679,9 +701,9 @@ queda entre 0.865 y 0.892 y el 039 entre 0.775 y 0.784; el 039 sigue siendo el p
 |---|---|---|---|
 | Error medio de distancia | 2.956 mm | 1.277 mm | 0.185 mm |
 | Error mediano / percentil 90 | 0.0 / 3.453 mm | 0.0 / 0.556 mm | 0.0 / 0.0 mm |
-| Correlación distancia real-predicha | 0.543 | 0.819 | 0.972 |
+| Correlación distancia real-predicha | 0.543 | 0.818 | 0.972 |
 | Fragmentos con distancia predicha | 36 de 41 | 36 de 41 | 38 de 41 |
-| Dice 3D principal / secundario | 0.909 / 0.682 | 0.931 / 0.757 | 0.921 / 0.701 |
+| Dice 3D principal / secundario | 0.909 / 0.682 | 0.931 / 0.756 | 0.921 / 0.701 |
 | Secundarios perdidos en 3D | 5.6 % | 7.8 % | 5.0 % |
 | ASSD / HD95 medios | 3.02 / 16.33 mm | 2.06 / 11.55 mm | 4.08 / 17.99 mm |
 
@@ -700,20 +722,59 @@ entender qué fallaba, así que no es una estimación independiente. Lo que la r
 el modelo se eligió solo con validación y estrés (reglas escritas antes de ver cada número),
 que la validación sube lo mismo (0.851 → 0.869) y que test y validación quedan a 0.006.
 
-## 13. Pendiente (actualizado el 06-oct, después de la segunda evaluación en test)
+### 12.6 Análisis de error en test con H6 (matriz de confusión y peores casos)
 
-Hecho: evaluación en test (secciones 11 y 12.5), latencia, SAM zero-shot, distancias sin relleno.
+Para el informe se repitió la inferencia de H6 s42 sobre test guardando registros y predicciones
+(`evaluate_volumes.py --save-records --save-predictions`, misma configuración). La repetición da
+exactamente las mismas cifras que la evaluación de 12.5 (diferencia 0.0 en todas las métricas), así
+que no es una evaluación nueva. Script: `src/informe_test.py`; salida en
+`outputs/s10/informe_h6_test/` (`informe.json` y un panel por caso).
+
+**Clasificación (presencia de cada región por corte, 4 664 cortes).**
+
+| Región | Presente y predicha | Ausente y predicha | Presente y no predicha | Ausente y no predicha | F1 |
+|---|---|---|---|---|---|
+| Sacro | 2 238 | 37 | 56 | 2 333 | 0.980 |
+| Coxal izquierdo | 3 372 | 11 | 12 | 1 269 | 0.997 |
+| Coxal derecho | 3 316 | 28 | 4 | 1 316 | 0.995 |
+
+**Segmentación semántica (a qué región va cada píxel real).** Sacro 96.6 % correcto y 3.3 % a
+fondo; coxal izquierdo 98.5 % y 1.5 %; coxal derecho 98.5 % y 1.5 %. Solo el 0.06 % del hueso se
+asigna a otra región (máximo por caso: 0.18 %, en el 039). Con D5 esa confusión era 13.7 % en el
+caso 012 y 8.2 % en el 039: la orientación canónica y el aumento la eliminaron.
+
+**Cinco peores casos (Dice por fragmento).**
+
+| Caso | Dice | Primario | Secundario | Secundarios sin pareja | Hueso a fondo | Centro / extremos |
+|---|---|---|---|---|---|---|
+| 039 | 0.784 | 0.890 | 0.635 | 7.7 % | 3.2 % | 0.788 / 0.768 |
+| 061 | 0.822 | 0.891 | 0.635 | 17.4 % | 1.2 % | 0.806 / 0.877 |
+| 007 | 0.831 | 0.913 | 0.545 | 24.5 % | 1.6 % | 0.821 / 0.859 |
+| 054 | 0.834 | 0.899 | 0.663 | 16.2 % | 2.9 % | 0.835 / 0.832 |
+| 047 | 0.854 | 0.870 | 0.753 | 17.1 % | 5.4 % | 0.888 / 0.745 |
+
+Lectura: lo que queda por resolver ya no es a qué hueso pertenece cada píxel, sino **dónde se
+parte el hueso en fragmentos**. En los cinco casos el principal está entre 0.87 y 0.91 y los
+secundarios entre 0.54 y 0.75. El 039 tiene muchos fragmentos secundarios por corte (418 en 392
+cortes); el 047 pierde en los extremos del volumen y deja 5.4 % del hueso como fondo.
+
+**Dato de las particiones que conviene tener presente.** Los volúmenes guardados girados no están
+repartidos por igual: 22 de 70 en entrenamiento, 10 de 15 en validación y 2 de 15 en test. La
+partición es por paciente con semilla fija y no se tocó.
+
+## 13. Pendiente (actualizado el 06-oct, cierre de la Semana 10)
+
+Hecho: evaluación en test (secciones 11 y 12.5), análisis de error (12.6), latencia en GPU y CPU,
+SAM zero-shot en validación y en test (sección 9), distancias sin relleno, notebook
+`04_semana10_pipeline_multitarea.ipynb`, `docs/resumen_semana10.md`, README,
+`resumen_experimentos.md` e `IA_USAGE.md` (entradas 15 a 18).
 
 1. **Llevar H6 a la demo de la semana 11.** El dashboard y la API deben cargar
    `h6_auggeo_rot35_canon_ema_w32_e60_s42.pth` y enderezar el volumen según la cabecera
    (`orientacion.to_canonical`) antes de predecir; sin ese paso H6 falla en los volúmenes
-   guardados girados 180 grados (un tercio de los casos).
-2. Mirar el fragmento del caso 007 (coxal derecho, 9.4 mm reales, 45.8 mm predichos) y por qué
+   guardados girados 180 grados. Lo hace la sesión de la Semana 11.
+2. Latencia en el Mac con `src/measure_latency.py`.
+3. Mirar el fragmento del caso 007 (coxal derecho, 9.4 mm reales, 45.8 mm predichos) y por qué
    suben los secundarios perdidos en 3D en test (5.6 % → 7.8 %).
-3. Caso 039: sigue siendo el peor de test (0.78). Caso 087: el peor de validación (0.79); su
-   problema es dónde se parte el hueso, no la orientación.
 4. Decidir si el ensamble entra a la demo (+0.003 en test y validación; triplica el costo).
-5. Notebook `04_semana10_pipeline_multitarea.ipynb`, `plan_semana10.md`, `IA_USAGE.md` y
-   `resumen_experimentos.md` con la serie H.
-6. Commit y push de todo lo de esta sección 12 (código, pruebas, notebook 05, resultados).
-7. Opcionales: test de F1 y C2 s44 (una vez, sin elegir), resolución 512, más épocas.
+5. Opcionales: test de F1 y C2 s44 (una vez, sin elegir), resolución 512, más épocas.
