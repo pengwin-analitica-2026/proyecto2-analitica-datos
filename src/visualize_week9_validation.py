@@ -12,7 +12,8 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from week9_detection import DetectionModel, REGION_NAMES, boxes_from_label, decode_predictions
+from week9_detection import (REGION_NAMES, boxes_from_label, decode_predictions,
+                             detection_model_from_checkpoint)
 
 COLORS = ("#00BFFF", "#00C853", "#FF5252")
 
@@ -33,6 +34,10 @@ def main() -> None:
     parser.add_argument("--cache", default="data/cache/week9_detection_slices.npz")
     parser.add_argument("--checkpoint", default="outputs/week9_detection_initial.pth")
     parser.add_argument("--case-id", default=None, help="caso de validación; omitir para el primero")
+    parser.add_argument("--confidence", type=float, default=0.20,
+                        help="umbral de confianza (0.20 por defecto, el de siempre); el "
+                             "calibrado sobre validacion se pasa explicito, ver "
+                             "notebooks/03_semana9_deteccion_jacobo.ipynb")
     parser.add_argument("--all-predictions", action="store_true",
                         help="muestra todas las propuestas posteriores a NMS")
     parser.add_argument("--output", default="outputs/figures/week9_detection_validation.png")
@@ -48,12 +53,10 @@ def main() -> None:
     image = torch.from_numpy(data["images"][index:index + 1].astype(np.float32))
     label = torch.from_numpy(data["labels"][index:index + 1].astype(np.int64))
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
-    model = DetectionModel(base_channels=checkpoint["base_channels"],
-                           use_cbam=checkpoint.get("use_cbam", True))
-    model.load_state_dict(checkpoint["model"])
+    model = detection_model_from_checkpoint(checkpoint)
     model.eval()
     with torch.no_grad():
-        predicted = decode_predictions(model(image), confidence=.20)[0]
+        predicted = decode_predictions(model(image), confidence=args.confidence)[0]
     if not args.all_predictions:
         # El visualizador de avance muestra una sola hipótesis legible por
         # región. La evaluación conserva todas las propuestas con NMS.
@@ -70,7 +73,7 @@ def main() -> None:
         cls = int(item["class_id"])
         draw(ax, item, f"Pred {REGION_NAMES[cls]} {item['score']:.2f}", "dashed")
     ax.set_title(f"Validación — caso {ids[index]}, corte {int(data['z_indices'][index])}\n"
-                 "GT sólida; predicción discontinua")
+                 f"GT sólida; predicción discontinua (confianza ≥ {args.confidence:.2f})")
     ax.axis("off")
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, dpi=180, bbox_inches="tight")

@@ -15,16 +15,29 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pengwin_io import load_case, resize_label_slice, resize_slice, window_hu
+from pengwin_io import GAMMA, load_case, resize_label_slice, resize_slice, window_hu
 
 
-def choose_slices(label: np.ndarray, count: int) -> np.ndarray:
-    """Cortes distribuidos en la extensión axial con anatomía etiquetada."""
-    valid = np.flatnonzero((label != 0).any(axis=(1, 2)))
+def choose_slices(label: np.ndarray, count: int, extent: tuple[float, float] = (0.15, 0.85),
+                  negatives: int = 0) -> np.ndarray:
+    """Cortes distribuidos en la extensión axial con anatomía etiquetada.
+
+    ``extent`` fija el rango (fracción de la extensión ósea) del que se toman los
+    cortes con hueso; (0.0, 1.0) cubre también los extremos, donde faltan
+    regiones. ``negatives`` agrega cortes SIN hueso repartidos por el volumen,
+    para que el clasificador de presencia vea ejemplos de ausencia.
+    """
+    has_bone = (label != 0).any(axis=(1, 2))
+    valid = np.flatnonzero(has_bone)
     if len(valid) == 0:
         return np.array([], dtype=int)
-    positions = np.linspace(0.15, 0.85, min(count, len(valid)))
-    return valid[np.unique(np.round(positions * (len(valid) - 1)).astype(int))]
+    positions = np.linspace(extent[0], extent[1], min(count, len(valid)))
+    chosen = valid[np.unique(np.round(positions * (len(valid) - 1)).astype(int))]
+    empty = np.flatnonzero(~has_bone)
+    if negatives > 0 and len(empty) > 0:
+        picks = np.unique(np.round(np.linspace(0, len(empty) - 1, min(negatives, len(empty)))).astype(int))
+        chosen = np.concatenate([chosen, empty[picks]])
+    return np.sort(chosen)
 
 
 def main() -> None:
@@ -35,6 +48,15 @@ def main() -> None:
     parser.add_argument("--slices-per-case", type=int, default=4)
     parser.add_argument("--max-train-cases", type=int, default=24)
     parser.add_argument("--max-val-cases", type=int, default=15)
+    parser.add_argument("--extent", type=float, nargs=2, default=(0.15, 0.85),
+                        help="Rango de la extensión ósea a muestrear, p. ej. 0.0 1.0.")
+    parser.add_argument("--negatives-per-case", type=int, default=0,
+                        help="Cortes sin hueso por caso (ejemplos de ausencia para clasificación).")
+    parser.add_argument("--context", type=int, default=0,
+                        help="Entrada 2.5D: K cortes vecinos a cada lado como canales (0 = 2D).")
+    parser.add_argument("--gamma", type=float, default=GAMMA,
+                        help=f"correccion gamma de la entrada (por defecto {GAMMA}, la de produccion); "
+                             "1.0 = solo ventaneo, para comparar preprocesamientos")
     parser.add_argument("--max-test-cases", type=int, default=0,
                         help="Incluye test solo para evaluación final; 0 conserva el cache de entrenamiento.")
     args = parser.parse_args()
@@ -52,8 +74,13 @@ def main() -> None:
             case = load_case(case_id, load_label=True)
             if case.label is None:
                 raise RuntimeError(f"El caso {case_id} no tiene máscara")
-            for z in choose_slices(case.label, args.slices_per_case):
-                images.append(resize_slice(window_hu(case.image[z]), args.size).astype(np.float16))
+            for z in choose_slices(case.label, args.slices_per_case, tuple(args.extent),
+                                   args.negatives_per_case):
+                depth = case.image.shape[0]
+                stack = [resize_slice(window_hu(case.image[min(max(z + d, 0), depth - 1)], gamma=args.gamma),
+                                      args.size).astype(np.float16)
+                         for d in range(-args.context, args.context + 1)]
+                images.append(np.stack(stack))  # (2K+1, S, S); K=0 → (1, S, S)
                 labels.append(resize_label_slice(case.label[z], args.size).astype(np.uint8))
                 case_ids.append(case_id)
                 z_indices.append(z)
@@ -64,11 +91,12 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         out,
-        images=np.stack(images)[:, None], labels=np.stack(labels),
+        images=np.stack(images), labels=np.stack(labels),
         case_ids=np.array(case_ids), z_indices=np.array(z_indices),
         split_names=np.array(split_names), size=np.array(args.size),
+        context=np.array(args.context), gamma=np.array(args.gamma),
     )
-    print(f"Cache: {out} | cortes={len(images)} | train={sum(s == 'train' for s in split_names)} "
+    print(f"Cache: {out} | gamma={args.gamma} | cortes={len(images)} | train={sum(s == 'train' for s in split_names)} "
           f"| val={sum(s == 'val' for s in split_names)} | test={sum(s == 'test' for s in split_names)}")
 
 

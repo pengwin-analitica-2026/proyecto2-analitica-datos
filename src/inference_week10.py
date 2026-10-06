@@ -13,8 +13,9 @@ import numpy as np
 import torch
 from torch import Tensor
 
+from instance_postprocess import primary_secondary_to_instances
 from week9_detection import decode_predictions
-from week10_multitask import PengwinMultiTaskModel
+from week10_multitask import INSTANCE_MODES, PengwinMultiTaskModel, two_pass_instances
 
 
 REGION_NAMES = {0: "sacro", 1: "coxal_izquierdo", 2: "coxal_derecho"}
@@ -48,7 +49,16 @@ def infer_slice(model: torch.nn.Module, image: Tensor, *, confidence: float = 0.
         outputs = model(image)
         detections = decode_predictions(outputs["detection"], confidence, iou_threshold)[0]
         semantic = outputs["semantic"].argmax(dim=1)[0].cpu().numpy().astype(np.uint8)
-        instance = outputs["instance"].argmax(dim=1)[0].cpu().numpy().astype(np.uint8)
+        if outputs["instance"].shape[1] == INSTANCE_MODES["primary"]:
+            if getattr(model, "two_pass", False):
+                instance = two_pass_instances(model, image, outputs["semantic"].argmax(dim=1))[0]
+            else:
+                instance = outputs["instance"].argmax(dim=1)[0]
+            # Cabeza primario/secundario → IDs PENGWIN por componentes conectados.
+            instance = primary_secondary_to_instances(instance.cpu().numpy().astype(np.uint8),
+                                                      semantic).astype(np.uint8)
+        else:
+            instance = outputs["instance"].argmax(dim=1)[0].cpu().numpy().astype(np.uint8)
 
     height, width = semantic.shape
     fragments = np.zeros((height, width), dtype=np.uint8)
@@ -83,7 +93,10 @@ def load_checkpoint(path: str | Path, device: str | None = None) -> tuple[torch.
     """Carga un checkpoint guardado por train_week10_overfit."""
     target = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
     checkpoint = torch.load(path, map_location=target)
-    model = PengwinMultiTaskModel(base_channels=int(checkpoint.get("base_channels", 4)))
+    model = PengwinMultiTaskModel(base_channels=int(checkpoint.get("base_channels", 4)),
+                                  instance_mode=str(checkpoint.get("instance_mode", "ids")),
+                                  in_channels=int(checkpoint.get("in_channels", 1)))
     model.load_state_dict(checkpoint["model"])
+    model.two_pass = bool(checkpoint.get("two_pass", False))
     return model.to(target), target
 

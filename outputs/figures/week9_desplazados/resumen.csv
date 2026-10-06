@@ -1,0 +1,6 @@
+caso,z,region,fragmento,dist_mm,pixeles_256,posicion_axial,dentro_rango_entrenamiento,veredicto_todas,cobertura_todas,caja_todas,veredicto_1_por_clase,cobertura_1_por_clase
+014,211,coxal_derecho,24,4.1,249,0.83,True,ninguna,0.0,,ninguna,0.0
+024,50,coxal_izquierdo,13,19.1,44,0.11,False,ninguna,0.0,,ninguna,0.0
+024,31,coxal_izquierdo,14,3.4,57,0.04,False,otra clase,1.0,sacro,otra clase,1.0
+087,33,coxal_izquierdo,14,5.4,187,0.02,False,ninguna,0.0,,ninguna,0.0
+099,86,coxal_izquierdo,12,12.9,651,0.24,True,otra clase,0.59,sacro,otra clase,0.59

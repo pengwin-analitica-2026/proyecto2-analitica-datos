@@ -1,0 +1,25 @@
+{
+  "device": "cpu (Colab, 12 hilos)",
+  "tamano": [
+    384,
+    384
+  ],
+  "nota": "lote 1, 30 cortes; transcrito de la salida del benchmark",
+  "config": {
+    "1 modelo": {
+      "mediana_ms": 161.7,
+      "p95_ms": 173.8,
+      "media_ms": 159.6
+    },
+    "1 modelo + TTA": {
+      "mediana_ms": 249.6,
+      "p95_ms": 274.5,
+      "media_ms": 253.9
+    },
+    "ensamble 3 + TTA": {
+      "mediana_ms": 518.0,
+      "p95_ms": 629.4,
+      "media_ms": 529.0
+    }
+  }
+}

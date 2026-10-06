@@ -12,10 +12,11 @@ train y en inferencia, como pidio el profesor).
 Convenciones del equipo (mismas constantes que el resto del repo):
 - Clip previo: [-1024, 3000] HU, neutraliza padding y metal.
 - Ventana osea de visualizacion/entrada al modelo: centro 400, ancho 1800.
-- CLAHE (clip_limit=0.02) sobre la imagen ya en [0,1], activado por defecto
-  en window_hu(): corrige casos con histograma oseo corrido/comprimido
-  (ej. caso 025, diagnosticado en asesoria con el profesor), sin tocar los
-  umbrales en HU crudo que usan bone_mask/body_mask.
+- Correccion gamma (gamma = 1.5) sobre la imagen ya en [0,1], activada por
+  defecto en window_hu(). Reemplaza al CLAHE de la version anterior, que
+  amplificaba el ruido del tejido blando (ver window_hu y
+  src/experimento_normalizacion.py). No toca los umbrales en HU crudo que
+  usan bone_mask/body_mask.
 - Umbral osea (mascara gruesa, sin ML): 250 HU sobre el volumen crudo.
 
 Uso:
@@ -33,7 +34,6 @@ import numpy as np
 import SimpleITK as sitk
 from scipy import ndimage as ndi
 from skimage.transform import resize as _sk_resize
-from skimage import exposure as _sk_exposure
 from skimage.morphology import ball as _sk_ball
 
 # ---------------------------------------------------------------------------
@@ -121,55 +121,87 @@ def clip_hu(volume: np.ndarray, clip_min: int = CLIP_MIN, clip_max: int = CLIP_M
     return np.clip(volume, clip_min, clip_max)
 
 
-CLAHE_CLIP_LIMIT = 0.02  # mismo valor con el que se comparo contra gamma y ecualizacion global
+GAMMA = 1.5  # correccion gamma de la entrada al modelo; justificacion en window_hu
 
 
 def window_hu(volume: np.ndarray, center: int = WINDOW_CENTER, width: int = WINDOW_WIDTH,
               clip_min: int = CLIP_MIN, clip_max: int = CLIP_MAX,
-              aplicar_clahe: bool = True) -> np.ndarray:
+              gamma: float = GAMMA) -> np.ndarray:
     """
-    Ventaneo HU -> [0, 1] float32 + CLAHE por defecto. Aplica clip_hu
-    internamente, asi que se puede llamar directo sobre el volumen crudo
-    de load_case(). Espera un CORTE 2D (y, x), no un volumen 3D completo
-    — asi la llaman todos los scripts del repo (train_overfit_detection.py,
-    prepare_week9_detection_data.py); CLAHE es local por parches y no tiene
-    sentido aplicarlo de una sola vez sobre un volumen 3D entero.
+    Ventaneo HU -> [0, 1] float32, seguido de correccion gamma. Aplica clip_hu
+    internamente, asi que se puede llamar directo sobre el volumen crudo de
+    load_case(). Funciona igual sobre un corte 2D o un volumen 3D: cada voxel
+    se transforma solo con su propio valor, sin mirar a sus vecinos.
 
-    CLAHE (skimage.exposure.equalize_adapthist) se agrego tras diagnosticar
-    el caso 025 en la asesoria con el profesor: NO es metal (esa hipotesis
-    se descarto, ver docs/resumen_semana8.md) sino que su histograma oseo
-    esta corrido y comprimido ~150-200 HU por debajo de lo tipico (unico
-    caso con z-score < -2 en hueso_media/hueso_p50 sobre los 100 casos),
-    probablemente por diferencia de kernel de reconstruccion entre
-    instituciones. Se comparo contra gamma fijo (distorsiona por igual los
-    casos ya normales, descartado) y ecualizacion global (demasiado
-    agresiva, aplana el tejido blando a un bloque gris uniforme y pierde
-    toda la anatomia, descartada). CLAHE es local/adaptivo por parches:
-    en el caso 025 recupera la textura trabecular que el corrimiento HU
-    escondia, y en casos ya normales no distorsiona la imagen de forma
-    perceptible. Comparacion visual en
-    outputs/eda/diagnostico_normalizacion_caso025.png.
+    salida = ventana(HU) ** gamma
 
-    Se aplica AQUI (a la imagen ya en [0,1]), nunca al HU crudo: bone_mask,
-    body_mask y clean_bone_mask siguen operando sobre volume_hu_crudo sin
-    tocar, tal como exigio el profesor (el umbral en HU se aplica antes de
-    normalizar la imagen que entra al modelo).
+    POR QUE GAMMA = 1.5 (asesoria de semana 9)
+    -------------------------------------------
+    La version anterior aplicaba CLAHE (clip_limit=0.02, nbins=256, tejas de
+    1/8 de la imagen). El profesor senalo que las imagenes salian granuladas
+    (caso 033) y con los grises mal repartidos, y recomendo el metodo NGC-CLAHE
+    de Rao et al. (EURASIP J. Adv. Signal Process., 2015,
+    doi:10.1186/s13634-015-0214-1): gamma normalizado ANTES de CLAHE.
 
-    aplicar_clahe=False deshabilita el paso para comparaciones/debug; todo
-    el pipeline de entrenamiento e inferencia debe dejarlo en True (default)
-    para que ambos usen exactamente el mismo preprocesamiento.
+    src/experimento_normalizacion.py barrio 166 combinaciones de gamma, clip
+    limit, tamano de teja y nbins sobre 5 casos (001, 025, 033, 068, 080) y
+    midio la relacion contraste-ruido (CNR) entre hueso etiquetado y tejido
+    blando. Resultados promedio:
+
+        ventaneo solo        CNR 6.62   ruido tejido blando 0.026
+        CLAHE anterior       CNR 3.23   ruido tejido blando 0.089
+        gamma 1.5            CNR 8.11   ruido tejido blando 0.020
+
+    1. CLAHE empeoraba la imagen en los 5 casos: la mitad del CNR del
+       ventaneo solo y mas de tres veces su ruido. Era el granulado que vio
+       el profesor.
+    2. Con cualquier gamma fijo, gamma solo le gano a TODAS las combinaciones
+       de CLAHE con ese mismo gamma. CLAHE no aporto en ningun punto del
+       barrido, asi que se retira y no queda ningun nbins que justificar.
+    3. gamma > 1 comprime los grises oscuros y expande los claros (derivada
+       0.5 en el tejido blando, ~0.25; 1.4 en el hueso, ~0.7). Es lo que debe
+       hacer una ventana osea: tejido blando uniforme, hueso destacado.
+    4. El CNR crece de forma monotona con gamma (6.62, 7.21, 8.11, 9.06,
+       9.74, 10.45 para 1.0 a 2.2) porque el ruido baja mas rapido que el
+       contraste: maximizarlo lleva a una imagen casi negra. Se uso un segundo
+       criterio, el brillo medio del hueso, para no perder la textura
+       trabecular que necesita la segmentacion. Con gamma 1.5 queda entre 0.22
+       y 0.35 (0.40 a 0.49 con ventaneo solo); con 2.2 cae a 0.12-0.23 y el
+       interior del hueso se apaga (outputs/eda/comparacion_gamma.png).
+
+    DIFERENCIA CON EL PAPER: no se renormaliza por minimo y maximo de cada
+    imagen tras el gamma. El ventaneo ya fija los extremos en 0 y 1, asi que
+    en un corte con aire y hueso denso esa renormalizacion no cambia nada;
+    pero en un corte sin hueso por encima de 1300 HU lo aclararia segun su
+    propio contenido, y el mismo tejido saldria con brillo distinto segun el
+    corte. Sin renormalizar, el resultado depende solo del HU del voxel, que
+    es la garantia de pipeline identico en entrenamiento e inferencia.
+
+    LIMITACION CONOCIDA: gamma es global, la misma curva para todos los
+    casos, asi que no iguala el brillo entre escaneres. Entre los 5 casos del
+    experimento, el 025 queda con el hueso mas oscuro (0.221 contra
+    0.267-0.350), pero en la revision de los 100 casos no es atipico: el
+    brillo medio del hueso va de 0.188 (caso 034) a 0.398 (caso 076), media
+    0.296, y los atipicos (|z| > 2) son 013, 026, 027, 034 y 095 (oscuros) y
+    076 (claro). Ver notebooks/03_semana9_deteccion.ipynb, seccion 1.1.
+    Por decision del equipo NO se normaliza por caso: un ajuste a medida no
+    se puede aplicar a un caso nuevo sin verlo. Si la diferencia afecta la
+    deteccion, se aborda con aumento de intensidad en el entrenamiento.
+
+    Se aplica a la imagen ya en [0,1], nunca al HU crudo: bone_mask,
+    body_mask y clean_bone_mask siguen operando sobre el volumen sin tocar,
+    tal como exigio el profesor. gamma=1.0 devuelve el ventaneo lineal, util
+    solo para comparar; entrenamiento e inferencia deben usar el valor por
+    defecto.
     """
+    if gamma <= 0:
+        raise ValueError(f"gamma debe ser positivo, recibido {gamma}")
     volume = clip_hu(volume, clip_min, clip_max)
     low, high = center - width / 2, center + width / 2
     windowed = np.clip(volume, low, high)
-    windowed = (windowed - low) / (high - low)
-    windowed = windowed.astype(np.float32)
-
-    if aplicar_clahe and windowed.max() > windowed.min():
-        windowed = _sk_exposure.equalize_adapthist(
-            windowed, clip_limit=CLAHE_CLIP_LIMIT
-        ).astype(np.float32)
-
+    windowed = ((windowed - low) / (high - low)).astype(np.float32)
+    if gamma != 1.0:
+        windowed = np.power(windowed, gamma, dtype=np.float32)
     return windowed
 
 
@@ -198,13 +230,20 @@ MIN_SURFACE_DEPTH_MM = 10.0   # profundidad minima (mm bajo la piel) de un compo
 BIG_COMPONENT_VOXELS = 50_000  # componentes >= a esto (esqueleto, femures) nunca se filtran
 DEPTH_DOWNSAMPLE = 2           # submuestreo del mapa de profundidad (memoria); error ~1-2 mm
 
-# Recuperacion de hueso de baja densidad (solo para la mascara visual del V1).
+# Recuperacion de hueso de baja densidad — DESACTIVADA POR DEFECTO desde la
+# asesoria de semana 9.
 # Con umbral fijo 250 HU la mascara captura en mediana solo 57% del hueso
 # etiquetado (22 casos, diag_umbral.py). Crecimiento por histeresis 150/250 +
 # cierre + relleno de cavidades sube la mediana a ~92% dentro de la caja del
-# hueso (diag_relleno.py). Se aplica DESPUES de la limpieza y solo a >= 10 mm de
-# la piel: aplicado antes, fusiono con el hueso los arcos pegados a la piel del
-# caso 001 y el filtro de profundidad dejo de poder borrarlos.
+# hueso (diag_relleno.py). Se retiro del camino por defecto por dos razones:
+#   1. El profesor pidio no agregar filtros que no hagan falta.
+#   2. El cierre morfologico puede sellar una linea de fractura o unir dos
+#      fragmentos separados por un espacio fino, que es justo lo que el
+#      proyecto debe mostrar y medir.
+# Sigue disponible pasando low_threshold=BONE_LOW_HU_THRESHOLD y
+# fill_cavities=True (lo hace src/diag_semana8/diag_final_v1.py para la
+# comparacion documentada). Costo aceptado: el V1 vuelve a mostrar el hueso
+# esponjoso hueco, sobre todo en el caso 025.
 BONE_LOW_HU_THRESHOLD = 150   # umbral bajo del crecimiento (semilla = mascara ya limpia)
 CLOSING_RADIUS_VOX = 2        # radio (voxeles) del cierre morfologico que sella grietas
 
@@ -245,8 +284,8 @@ def clean_bone_mask(volume_hu_crudo: np.ndarray, bone_threshold: int = BONE_HU_T
                      spacing_zyx: tuple | None = None,
                      min_surface_depth_mm: float = MIN_SURFACE_DEPTH_MM,
                      big_component_voxels: int = BIG_COMPONENT_VOXELS,
-                     low_threshold: int | None = BONE_LOW_HU_THRESHOLD,
-                     fill_cavities: bool = True,
+                     low_threshold: int | None = None,
+                     fill_cavities: bool = False,
                      closing_radius: int = CLOSING_RADIUS_VOX) -> np.ndarray:
     """
     Mascara de hueso limpia, sin camilla ni cables: interseccion entre
@@ -267,7 +306,9 @@ def clean_bone_mask(volume_hu_crudo: np.ndarray, bone_threshold: int = BONE_HU_T
     spacing_zyx = (sz, sy, sx) en mm, en el orden del volumen (z, y, x). Si
     es None el filtro de profundidad se omite (comportamiento anterior).
 
-    3. Recuperacion de hueso de baja densidad (requiere spacing_zyx): partiendo
+    3. Recuperacion de hueso de baja densidad — DESACTIVADA POR DEFECTO (ver
+    el comentario de BONE_LOW_HU_THRESHOLD). Solo corre si se pasan
+    low_threshold y fill_cavities=True, ademas de spacing_zyx. Partiendo
     de la mascara ya limpia (filtros 1 y 2), crece hacia voxeles entre
     low_threshold (150 HU) y bone_threshold, solo si estan conectados a ese
     hueso y a >= min_surface_depth_mm de la piel; luego un cierre morfologico
