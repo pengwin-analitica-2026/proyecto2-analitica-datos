@@ -45,7 +45,11 @@ def _check_key(key: str | None) -> None:
 
 
 @app.get("/health")
-def health() -> dict:
+def health(deep: int = 0) -> dict:
+    # Sin ?deep=1 responde al instante: el adaptador de Lambda lo usa como chequeo de arranque (10 s)
+    # y cargar torch + el modelo tarda más en frío. Con ?deep=1 carga el modelo y lo reporta.
+    if not deep:
+        return {"ok": True, "loaded": bool(_state)}
     state = _load()
     return {"ok": True, "model": state["info"]["checkpoint"], "device": str(state["device"]),
             "parameters": state["info"]["parameters"], "tta": state["info"]["tta"]}

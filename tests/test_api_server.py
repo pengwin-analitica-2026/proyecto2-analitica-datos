@@ -34,7 +34,7 @@ class ApiServer(unittest.TestCase):
         return buffer.getvalue()
 
     def test_health_reports_the_model(self):
-        body = self.client.get("/health").json()
+        body = self.client.get("/health?deep=1").json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["model"], CHECKPOINT.name)
 

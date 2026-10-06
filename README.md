@@ -23,13 +23,14 @@ propio de 32 canales con CBAM, tres cabezas (clasificación, detección con grid
 segmentación semántica e instancia), orientación canónica de los volúmenes según su cabecera,
 aumento geométrico con rotación de ±35° y pesos EMA.
 
-| Métrica (test, 15 pacientes, media de 3 semillas) | Valor |
-|---|---|
-| Dice por fragmento | 0.875 |
-| IoU por fragmento | 0.815 |
-| F1 / AUC de clasificación | 0.988 / 0.999 |
-| IoU de detección / mAP50 / mAP50:95 | 0.941 / 0.958 / 0.899 |
-| Dice / IoU semántico | 0.970 / 0.943 |
+| Métrica en test (15 casos, H6 semilla 42) | Objetivo | Resultado |
+|---|---|---|
+| F1 / AUC de clasificación | 0.85 / 0.85 | 0.990 / 0.999 |
+| IoU medio / mAP50 / mAP50:95 de detección | 0.65 / 0.65 / 0.40 | 0.943 / 0.961 / 0.902 |
+| Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.971 / 0.943 |
+| Dice / IoU por fragmento | 0.85 / 0.70 | 0.875 / 0.816 |
+
+Las tres semillas (42, 43 y 44) dan 0.875, 0.875 y 0.876 de Dice por fragmento.
 
 Estas cifras son una **segunda evaluación en test, posterior al análisis de fallos**; la primera
 evaluación oficial fue D5 (Dice por fragmento 0.845). Cómo se eligió H6, las ablaciones, la
@@ -58,7 +59,8 @@ app/        dashboard Streamlit
 api/        API de inferencia
 deploy/     scripts de despliegue
 data/       manifest, splits y CSVs del EDA (data/raw/ y data/cache/ NO se versionan)
-outputs/    figuras, resultados (outputs/s10/) y checkpoints
+outputs/    figuras (figures/), EDA (eda/), resultados y checkpoints de la Semana 10 (s10/)
+            y casos exportados para el dashboard (demo/)
 docs/       resúmenes y bitácoras de avance
 ```
 
@@ -172,6 +174,17 @@ python src/evaluate_volumes.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_em
     --cache-dir data/cache/s10/cache_384 --split val --tta \
     --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42_val.json
 ```
+
+Para el post-proceso 3D y la distancia de separación en mm por fragmento (también sobre el ground
+truth):
+
+```bash
+python src/infer_volume.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+    --cache-dir data/cache/s10/cache_384 --split val --tta --distance-nofill --surface-metrics
+```
+
+H6 espera los volúmenes en orientación canónica: `evaluate_volumes.py` e `infer_volume.py` los
+enderezan solos según lo que indica el checkpoint.
 
 Resultado esperado en validación: Dice por fragmento 0.869 (puede variar en la tercera cifra según
 el hardware). Reporta la detección cruda (cabeza grid) y la refinada, y separa el Dice en

@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 COPY src/ src/
 COPY api/server.py api/server.py
 COPY outputs/s10/d5_ema_w32_e60_s42.pth outputs/s10/d5_ema_w32_e60_s42.pth
+# Lambda ejecuta con un usuario sin privilegios: los archivos deben ser legibles por todos
+RUN chmod -R a+rX /app
 
 ENV PORT=8080 AWS_LWA_PORT=8080 AWS_LWA_READINESS_CHECK_PATH=/health \
     MODEL_PATH=/app/outputs/s10/d5_ema_w32_e60_s42.pth OMP_NUM_THREADS=2

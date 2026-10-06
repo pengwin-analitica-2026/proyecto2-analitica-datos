@@ -102,9 +102,9 @@ Nuevo en `continuacion_semana08`. Centraliza en un solo lugar lo que antes estab
 | Flujo | Funciones | Escala | Para qué |
 |---|---|---|---|
 | Entrada al modelo | `window_hu` (+ CLAHE) → `resize_slice` | Grises `[0, 1]` | Entrenamiento e inferencia |
-| Visualizador 1 | `clean_bone_mask` (usa `bone_mask` y `body_mask`) | HU reales | Reconstrucción 3D sin modelo |
+| Visualizador 1 | `clean_bone_mask` (usa `bone_mask` y `body_mask`) | HU reales | MIP en tres ejes y reconstrucción 3D, sin modelo |
 
-Las máscaras se calculan sobre HU reales porque los umbrales (250, 150 y −300 HU) solo tienen sentido en esa escala; el ventaneo y CLAHE la destruyen. **Verificado en el código** (búsqueda de `bone_mask|clean_bone_mask` en `src/`): la máscara ósea solo la usan `pengwin_io.py`, `volumen_3d_visualizer.py` y los scripts de diagnóstico. Ningún script de entrenamiento la llama, así que los cambios de la sección 8 **no afectan al modelo, a las métricas ni a la medición de distancias**.
+Las máscaras se calculan sobre HU reales porque los umbrales (250, 150 y −300 HU) solo tienen sentido en esa escala; el ventaneo y CLAHE la destruyen. **Verificado en el código** (búsqueda de `bone_mask|clean_bone_mask` en `src/`): la máscara ósea solo la usan `pengwin_io.py`, los dos visualizadores (`volumen_3d_visualizer.py` y `raw_view.py`, que llama `demo_export.py` para el dashboard) y los scripts de diagnóstico. Ningún script de entrenamiento la llama, así que los cambios de la sección 8 **no afectan al modelo, a las métricas ni a la medición de distancias**.
 
 Constantes nuevas en `pengwin_io.py`:
 
@@ -124,9 +124,9 @@ Constantes nuevas en `pengwin_io.py`:
 - Función `apply_hu_window`: primero `clip` a **[-1024, 3000] HU** y luego ventana ósea **C=400 / W=1800**, normalizada a `[0, 1]`. Misma fórmula ahora centralizada en `pengwin_io.window_hu`.
 - Verificado visualmente en 3 casos: `001` (normal), `080` (HU máx. 47 685, metal) y `068` (HU mín. -6 211, padding). Salida: `outputs/figures/hu_window_check_{001,068,080}.png`.
 
-## 8. Visualizador 1 — Reconstrucción 3D del volumen crudo (`volumen_3d_visualizer.py`)
+## 8. Visualizador 1 — MIP y reconstrucción 3D del volumen crudo (`raw_view.py`, `volumen_3d_visualizer.py`)
 
-Reemplaza la versión anterior (`mip_visualizer.py`, tres PNG estáticos de proyección de máxima intensidad) por una **isosuperficie 3D interactiva en Plotly**, rotable con el mouse — lo que pide literalmente el pliego para el V1 ("reconstrucción 3D inicial del volumen original").
+El enunciado pide dos cosas para el V1: una proyección de máxima intensidad (MIP) que muestre solo el hueso, con un umbral en HU sobre el volumen sin procesar (sección 3.4), y una reconstrucción 3D inicial del volumen original. La primera versión (`mip_visualizer.py`, tres PNG estáticos) se reemplazó en esta semana por una **isosuperficie 3D interactiva en Plotly**, rotable con el mouse. En la Semana 11 se recuperó el MIP en `src/raw_view.py` (`compute_mips`), que usa la misma `clean_bone_mask` y remuestrea a 1 mm por píxel, de modo que el V1 entrega las dos vistas. El MIP se ve en la sección 6.1 del notebook 01 y en el dashboard (`demo_export.py` → `raw_view.npz`).
 
 Uso: `python src/volumen_3d_visualizer.py` corre los casos de ejemplo (`001`, `025`, `068`); `python src/volumen_3d_visualizer.py 007` corre un caso puntual. Salida: `outputs/figures/volumen_3d_<id>.html`. Tarda entre 4 y 17 s por caso solo en la máscara, así que para la demo los HTML se dejan pregenerados.
 
@@ -268,6 +268,7 @@ Todos los comandos se corren **desde la raíz del repo**.
 | 3 | Splits fijos | `python src/make_splits.py` | `data/splits.json` (70/15/15, seed 42) |
 | 4 | Ventaneo HU | `python src/hu_windowing_check.py` | `outputs/figures/hu_window_check_*.png` |
 | 5 | Visualizador 1 (3D) | `python src/volumen_3d_visualizer.py` | `outputs/figures/volumen_3d_<id>.html` |
+| 5b | Visualizador 1 (MIP) | notebook 01, sección 6.1 (`src/raw_view.py`) | `outputs/figures/mip_visualizador1.png` |
 | 6 | EDA de fragmentos | `python src/eda_fragments.py` | `data/eda_fragments_detalle.csv` + `outputs/eda/*` |
 | 7 | EDA fragmento principal | `python src/eda_fragmento_principal_y_tamano.py` | `data/eda_fragmentos_individuales.csv` + `outputs/eda/*` |
 
@@ -336,7 +337,7 @@ python src/eda_fragmento_principal_y_tamano.py
 - [x] Dataset curado con splits fijos.
 - [x] Carga de `.mha` + ventaneo HU con clip, probado visualmente en 3 casos.
 - [x] EDA de fragmentos por caso.
-- [x] Visualizador 1 — reconstrucción 3D interactiva (no solo MIP), limpia de camilla/cables.
+- [x] Visualizador 1 — MIP en los tres ejes (`raw_view.py`) y reconstrucción 3D interactiva, limpios de camilla/cables.
 - [x] Módulo de preprocesamiento reutilizable (`pengwin_io.py`).
 - [x] EDA de tamaño de fragmento (mm³, cortes) y validación del fragmento principal.
 - [x] `requirements.txt` curado y probado en Windows sin GPU.

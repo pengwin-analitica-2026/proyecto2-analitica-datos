@@ -1,6 +1,6 @@
-# Plan de la Semana 10 (v2) — reinicio desde cero
+# Plan de la Semana 10 (v3) — reinicio desde cero
 
-Actualizado: 4 de octubre de 2026. Rama base: `unificado_semana09` (commit `a667c41`).
+Actualizado: 6 de octubre de 2026 (sección 0c con el cierre; lo demás es del 5 de octubre, v3: estado de experimentos, checklist y tabla de modelos). El resto del documento es la v2 sin cambios. Rama base: `unificado_semana09` (commit `a667c41`).
 Reemplaza la versión 1 de este mismo documento.
 
 ## 0. Decisiones tomadas
@@ -13,6 +13,126 @@ Reemplaza la versión 1 de este mismo documento.
   dos lecturas (sección 2).
 - **Se explora todo lo que pueda ayudar.** El único límite son las restricciones del
   enunciado. Las recomendaciones (resolución, batch) no limitan.
+
+## 0c. Estado al 6 de octubre de 2026 (17:00 UTC): cierre de la exploración
+
+La sección 0b quedó atrás. El registro completo y actualizado está en el repositorio:
+`docs/decisiones_semana10.md` (bitácora de decisiones). Resumen:
+
+- **Modelo final: H6** = receta C2 + EMA (ancho 32, CBAM en 1 etapa, secundarios x3, 60 épocas)
+  más aumento geométrico con rotación de +-35 grados y orientación canónica según la cabecera
+  del .mha (`--aug-geo 1.0 --aug-rot-deg 35 --canonical`). Archivo:
+  `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`.
+- **Test, primera evaluación (D5 s42 + TTA, configuración congelada antes de ver test):**
+  Dice de instancias 0.845; no cumplía el objetivo de 0.85. Es la cifra limpia.
+- **Diagnóstico:** dos casos hundían el test (012, paciente girado unos 26 grados; 039,
+  orientación RAI con aspecto de LPI). El 34 % de los volúmenes está guardado girado 180
+  grados y el modelo no veía ningún aumento geométrico.
+- **Test, segunda evaluación (H6 s42 + TTA, posterior al análisis de fallos):** Dice de
+  instancias 0.875 (primario 0.915, secundario 0.750), F1 0.990, mAP50 0.961, mAP50:95 0.902,
+  Dice semántico 0.971. Cumple todos los objetivos. Las semillas 43 y 44 dan 0.875 y 0.876; el
+  ensamble de las tres, 0.879. Caso 012: 0.692 → 0.865; caso 039: 0.710 → 0.784.
+- **Validación (H6, tres semillas):** 0.869 / 0.868 / 0.872; con la validación girada 30 grados,
+  0.854 (D5: 0.559).
+- **Distancias en mm (test):** error medio 2.96 → 1.28 mm y correlación 0.54 → 0.82; un solo
+  fragmento (caso 007) concentra el 79 % del error.
+- **Hecho además:** ablaciones de CBAM y transfer learning, calibración de lambdas, tres
+  semillas, post-proceso 3D, SAM zero-shot (en test con H6: 0.889 frente a 0.934 nuestro en Dice
+  por región),
+  latencia en GPU y CPU.
+- **Descartado:** detector geométrico de giro (falla en pacientes bien colocados), filtros de
+  post-proceso, ensamble como modelo principal (gana 0.003, dentro del ruido).
+- **Análisis de error en test (H6):** la confusión entre regiones bajó a 0.06 % del hueso; el
+  error que queda está en dónde se parte el hueso en fragmentos. Peores casos: 039, 061, 007, 054
+  y 047 (`outputs/s10/informe_h6_test/`).
+- **Documentado:** notebook `notebooks/04_semana10_pipeline_multitarea.ipynb` (lee los resultados
+  guardados), `docs/resumen_semana10.md`, `outputs/s10/resumen_experimentos.md`, README e
+  `IA_USAGE.md` (entradas 15 a 18).
+- **Pendiente:** llevar H6 y el paso de orientación canónica al dashboard y la API de la
+  semana 11 (lo hace la sesión de la Semana 11); latencia en el Mac.
+
+## 0b. Estado al 5 de octubre de 2026 (15:30 UTC)
+
+Se actualiza a medida que terminan las corridas. Resultados de validación sobre el volumen completo (15 casos, TTA espejo). Detalle de métricas: `outputs/s10/resumen_experimentos.md`.
+
+Leyenda: **Hecho** · **En curso** · **Parcial** · **Pendiente** · **Descartado**.
+
+### Checklist del mapa de exploración (sección 5)
+
+| # | Qué | Estado | Resultado o nota |
+|---|---|---|---|
+| A1 | Extensión completa, todos los cortes | Hecho | Cachés a 384 px, 70/15/15 casos; entrenamiento con muestreo por época |
+| A2 | Cortes sin hueso | Hecho | `--neg-fraction 0.15`, margen de 10 cortes; AUC 0.99 |
+| A3 | Muestreo dirigido a secundarios y extremos | Pendiente | Solo se probó el peso en la pérdida (E4) |
+| A4 | Aumentos | Hecho | `--augment` en todas las corridas desde B1; sin ablación aislada |
+| A5 | Recorte al cuerpo | Pendiente | |
+| A6 | Contexto 2.5D | Pendiente | `--context` no está en `train_s10.py`; hay que portarlo |
+| A7 | Resolución 256 / 384 / 512 | Parcial | Solo 384. Faltan 256 y 512 |
+| B1 | 16 / 32 / 48 canales | En curso | 8 → 32 canales es la mayor mejora. 16 y 32 hechos; 48 en curso |
+| B2 | CBAM ninguno / 1 etapa / 3 etapas con γ | Hecho | 1 etapa gana en detección; no mejora instancias. Una semilla; se repite en la fase 5 |
+| B3 | Bloques estilo FundidoraPC | Pendiente | |
+| B4 | Más campo receptivo | Pendiente | |
+| C1 | Pesos de FundidoraPC | Pendiente | Preguntar al equipo |
+| C2 | Preentrenar en Intel Image | Pendiente | Ablación obligatoria; se hace antes de entrenar el modelo final |
+| D1 | Medir la cabeza grid cruda | Hecho | c2: mAP50 0.875, mAP50:95 0.474 sin refinar |
+| D2 | Varias celdas positivas por región | Pendiente | |
+| D3 | Pérdida de caja por IoU | Pendiente | |
+| D4–D6 | Objectness por IoU, grid fino, regresión a bordes | Pendiente | |
+| D7 | Caja refinada con la semántica | Hecho | Se reportan ambas |
+| E1 | Formulaciones de instancia | Parcial | `primary` frente a `ids`: `ids` pierde 45 % de secundarios (Dice 0.787), descartado. Borde, centros y offsets existen como cabezas auxiliares |
+| E2 | Segundo pase por región | Pendiente | `--two-pass` solo está en `evaluate_volumes.py` |
+| E3 | Post-proceso 3D | Pendiente | No requiere reentrenar; se aplica sobre cualquier modelo ya entrenado |
+| E4 | Pérdidas para fragmentos pequeños | Parcial | Peso a secundarios ×3 (B1) y ×6 (B2) y peso por fractura (v4) no mejoran instancias. Faltan focal y Tversky |
+| E5 | Supervisión profunda | Pendiente | |
+| F1 | Calibrar λ | En curso | Primer ensayo: ancho 32 con instancia ×2, borde ×2, detección ×0.5 |
+| F2 | Tres semillas | En curso | B1 hecho (3 semillas); c2 con semillas 43 y 44 en curso |
+| F3 | Umbral por clase | Pendiente | |
+| F4 | Promedio móvil de pesos | Pendiente | Coseno y calentamiento ya se usan |
+| F5 | TTA multiescala | Pendiente | Espejo en uso |
+| F6 | HD95 y ASSD | Pendiente | |
+
+### Fases (sección 6)
+
+| Fase | Estado |
+|---|---|
+| 0 Preparación | Hecho: cachés, evaluador de volumen completo, línea base |
+| 1 Modelo desde cero | Hecho |
+| 2 Receta base | Hecho como B1 (8 canales, 384 px, CBAM 1 etapa, sec3, 80 ép., 3 semillas). Difiere de lo planeado (256 px, 32 canales) |
+| 3 Exploración | En curso: ancho, instancia, λ, peso por fractura |
+| 4 Modelo candidato | Pendiente: c2 es el candidato provisional |
+| 5 Ablaciones obligatorias | Pendiente |
+| 6 Volumen: 3D y distancias | Pendiente |
+| 7 SAM | Pendiente |
+| 8 Test, latencia, notebook 04 | Pendiente |
+
+### Modelos probados
+
+Todos: CBAM en 1 etapa salvo indicación, resolución 384, batch 16, coseno, aumentos, semilla 42 salvo indicación, instancia `primary` salvo indicación. "ép. × cortes" son épocas por cortes muestreados por época.
+
+| Modelo | Canales | Parámetros | ép. × cortes | Cambio principal | Dónde | Min | mAP50 ref. | mAP50:95 ref. | Dice seg. | Dice inst. | Dice secundarios |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `w10g_384neg` | — | — | — | Línea base de la Semana 10 anterior | Kaggle | — | 0.874 | 0.781 | 0.956 | 0.834 | 0.702 |
+| B0 sin CBAM | 8 | 173 mil | 40 × 2 500 | Ablación | Kaggle | — | 0.900 | 0.796 | — | — | — |
+| B0 CBAM 1 | 8 | 173 mil | 40 × 2 500 | Ablación | Kaggle | — | 0.926 | 0.835 | — | — | — |
+| B0 CBAM 3 + γ | 8 | — | 40 × 2 500 | Ablación | Kaggle | — | 0.907 | 0.814 | — | — | — |
+| B1 (s42 / s43 / s44) | 8 | 173 mil | 80 × 2 500 | Secundarios ×3 | Kaggle T4 | 64 | 0.935 / 0.937 / 0.929 | 0.850 / 0.854 / 0.848 | 0.963 / 0.960 / 0.963 | 0.835 / 0.826 / 0.826 | 0.661 / 0.631 / 0.644 |
+| B2 | 8 | 173 mil | 50 × 2 500 | Secundarios ×6 | Kaggle T4 | 41 | 0.918 | 0.834 | 0.963 | 0.832 | 0.681 |
+| v4 | 8 | 173 mil | 60 × 5 000 | Peso por fractura 2 | Colab L4 | 81 | 0.945 | 0.867 | 0.965 | 0.832 | 0.642 |
+| `ids` | 8 | 174 mil | 80 × 2 500 | Instancia con 31 clases | Colab L4 | 62 | 0.933 | 0.844 | 0.962 | 0.787 | 0.460 |
+| c1 | 16 | 688 mil | 80 × 2 500 | Ancho 16 | Kaggle T4 | 70 | 0.955 | 0.886 | 0.969 | 0.839 | 0.649 |
+| **c2** | **32** | **2.74 M** | **60 × 2 500** | **Ancho 32** | Kaggle T4 | 62 | **0.962** | **0.889** | **0.969** | **0.849** | **0.687** |
+
+En curso: c2 semillas 43 y 44 (Kaggle), ancho 48 con 6.15 M de parámetros (Colab) y ancho 32 con λ ajustados (Colab).
+
+### Qué es código nuevo y cuándo se ejecuta
+
+- **Antes de entrenar** (cambia lo que aprende el modelo): contexto 2.5D, pérdida focal o Tversky, supervisión profunda, promedio móvil de pesos, pérdida de caja por IoU, varias celdas positivas, y el **preentrenamiento en Intel Image (C2)**, que es un paso previo: se entrena el backbone en clasificación de imágenes naturales, se guardan sus pesos y el entrenamiento en PENGWIN parte de ahí.
+- **Después de entrenar** (no se reentrena nada; se aplica a un modelo ya entrenado): el post-proceso 3D, las distancias en mm, HD95 y ASSD, SAM, el umbral por clase, la latencia y la evaluación en test. Estos pasos se pueden desarrollar mientras otros modelos entrenan.
+- **Intermedio:** el segundo pase por región funciona al entrenar o solo al inferir; se prueba primero solo al inferir con el modelo c2.
+
+### Por qué 60 u 80 épocas
+
+Aquí una "época" no es una pasada sobre todo el conjunto: cada una toma 2 500 cortes al azar de los ~18 000 de entrenamiento. Ochenta épocas son unos 200 000 cortes vistos, cerca de once pasadas completas; 60 épocas con 5 000 cortes (v4) son unas diecisiete. Las curvas de validación indican que no sobra: en B1 el Dice de instancia sigue subiendo hasta la época 72 (0.805 en la 24, 0.832 en la 72) y la pérdida de entrenamiento aún baja. En c2 la mejor época es la 40 (instancia 0.851) y de ahí oscila (0.847, 0.843), lo que sugiere que con el ancho 32 ya converge sobre esas 60 y lo que falta no es más tiempo.
 
 ## 1. Restricciones del enunciado y recomendaciones
 

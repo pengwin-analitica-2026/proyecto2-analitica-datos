@@ -20,7 +20,14 @@ kaggle.json
 *.token
 
 # Semana 11: casos exportados para el dashboard (se regeneran con src/demo_export.py)
-outputs/demo/
+outputs/demo/*
+# Casos que lee el dashboard desplegado en Streamlit Community Cloud (CI/CD al hacer push a main)
+!outputs/demo/latency.json
+!outputs/demo/d5_ema_w32_e60_s42/
+outputs/demo/d5_ema_w32_e60_s42/*
+!outputs/demo/d5_ema_w32_e60_s42/024/
+!outputs/demo/d5_ema_w32_e60_s42/044/
+!outputs/demo/d5_ema_w32_e60_s42/099/
 
 # Carpeta generada por deploy/build_streamlit_cloud.py
 build/

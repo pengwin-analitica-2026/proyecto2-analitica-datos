@@ -1,0 +1,56 @@
+{
+  "checkpoint": "/content/salida/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth",
+  "canonical": true,
+  "split": "test",
+  "stride": 3,
+  "cortes": 1181,
+  "ms_sam_por_corte": 522.6,
+  "regiones": {
+    "sacro": {
+      "sam": {
+        "dice": 0.7917,
+        "iou": 0.69,
+        "n": 766
+      },
+      "nuestro": {
+        "dice": 0.8837,
+        "iou": 0.8203,
+        "n": 766
+      }
+    },
+    "coxal_izquierdo": {
+      "sam": {
+        "dice": 0.9147,
+        "iou": 0.859,
+        "n": 1130
+      },
+      "nuestro": {
+        "dice": 0.9466,
+        "iou": 0.9051,
+        "n": 1130
+      }
+    },
+    "coxal_derecho": {
+      "sam": {
+        "dice": 0.9299,
+        "iou": 0.8788,
+        "n": 1106
+      },
+      "nuestro": {
+        "dice": 0.9572,
+        "iou": 0.921,
+        "n": 1106
+      }
+    }
+  },
+  "global_sam": {
+    "dice": 0.8889,
+    "iou": 0.8232,
+    "n": 3002
+  },
+  "global_nuestro": {
+    "dice": 0.9345,
+    "iou": 0.8893,
+    "n": 3002
+  }
+}

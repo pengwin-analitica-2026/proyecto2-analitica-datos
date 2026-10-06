@@ -61,7 +61,7 @@ def main() -> None:
     rows = {name: {"sam": [], "nuestro": []} for name in REGIONS.values()}
     sam_time, n = 0.0, 0
     for case_id in cases_of_split(cache_dir, args.split):
-        case = load_case_cache(cache_dir, case_id)
+        case = load_case_cache(cache_dir, case_id, canonical=getattr(model, "canonical", False))
         images, labels = case["images"], case["labels"]
         gt_sem = semantic_from_labels(labels)
         for z in np.flatnonzero((labels != 0).any(axis=(1, 2)))[:: args.stride]:
@@ -98,7 +98,8 @@ def main() -> None:
                     rows[name]["nuestro"].append((0.0, 0.0))
         print("caso", case_id, "cortes acumulados", n, flush=True)
 
-    summary = {"split": args.split, "stride": args.stride, "cortes": n,
+    summary = {"checkpoint": args.checkpoint, "canonical": bool(getattr(model, "canonical", False)),
+               "split": args.split, "stride": args.stride, "cortes": n,
                "ms_sam_por_corte": round(1000 * sam_time / max(n, 1), 1), "regiones": {}}
     for name, methods in rows.items():
         summary["regiones"][name] = {

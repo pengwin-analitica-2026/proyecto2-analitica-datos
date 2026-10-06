@@ -1,17 +1,11 @@
 name: Deploy API de inferencia (AWS Lambda)
 
 # Reconstruye la imagen de api/Dockerfile, la sube a ECR y actualiza la función Lambda.
-# Se ejecuta al integrar cambios de la API, del código de inferencia o del checkpoint en main,
-# o a mano desde la pestaña Actions. La función Lambda debe existir (se crea una vez a mano).
+# Se ejecuta en cada push a main (y a mano desde Actions). Autentica por OIDC con un rol de IAM. La función Lambda debe existir (se crea una vez a mano).
 
 on:
   push:
     branches: [main]
-    paths:
-      - "api/**"
-      - "src/**"
-      - "outputs/s10/d5_ema_w32_e60_s42.pth"
-      - ".github/workflows/deploy-api.yml"
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +14,7 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write               # OIDC: GitHub asume un rol de IAM, sin claves guardadas
 
 jobs:
   tests:
@@ -34,14 +29,13 @@ jobs:
       - run: |
           python -m pip install --upgrade pip
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -r requirements.txt fastapi httpx
+          pip install -r requirements.txt fastapi httpx pytest
       - run: python -m unittest discover -s tests
 
   deploy:
     needs: tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: aws              # permite exigir aprobación manual en Settings → Environments
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
@@ -51,8 +45,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - id: ecr
@@ -75,4 +68,4 @@ jobs:
       - name: Prueba de humo (/health)
         run: |
           URL=$(aws lambda get-function-url-config --function-name "$LAMBDA_FUNCTION" --query FunctionUrl --output text)
-          curl -fsS --retry 6 --retry-delay 15 --retry-all-errors --max-time 120 "${URL%/}/health"
+          curl -fsS --retry 4 --retry-delay 15 --retry-all-errors --max-time 150 "${URL%/}/health?deep=1"
