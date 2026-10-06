@@ -12,8 +12,7 @@ de su hueso. Usa el dataset [PENGWIN 2024](https://pengwin.grand-challenge.org/)
 > clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
 
 > **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Confirmar el despliegue final (Cloudflare o Streamlit Cloud + AWS) y completar la sección
->   "Despliegue".
+> - Confirmar el comando del túnel de Cloudflare y probar el acceso desde un celular.
 > - Cuando la demo lea la orientación de la cabecera, quitar la advertencia de la sección "Demo".
 > - Confirmar con `--help` el parámetro de split de `sam_baseline.py`.
 
@@ -237,8 +236,17 @@ Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
 
 ### Despliegue
 
-*(Completar cuando se confirme la opción final. La propuesta con Streamlit Cloud y una API en AWS
-Lambda está en `docs/despliegue_aws_streamlit.md`, y el CI en `docs/cicd_github_actions.md`.)*
+El enunciado pide el dashboard en vivo mediante un **túnel de Cloudflare**, accesible desde un
+computador y un celular. Con el dashboard corriendo en otra terminal:
+
+```bash
+streamlit run app/dashboard.py            # terminal 1: queda en http://localhost:8501
+cloudflared tunnel --url http://localhost:8501   # terminal 2: imprime una URL pública trycloudflare.com
+```
+
+`cloudflared` se instala con `brew install cloudflared` (macOS) o desde la página de Cloudflare.
+Como extra, el equipo dejó documentada una alternativa con Streamlit Cloud y una API en AWS Lambda
+(`docs/despliegue_aws_streamlit.md`, CI en `docs/cicd_github_actions.md`).
 
 ## Verificación de reproducibilidad
 

@@ -108,9 +108,13 @@ const children = [
     ['CBAM en 1 etapa', 'Atención antes de las cabezas', 'Mejor detección que sin CBAM y que en 3 etapas (sección 6)'],
     ['Instancia primario / secundario', 'Tarea acotada por hueso', 'Con 31 IDs se perdía el 45 % de los secundarios (0.787)'],
     ['Grid y NMS propios', 'Restricción del curso', 'Overfit intencional: pérdida de 1.687 a 0.002 (758×)'],
+    ['384 px por corte (el enunciado recomienda 224–256)', 'Hay fragmentos desde 9 cortes y menos de 500 mm³; a 256 px ocupan muy pocos píxeles', 'Fue parte de los cambios que subieron el Dice por fragmento de 0.667 a ~0.82 en la primera versión de la Semana 10; batch 16 con precisión mixta cabe en una GPU T4'],
     ['EMA de pesos (0.999)', 'Estabiliza el entrenamiento', '+0.004 de media en 3 semillas'],
     ['Orientación canónica + aumento geométrico', 'Robustez a la posición del paciente', '+0.016 en validación y +0.028 en test (sección 7)'],
   ], { boldFirst: true }),
+
+  sp(),
+  P([B('Fuentes consultadas. '), 'Para la cabeza de detección se consultó el principio de grid de YOLO (Redmon et al., 2016): cada celda predice la caja del objeto cuyo centro cae en ella. La supresión de no máximos sigue el algoritmo estándar por IoU. Ambas están implementadas por el equipo (src/week9_detection.py), sin código, pesos ni librerías de YOLO, Detectron2 o Mask R-CNN, y se verificaron con 19 pruebas unitarias.']),
 
   // ---------- 4 ----------
   H1('4. Entrenamiento'),
@@ -122,6 +126,19 @@ const children = [
     ['Promedio de pesos', 'EMA con decaimiento 0.999'],
     ['Semillas', '42, 43 y 44 (todas reportadas)'],
   ], { boldFirst: true }),
+  H2('Calibración de los pesos de la pérdida'),
+  P('Los pesos no se copiaron de otra implementación: cada uno responde a una propiedad medida de los datos o del entrenamiento, y las alternativas se probaron una a una sobre la receta base (validación, Dice por fragmento de referencia 0.849).'),
+  table([2200, 900, 3260, 3000], ['Término', 'Peso', 'Por qué', 'Evidencia'], [
+    ['Clasificación (BCE)', '0.5', 'Es la tarea más fácil: converge primero y, con peso 1, sus gradientes competirían con tareas que aún no aprenden', 'En la época 1 de H6 el F1 ya es 0.907, mientras la detección va en mAP@0.5 0.287 y la instancia en 0.529'],
+    ['Semántica (CE)', '2.0', 'Es la primera etapa de la lógica de dos etapas: un error de región arrastra a todos sus fragmentos', 'Bajar su peso relativo (λ×2 en instancia) no mejora los fragmentos'],
+    ['Detección, instancia, Dice semántico y Dice de instancia', '1.0', 'Peso de referencia; los términos Dice no dependen de la cantidad de píxeles y compensan el desbalance', 'λ×2 (instancia y borde ×2, detección ×0.5): fragmentos 0.849, sin cambio; detección cruda de 0.868 a 0.832'],
+    ['Fondo en la CE semántica / de instancia', '0.2 / 0.1', 'El fondo es el 98.1 % de los vóxeles de train (≈ 97.5 % en los cortes con hueso)', 'Proporción medida en los 70 casos de train'],
+    ['Fragmentos secundarios en la CE de instancia', '×3', 'Son el 47.9 % de los fragmentos pero solo el 10.1 % de los vóxeles de hueso (≈ 9:1). Compensar del todo (×9) sobrepondera; ×3 es el compromiso', 'Barrido: ×3 (B1) frente a ×6 (B2, peor detección; 0.820 en otra receta) y sobremuestreo ×3 (D6: 0.837, peor)'],
+    ['Peso por fractura, focal, Tversky, supervisión profunda', '0', 'Alternativas para los secundarios y los bordes de fractura', 'Ninguna supera el ruido: 0.832, 0.846, 0.846 y 0.846'],
+  ], { boldFirst: true, leftAll: true }),
+  sp(),
+  P(['Dos términos auxiliares no tuvieron barrido propio y se declaran así: el mapa de centros pondera sus píxeles positivos por 21 (1 + 20 × objetivo), la práctica habitual para mapas de calor con muy pocos positivos; y la pérdida de bordes usa pos_weight 3.0 con un Dice suavizado. ',
+    B('El diagnóstico mostró que la cabeza de bordes quedaba inactiva en todos los modelos'), ' (probabilidad máxima 0.0005), porque esa combinación premia predecir cero. Reentrenarla con un peso calculado del desbalance la reactivó, pero el Dice por fragmento solo cambió +0.001, así que H6 la conserva sin efecto práctico.']),
 
   // ---------- 5 ----------
   H1('5. Resultados'),
@@ -269,6 +286,7 @@ const children = [
   bullet('Sang, Y. et al. Benchmark of Segmentation Techniques for Pelvic Fracture in CT and X-Ray: Summary of the PENGWIN 2024 Challenge. IEEE TMI, 2026. arXiv:2504.02382.'),
   bullet('PENGWIN Task 1: Pelvic Fracture Segmentation on CT. Zenodo, doi:10.5281/zenodo.10927452.'),
   bullet('Woo, S. et al. CBAM: Convolutional Block Attention Module. ECCV, 2018.'),
+  bullet('Redmon, J. et al. You Only Look Once: Unified, Real-Time Object Detection. CVPR, 2016 (consultado solo como principio del grid; implementación propia).'),
   bullet('Kirillov, A. et al. Segment Anything. ICCV, 2023.'),
 ];
 

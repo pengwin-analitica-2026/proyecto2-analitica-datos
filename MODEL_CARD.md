@@ -3,7 +3,8 @@
 > **Pendientes antes de entregar (borrar este bloque al cerrar):**
 > - Latencia por imagen en GPU y CPU (sección 4.5) y baseline de SAM (sección 4.6).
 > - Licencia exacta del dataset PENGWIN (sección 2).
-> - Sección 6.1: actualizar cuando la demo lea la orientación de la cabecera de cada archivo.
+> - Limitación 1: actualizar cuando la demo lea la orientación de la cabecera de cada archivo.
+> - Despliegue: confirmar la URL del túnel de Cloudflare y la prueba desde celular.
 
 ## 1. Resumen
 
@@ -46,8 +47,11 @@
 - **Entrada:** cortes axiales 2D a 384 px. Ventana C400/W1800 con corrección gamma 1.5.
 - **Orientación canónica:** los volúmenes LPI se giran 180° en el plano antes del modelo, a partir
   de su cabecera. Se aplica igual a imagen y máscara, en todos los splits, sin usar etiquetas.
-- **Entrenamiento:** 60 épocas, batch 16, tasa de aprendizaje con coseno, peso ×3 a los fragmentos
-  secundarios, λ de la pérdida compuesta por defecto, sin preentrenamiento.
+- **Entrenamiento:** 60 épocas, batch 16, tasa de aprendizaje con coseno, precisión mixta
+  (`torch.cuda.amp`), sin preentrenamiento.
+- **Pérdida compuesta:** detección 1.0, clasificación 0.5, semántica 2.0 (CE) y 1.0 (Dice), instancia
+  1.0 (CE, con secundarios ×3 y fondo ×0.1) y 1.0 (Dice). Cada peso se justifica con una medida del
+  dataset o un barrido; la tabla de calibración está en el informe (sección 4).
 - **Aumento de datos (solo en entrenamiento):** aumento geométrico (escala, proporción, traslación
   y rotación de ±35°) e intensidad. No se aplica en validación ni en test.
 - **Pesos:** promedio exponencial (EMA 0.999).
@@ -150,17 +154,20 @@ zero-shot sobre test, usando la caja predicha como prompt.)*
 1. **Orientación en la demo.** La orientación canónica se identifica con una lista de los 34 casos
    LPI del dataset, derivada de sus cabeceras. Para un volumen nuevo, la demo debe leer la
    orientación de la cabecera de cada archivo. *(Actualizar cuando esté corregido.)*
-2. **Fragmentos secundarios.** Son el punto débil: Dice de 0.764 frente a 0.905 del primario, y el
-   6.9 % no se detecta. El esquema primario/secundario del challenge fusiona fragmentos en contacto,
-   y separarlos sigue siendo difícil.
-3. **Fragmentos sobrantes.** El Dice por fragmento empareja fragmentos reales con predichos, pero
+2. **Fragmentos en contacto en la superficie de fractura.** Cuando dos fragmentos se tocan, la
+   segmentación puede fusionarlos en uno solo. En ese caso se pierde el fragmento secundario y su
+   distancia de separación al principal no es confiable (puede salir 0 mm o no existir).
+3. **Fragmentos secundarios.** Son el punto débil: Dice de 0.764 frente a 0.905 del primario, y el
+   6.9 % no se detecta. Representan el 47.9 % de los fragmentos pero solo el 10.1 % de los vóxeles
+   de hueso.
+4. **Fragmentos sobrantes.** El Dice por fragmento empareja fragmentos reales con predichos, pero
    no penaliza los fragmentos predichos que sobran. El dashboard oculta los menores de 1000 mm³; es
    un filtro de presentación que no cambia la métrica.
-4. **Modelo 2D.** Procesa corte a corte. La coherencia entre cortes depende del post-proceso 3D.
-5. **Tamaño de la muestra.** Test tiene 15 pacientes de un solo dataset. Las diferencias de ±0.004
+5. **Modelo 2D.** Procesa corte a corte. La coherencia entre cortes depende del post-proceso 3D.
+6. **Tamaño de la muestra.** Test tiene 15 pacientes de un solo dataset. Las diferencias de ±0.004
    son del orden del ruido, y no se evaluó en otros centros ni escáneres.
-6. **Segunda evaluación en test.** La cifra de H6 no es una estimación limpia (ver la sección 4.1).
-7. **Métrica de detección.** El mAP reportado usa cajas refinadas con la máscara semántica; la
+7. **Segunda evaluación en test.** La cifra de H6 no es una estimación limpia (ver la sección 4.1).
+8. **Métrica de detección.** El mAP reportado usa cajas refinadas con la máscara semántica; la
    cabeza grid sola rinde menos.
 
 ## 7. Consideraciones éticas
@@ -170,7 +177,13 @@ zero-shot sobre test, usando la caja predicha como prompt.)*
   de fragmentos o en la lateralidad tendría consecuencias clínicas.
 - El rendimiento puede bajar con escáneres, protocolos o poblaciones distintas a las del dataset.
 
-## 8. Reproducción
+## 8. Despliegue
+
+El dashboard se sirve con Streamlit y se publica con un túnel de Cloudflare, como pide el enunciado,
+accesible desde el navegador de un computador y de un celular. La advertencia de uso no clínico está
+siempre visible en el dashboard.
+
+## 9. Reproducción
 
 Los comandos para regenerar los datos, entrenar H6 y evaluarlo están en el `README.md`. La
 configuración congelada de la evaluación en test está en `docs/decisiones_semana10.md`
