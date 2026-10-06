@@ -244,7 +244,9 @@ python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema
     --device cpu --device cuda
 ```
 
-Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
+Resultado con H6 (mediana por corte): 72 ms en GPU L4 y 250 ms en CPU de 12 hilos con TTA (64 y
+162 ms sin TTA); detalle en el notebook 04, sección 12. Mide un corte a la vez y reporta la mediana y
+el percentil 90. Escribe en
 `outputs/demo/latency.json`, que el dashboard muestra. Si no hay GPU, omite `cuda` y lo avisa.
 
 ### Despliegue

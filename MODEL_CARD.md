@@ -1,7 +1,6 @@
 # Model card — H6 (detección, segmentación y clasificación de fragmentos de fractura pélvica)
 
 > **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Latencia por imagen en GPU y CPU (sección 4.8).
 > - Licencia exacta del dataset PENGWIN (sección 2).
 > - Limitación 1: actualizar cuando la demo lea la orientación de la cabecera de cada archivo.
 > - Despliegue: confirmar la URL del túnel de Cloudflare y la prueba desde celular.
@@ -150,7 +149,7 @@ pares corte-región). SAM no forma parte del pipeline.
 | **Global** | **0.889** | **0.935** | **0.823** | **0.889** |
 
 El modelo propio supera a SAM en las tres regiones; la mayor diferencia está en el sacro. SAM tarda
-unos 520 ms por corte.
+unos 259 ms por corte en la GPU L4 solo en su parte, frente a unos 64 ms de todo el modelo propio.
 
 ### 4.7 Clasificación y peores casos (test)
 
@@ -163,9 +162,29 @@ unos 520 ms por corte.
   de tamaño parecido (061, 054), fragmentos pequeños en contacto (007) y hueso fino en los extremos
   del volumen (047). La galería y el análisis están en el informe, sección 8.
 
-### 4.8 Latencia
+### 4.8 Latencia (mediana por corte de 384 px, lote 1)
 
-*(Completar: latencia por imagen en GPU y en CPU, con TTA incluido.)*
+| Configuración | GPU (NVIDIA L4) | CPU (12 hilos) |
+|---|---|---|
+| 1 modelo | 63.7 ms | 161.7 ms |
+| 1 modelo + TTA de espejo (entregado) | 71.6 ms | 249.6 ms |
+| Ensamble de 3 semillas + TTA | 87.4 ms | 518.0 ms |
+
+Medido sobre 60 cortes reales de validación tras 5 pasadas de calentamiento. D5 y H6 comparten
+arquitectura, así que su latencia es la misma.
+
+### 4.9 Distancia de separación y métricas de superficie (41 secundarios)
+
+| Métrica | Val. H6 | Test D5 | Test H6 |
+|---|---|---|---|
+| Error medio de distancia | 0.185 mm | 2.956 mm | 1.277 mm |
+| Correlación con la distancia real | 0.972 | 0.543 | 0.818 |
+| Dice 3D principal / secundario | 0.921 / 0.701 | 0.909 / 0.682 | 0.931 / 0.756 |
+| ASSD / HD95 | 4.08 / 17.99 mm | 3.02 / 16.33 mm | 2.06 / 11.55 mm |
+
+La distancia se mide borde a borde en 3D con `distance_transform_edt` y el espaciado de la
+cabecera, en la predicción y en el ground truth. En test, un solo fragmento del caso 007 concentra el
+79 % del error: la predicción le agrega un componente aislado lejos del hueso.
 
 ## 5. Protocolo de evaluación
 
