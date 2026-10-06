@@ -159,6 +159,8 @@ def evaluate_case(model: torch.nn.Module, case_id: str, images_u8: np.ndarray, l
         else:
             instances = semantic_to_instances(semantic, None)
 
+        if instances.ndim == 2:   # lote de 1 slice: el post-proceso devuelve 2D
+            instances = instances[None]
         raw = decode_predictions(output["detection"], confidence=confidence)
         raw_one = decode_predictions(output["detection"], confidence=confidence, max_por_clase=1)
         refined = refine_boxes_with_semantic(raw, semantic)

@@ -1,0 +1,25 @@
+{
+  "device": "cuda (Colab L4)",
+  "tamano": [
+    384,
+    384
+  ],
+  "nota": "lote 1, 60 cortes reales de val tras 5 de calentamiento; transcrito de la salida del benchmark",
+  "config": {
+    "1 modelo": {
+      "mediana_ms": 63.7,
+      "p95_ms": 66.0,
+      "media_ms": 63.4
+    },
+    "1 modelo + TTA": {
+      "mediana_ms": 71.6,
+      "p95_ms": 77.3,
+      "media_ms": 71.7
+    },
+    "ensamble 3 + TTA": {
+      "mediana_ms": 87.4,
+      "p95_ms": 89.1,
+      "media_ms": 86.8
+    }
+  }
+}

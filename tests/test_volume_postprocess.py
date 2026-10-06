@@ -81,3 +81,24 @@ class PostprocessTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_sin_relleno_conserva_la_separacion_entre_fragmentos():
+    """Con fill_unlabeled=True el hueco entre fragmentos se vuelve principal (distancia 0)."""
+    from volume_postprocess import fragment_distance_table
+    shape = (6, 16, 40)
+    semantic = np.zeros(shape, dtype=np.uint8)
+    semantic[:, 2:14, 2:38] = 1                       # región sacro continua (cubre el hueco)
+    ps = np.zeros(shape, dtype=np.uint8)
+    ps[:, 2:14, 2:14] = 1                              # principal
+    ps[:, 2:14, 26:38] = 2                             # secundario separado por 12 vóxeles
+    truth = np.zeros(shape, dtype=np.uint8)
+    truth[:, 2:14, 2:14] = 1
+    truth[:, 2:14, 26:38] = 2
+    spacing = (1.0, 1.0, 1.0)
+    filled = postprocess_3d(semantic, ps, min_voxels=10, min_region_voxels=10)
+    raw = postprocess_3d(semantic, ps, min_voxels=10, min_region_voxels=10, fill_unlabeled=False)
+    d_filled = fragment_distance_table(filled, truth, spacing)[0]["predicted_mm"]
+    d_raw = fragment_distance_table(raw, truth, spacing)[0]["predicted_mm"]
+    assert d_filled == 0.0
+    assert d_raw > 5.0

@@ -74,6 +74,8 @@ def main() -> None:
     parser.add_argument("--two-pass", action="store_true")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--min-voxels", type=int, default=30)
+    parser.add_argument("--distance-nofill", action="store_true",
+                        help="Mide las distancias sobre el volumen sin rellenar huecos entre fragmentos.")
     parser.add_argument("--surface-metrics", action="store_true", help="Agrega ASSD y HD95.")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
@@ -100,7 +102,9 @@ def main() -> None:
         volume = postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels)
         t_total = time.time() - started
         spacing = cache_spacing_xyz(index[case_id], size)
-        distances = fragment_distance_table(volume, case["labels"], spacing, args.surface_metrics)
+        dist_volume = (postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels,
+                                      fill_unlabeled=False) if args.distance_nofill else volume)
+        distances = fragment_distance_table(dist_volume, case["labels"], spacing, args.surface_metrics)
         cases.append({"case_id": case_id, "n_slices": int(len(volume)),
                       "spacing_xyz_mm": spacing, "segundos_modelo": round(t_model, 1),
                       "segundos_total": round(t_total, 1),

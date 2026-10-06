@@ -1,0 +1,55 @@
+{
+  "nota": "Transcrito de la salida de src/sam_baseline.py (Colab L4). SAM ViT-B zero-shot con cajas de nuestro detector; nuestro = semantica D5 s42 dentro de la misma caja.",
+  "split": "val",
+  "stride": 3,
+  "cortes": 1308,
+  "ms_sam_por_corte": 259.4,
+  "regiones": {
+    "sacro": {
+      "sam": {
+        "dice": 0.7695,
+        "iou": 0.6651,
+        "n": 878
+      },
+      "nuestro": {
+        "dice": 0.8517,
+        "iou": 0.7765,
+        "n": 878
+      }
+    },
+    "coxal_izquierdo": {
+      "sam": {
+        "dice": 0.8639,
+        "iou": 0.7952,
+        "n": 1252
+      },
+      "nuestro": {
+        "dice": 0.9083,
+        "iou": 0.8547,
+        "n": 1252
+      }
+    },
+    "coxal_derecho": {
+      "sam": {
+        "dice": 0.8831,
+        "iou": 0.8154,
+        "n": 1263
+      },
+      "nuestro": {
+        "dice": 0.9194,
+        "iou": 0.8672,
+        "n": 1263
+      }
+    }
+  },
+  "global_sam": {
+    "dice": 0.8466,
+    "iou": 0.7691,
+    "n": 3393
+  },
+  "global_nuestro": {
+    "dice": 0.8978,
+    "iou": 0.8391,
+    "n": 3393
+  }
+}

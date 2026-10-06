@@ -36,11 +36,13 @@ def cache_spacing_xyz(row: dict, size: int) -> tuple[float, float, float]:
 
 
 def postprocess_3d(semantic: np.ndarray, primary_secondary: np.ndarray, min_voxels: int = 30,
-                   min_region_voxels: int = 200) -> np.ndarray:
+                   min_region_voxels: int = 200, fill_unlabeled: bool = True) -> np.ndarray:
     """Volumen [z,y,x] de IDs PENGWIN a partir de la semántica y del mapa de 7 clases.
 
     Ver el docstring del módulo. ``min_region_voxels`` descarta regiones 3D enteras que son
     ruido (por ejemplo, un coxal "detectado" en unos pocos vóxeles aislados).
+    ``fill_unlabeled=False`` deja sin etiqueta los vóxeles anatómicos que no son ni principal ni
+    fragmento: así no se rellena el hueco entre fragmentos y se puede medir su separación.
     """
     output = np.zeros(semantic.shape, dtype=np.uint8)
     for region, start in enumerate(REGION_STARTS):
@@ -72,7 +74,8 @@ def postprocess_3d(semantic: np.ndarray, primary_secondary: np.ndarray, min_voxe
         for rank, piece in enumerate(order):
             output[pieces == piece] = start + 1 + rank
         # Vóxeles de la región sin etiqueta (secundarios chicos, huecos) → principal.
-        output[anatomical & (output == 0)] = start
+        if fill_unlabeled:
+            output[anatomical & (output == 0)] = start
     return output
 
 
