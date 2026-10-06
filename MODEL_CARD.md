@@ -1,7 +1,7 @@
 # Model card — H6 (detección, segmentación y clasificación de fragmentos de fractura pélvica)
 
 > **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Latencia por imagen en GPU y CPU (sección 4.5) y baseline de SAM (sección 4.6).
+> - Latencia por imagen en GPU y CPU (sección 4.8).
 > - Licencia exacta del dataset PENGWIN (sección 2).
 > - Limitación 1: actualizar cuando la demo lea la orientación de la cabecera de cada archivo.
 > - Despliegue: confirmar la URL del túnel de Cloudflare y la prueba desde celular.
@@ -136,10 +136,36 @@ pacientes girados en el escáner, que existen en el dataset (caso 012).
 Las ablaciones se hicieron sobre D5. H6 es D5 más la orientación canónica y el aumento geométrico,
 cuya ablación es la de la sección 4.3.
 
-### 4.6 Latencia y baseline de SAM
+### 4.6 Comparación con SAM (test)
 
-*(Completar: latencia por imagen en GPU y en CPU, con TTA incluido, y comparación con SAM
-zero-shot sobre test, usando la caja predicha como prompt.)*
+SAM ViT-B en modo zero-shot, con la caja predicha por nuestro detector como prompt, comparado con
+la máscara semántica de H6 dentro de la misma caja (1 181 cortes de test, uno de cada tres; 3 002
+pares corte-región). SAM no forma parte del pipeline.
+
+| Región | Dice SAM | Dice H6 | IoU SAM | IoU H6 |
+|---|---|---|---|---|
+| Sacro | 0.792 | 0.884 | 0.690 | 0.820 |
+| Coxal izquierdo | 0.915 | 0.947 | 0.859 | 0.905 |
+| Coxal derecho | 0.930 | 0.957 | 0.879 | 0.921 |
+| **Global** | **0.889** | **0.935** | **0.823** | **0.889** |
+
+El modelo propio supera a SAM en las tres regiones; la mayor diferencia está en el sacro. SAM tarda
+unos 520 ms por corte.
+
+### 4.7 Clasificación y peores casos (test)
+
+- **Clasificación por región:** F1 de 0.980 (sacro), 0.997 (coxal izquierdo) y 0.995 (coxal
+  derecho). A nivel de píxel, casi todo el error es hueso predicho como fondo (3.3 % del sacro) y
+  la confusión entre coxal izquierdo y derecho es menor al 0.1 %.
+- **Peores casos:** 039 (0.784), 061 (0.822), 007 (0.831), 054 (0.834) y 047 (0.854). En todos el
+  fragmento principal está entre 0.87 y 0.91 y el error se concentra en los secundarios: volumen
+  de baja resolución que se sobrefragmenta (039), intercambio principal/secundario entre fragmentos
+  de tamaño parecido (061, 054), fragmentos pequeños en contacto (007) y hueso fino en los extremos
+  del volumen (047). La galería y el análisis están en el informe, sección 8.
+
+### 4.8 Latencia
+
+*(Completar: latencia por imagen en GPU y en CPU, con TTA incluido.)*
 
 ## 5. Protocolo de evaluación
 
