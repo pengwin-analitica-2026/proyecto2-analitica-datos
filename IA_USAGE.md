@@ -590,6 +590,27 @@ pedido de Gustavo con los prompts copiados tal cual.
   `grep` en el pipe), la relanzó y las dos corrieron a la vez sobre la misma carpeta; se detectó al
   llegar el aviso de fin y se verificó que los archivos finales quedaran íntegros.
 
+### 32. Mini-paper y licencia de los datos en el model card
+
+- **Integrante y herramienta:** Gustavo · Claude (Cowork), `claude-opus-5-5`. 6 de octubre de 2026.
+- **Prompt exacto:**
+  > Creo que ya hicimos todo , igual valida , y falta :  * el mini-paper. * La licencia de PENGWIN en el model card.
+- **Qué produjo la IA:** el mini-paper de 5 páginas (`docs/mini_paper/`, en `.docx` y PDF, con su
+  `build.js` y el script de las dos figuras nuevas); la licencia de los datos (CC BY 4.0) y las
+  referencias en la sección 2 del model card; la tabla de latencia de la sección 4.8 con las
+  mediciones que ya estaban en `outputs/`; y una revisión del estado del repositorio contra los
+  entregables.
+- **Qué se hizo a mano:** el equipo revisa la redacción del mini-paper y decide si el formato y la
+  extensión son los que pide el profesor; la IA no tenía el enunciado y eligió una estructura de
+  artículo corto.
+- **Análisis crítico:** la licencia no se escribió de memoria: se consultó el registro de Zenodo del
+  dataset, y ahí se vio que el DOI que aparecía en un README generado para Hugging Face
+  (`10990767`) es el del documento de diseño del reto y no el de los datos. Las cifras del
+  mini-paper se contrastaron con un script contra los JSON de `outputs/s10/`. El mini-paper no trae
+  resultados nuevos; repite el aviso de que el 0.875 es una segunda evaluación en test. La cifra
+  del mejor método del reto (IoU 0.930) se tomó del resumen del artículo del reto y no es
+  comparable con las nuestras.
+
 ---
 
 # Parte 2. Análisis crítico

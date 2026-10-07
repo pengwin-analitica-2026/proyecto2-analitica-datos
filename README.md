@@ -40,6 +40,8 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | Documento | Contenido |
 |---|---|
 | [`MODEL_CARD.md`](MODEL_CARD.md) | Modelo, datos, métricas, ablaciones, protocolo de test y limitaciones |
+| [`docs/mini_paper/Mini_paper_PENGWIN.pdf`](docs/mini_paper/Mini_paper_PENGWIN.pdf) | Mini-paper de 5 páginas: método, resultados y limitaciones (fuente en `.docx` y `build.js`) |
+| [`docs/informe/Informe_tecnico_PENGWIN.docx`](docs/informe/Informe_tecnico_PENGWIN.docx) | Informe técnico completo |
 | [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
 | [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
 | [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |
@@ -92,7 +94,7 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121
 ## Datos
 
 Los volúmenes están en formato `.mha` (no NIfTI; el profesor aprobó este formato). Se descargan de
-[Zenodo](https://doi.org/10.5281/zenodo.10927452) y **no se versionan**. Descomprimir con esta
+[Zenodo](https://doi.org/10.5281/zenodo.10927452) (licencia CC BY 4.0) y **no se versionan**. Descomprimir con esta
 estructura exacta:
 
 ```
