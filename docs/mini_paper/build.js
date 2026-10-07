@@ -1,4 +1,4 @@
-// Mini-paper del proyecto PENGWIN. Genera Mini_paper_PENGWIN.docx.
+// Informe técnico corto con estructura de mini-paper (entregable del enunciado). Genera Mini_paper_PENGWIN.docx.
 // Uso, desde docs/mini_paper:  node build.js   (necesita el paquete npm "docx")
 // Las cifras salen de outputs/s10/*.json y outputs/demo/latency.json.
 const fs = require('fs');
@@ -45,8 +45,8 @@ function tabla(anchos, cabecera, filas, o = {}) {
     borders: { left: NADA, right: NADA,
       top: tipo === 'cabeza' ? GRUESA : NADA,
       bottom: tipo === 'cabeza' ? FINA : (tipo === 'ultima' ? GRUESA : NADA) },
-    children: [new Paragraph({ alignment: i === 0 ? AlignmentType.LEFT : AlignmentType.CENTER,
-      keepNext: tipo !== 'ultima',     // la tabla no se parte entre páginas
+    children: [new Paragraph({ alignment: (i === 0 || (o.izquierda || []).includes(i)) ? AlignmentType.LEFT : AlignmentType.CENTER,
+      keepNext: !o.partir && tipo !== 'ultima',     // la tabla no se parte entre páginas, salvo las largas
       children: [run(texto, { size: 18, bold: tipo === 'cabeza' || negrita })] })] });
   return new Table({ width: { size: total, type: WidthType.DXA }, columnWidths: anchos, alignment: AlignmentType.CENTER,
     rows: [new TableRow({ tableHeader: true, cantSplit: true, children: cabecera.map((c, i) => celda(c, i, 'cabeza')) }),
@@ -63,10 +63,24 @@ function dosFiguras(izquierda, derecha) {
   return new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [W / 2, W / 2],
     rows: [new TableRow({ cantSplit: true, children: [celda(izquierda), celda(derecha)] })] });
 }
+// Galería: una fila de dos paneles (el segundo puede faltar).
+function filaGaleria(izquierda, derecha) {
+  const celda = (panel) => new TableCell({ width: { size: W / 2, type: WidthType.DXA },
+    borders: { top: NADA, bottom: NADA, left: NADA, right: NADA }, margins: { left: 60, right: 60 },
+    children: panel ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun({ type: 'png', data: aqui(panel[0]),
+        transformation: { width: 296, height: 201 }, altText: { title: panel[0], description: panel[1], name: panel[0] } })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 30, after: 90 }, children: [run(panel[1], { size: 17 })] })]
+      : [new Paragraph({ children: [] })] });
+  return new TableRow({ cantSplit: true, children: [celda(izquierda), celda(derecha)] });
+}
+const galeria = (paneles) => new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [W / 2, W / 2],
+  rows: [0, 2, 4].filter((i) => i < paneles.length).map((i) => filaGaleria(paneles[i], paneles[i + 1])) });
 const aire = () => new Paragraph({ spacing: { after: 90 }, children: [] });
 
 const contenido = [
   // ---------- Título ----------
+  new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 },
+    children: [run('INFORME TÉCNICO', { size: 19, bold: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 160 },
     children: [run('Detección, segmentación por fragmento y medición de fracturas pélvicas en CT con una red multitarea 2D propia', { bold: true, size: 32 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 50 },
@@ -101,8 +115,29 @@ const contenido = [
   P('Un backbone convolucional propio, con 32 canales base y un módulo CBAM en una etapa, alimenta tres cabezas en un solo paso hacia adelante (Figura 1). La cabeza de clasificación dice cuáles de las tres regiones aparecen en el corte. La de detección predice, en un grid de 24 × 24 celdas, la caja de la región cuyo centro cae en cada celda, y una supresión de no máximos propia deja una caja por región. La de segmentación tiene dos salidas: una semántica (fondo y las tres regiones) y una de instancia que, dentro de cada región, separa el fragmento principal de los secundarios. Los fragmentos secundarios individuales salen de las componentes conexas de esa salida, con un tamaño mínimo de 12 píxeles.'),
   figura('../informe/fig/fig_arquitectura.png', 440, 185),
   pie('Figura 1. Arquitectura del modelo: un backbone compartido y tres cabezas entrenadas desde cero.'),
+  P('Para la cabeza de detección se consultó el principio del grid de YOLO [5]: cada celda predice la caja del objeto cuyo centro cae en ella. La cabeza, la asignación de celdas y la supresión de no máximos están escritas por el equipo, sin código ni pesos de YOLO, Detectron2 o Mask R-CNN. Cada decisión de diseño se tomó con una medida en validación (Tabla 1).'),
+  cabezaTabla('Tabla 1. Decisiones de arquitectura, su motivo y la evidencia en validación (Dice por fragmento salvo que se diga otra cosa).'),
+  tabla([2300, 3000, 4060], ['Decisión', 'Motivo', 'Evidencia'], [
+    ['32 canales base', 'El ancho del backbone era la limitación principal', 'Con 8, 16 y 32 canales: 0.829, 0.839 y 0.850. Con 48: 0.844'],
+    ['CBAM en una etapa, antes de las cabezas', 'Lo pide el curso; se probó en una y en tres etapas', 'mAP50 de 0.926 con una etapa, 0.907 con tres y 0.900 sin CBAM (40 épocas)'],
+    ['Instancia como principal o secundario por región', 'Lógica de dos etapas: primero la región y luego sus fragmentos. Es una tarea más acotada que predecir 31 identificadores', 'Con 31 identificadores: 0.787, y secundarios en 0.460. Con principal y secundario: 0.829 y 0.645'],
+    ['384 px por corte (el curso recomienda 224 a 256)', 'Hay fragmentos pequeños que a 256 px ocupan muy pocos píxeles', 'No se midió por separado en la serie final. Un lote de 16 con precisión mixta cabe en una GPU T4'],
+    ['Promedio exponencial de los pesos (EMA)', 'Estabiliza el final del entrenamiento', 'Secundarios +0.016, +0.048 y +0.009 en tres semillas'],
+    ['Sin preentrenamiento', 'El preentrenamiento del backbone no dio ganancia consistente', 'Sección 5.3'],
+  ], { izquierda: [1, 2], partir: true }),
+  aire(),
   H2('3.2 Pérdida y entrenamiento'),
-  P('La pérdida es una suma ponderada: detección (peso 1), clasificación (0.5), segmentación semántica (2 para la entropía cruzada y 1 para el Dice), instancia (1 y 1) y borde (1). En la entropía cruzada de instancia los píxeles de fragmentos secundarios pesan el triple, porque son cerca de la mitad de los fragmentos pero cerca de una décima parte del hueso. La clasificación pesa menos porque es la tarea que converge primero; la semántica pesa más porque un error de región arrastra a todos sus fragmentos. Duplicar el peso de instancia y borde no mejoró los fragmentos y empeoró la detección (sección 5.3).'),
+  P('La pérdida es una suma ponderada de los términos de las tres cabezas. Los pesos no se copiaron de otra implementación: cada uno responde a algo medido en los datos o en el entrenamiento (Tabla 2).'),
+  cabezaTabla('Tabla 2. Pesos de la pérdida y su justificación.'),
+  tabla([2500, 900, 5960], ['Término', 'Peso', 'Por qué'], [
+    ['Detección', '1', 'Peso de referencia'],
+    ['Clasificación', '0.5', 'Es la tarea que converge primero: en la primera época el F1 ya es 0.907, cuando el mAP50 va en 0.287 y el Dice por fragmento en 0.529. Con más peso competiría con tareas que aún no aprenden'],
+    ['Semántica (entropía cruzada y Dice)', '2 y 1', 'Es la primera de las dos etapas: un error de región arrastra a todos sus fragmentos'],
+    ['Instancia (entropía cruzada y Dice)', '1 y 1', 'En la entropía cruzada los secundarios pesan el triple: son cerca de la mitad de los fragmentos y cerca de una décima parte del hueso. Con peso ×6 no superó el ruido (0.832 frente a 0.829) y con sobremuestreo ×3 empeoró (0.837 frente a 0.850)'],
+    ['Borde', '1', 'Término auxiliar para el contorno de los fragmentos'],
+    ['Instancia y borde ×2, detección ×0.5', '—', 'Alternativa probada: 0.855, dentro del ruido, y el mAP50 de la cabeza de grid baja de 0.868 a 0.827. Se dejan los pesos de arriba'],
+  ], { izquierda: [2], partir: true }),
+  aire(),
   P('El modelo se entrena desde cero con AdamW (tasa 2 × 10⁻³ con decaimiento coseno, lote de 16, precisión mixta), 60 épocas de 2 500 cortes y un promedio exponencial de los pesos (EMA, 0.999). El aumento de datos combina espejo sagital con intercambio de las etiquetas de los coxales, cambios de intensidad y, en el modelo final, rotación de hasta ±35°, escala, proporción y desplazamiento.'),
   H2('3.3 Volumen y distancia'),
   P('Las predicciones de todos los cortes se apilan y un post-proceso 3D por región une cada fragmento a lo largo del volumen. La separación de un fragmento secundario es la distancia mínima borde a borde hasta el fragmento principal de su hueso, calculada con la transformada de distancia euclídea y el espaciado en milímetros de la cabecera. En inferencia se promedia la predicción del corte con la de su espejo (TTA).'),
@@ -116,8 +151,8 @@ const contenido = [
   // ---------- 5 ----------
   H('5. Resultados'),
   H2('5.1 Métricas frente a los objetivos'),
-  P('El modelo final cumple los nueve objetivos en test (Tabla 1). La primera evaluación cumplía ocho: el Dice por fragmento quedaba en 0.845. Las tres semillas de H6 dan 0.875, 0.875 y 0.876; promediar los tres modelos da 0.879, pero triplica el costo y no se usa. La detección se reporta con la caja refinada con la máscara semántica; la cabeza de grid sola obtiene en test un IoU medio de 0.783, mAP50 de 0.912 y mAP50:95 de 0.556, que también cumplen.'),
-  cabezaTabla('Tabla 1. Las nueve métricas del curso. Test: 15 casos; un modelo con TTA.'),
+  P('El modelo final cumple los nueve objetivos en test (Tabla 3). La primera evaluación cumplía ocho: el Dice por fragmento quedaba en 0.845. Las tres semillas de H6 dan 0.875, 0.875 y 0.876; promediar los tres modelos da 0.879, pero triplica el costo y no se usa. La detección se reporta con la caja refinada con la máscara semántica; la cabeza de grid sola obtiene en test un IoU medio de 0.783, mAP50 de 0.912 y mAP50:95 de 0.556, que también cumplen.'),
+  cabezaTabla('Tabla 3. Las nueve métricas del curso. Test: 15 casos; un modelo con TTA.'),
   tabla([3300, 1100, 1650, 1650, 1660],
     ['Métrica', 'Objetivo', 'Test, 1.ª eval. (D5)', 'Test, 2.ª eval. (H6)', 'Validación (H6)'], [
       ['F1 de clasificación', '0.85', '0.984', '0.990', '0.992'],
@@ -134,9 +169,9 @@ const contenido = [
   P('La mejora no viene de un solo paciente: H6 sube en 13 de los 15 casos de test (Figura 2). Los dos que más cambian son los que motivaron el análisis, 012 (de 0.692 a 0.865) y 039 (de 0.710 a 0.784).'),
 
   H2('5.2 Qué aporta cada cambio'),
-  P('H6 añade dos cosas a D5: la orientación canónica y el aumento geométrico. Cada combinación se entrenó por separado (Tabla 2). Cada cambio aporta por su cuenta (+0.010 la orientación y +0.014 el aumento con ±12°) y juntos casi se suman (+0.023). La ganancia está en los fragmentos secundarios, que pasan de 0.703 a 0.764.'),
+  P('H6 añade dos cosas a D5: la orientación canónica y el aumento geométrico. Cada combinación se entrenó por separado (Tabla 4). Cada cambio aporta por su cuenta (+0.010 la orientación y +0.014 el aumento con ±12°) y juntos casi se suman (+0.023). La ganancia está en los fragmentos secundarios, que pasan de 0.703 a 0.764.'),
   P('H5 y H6 empatan en la validación normal, dentro del ruido. Los separa la prueba de estrés (Figura 3): con la validación girada 30°, H6 conserva 0.854 y D5 cae a 0.559; con 60°, H6 baja a 0.734 y los demás quedan por debajo de 0.22. Elegimos H6 porque en el dataset hay pacientes girados dentro del escáner, como el caso 012.'),
-  cabezaTabla('Tabla 2. Componentes de H6. Dice por fragmento en validación, semilla 42; las dos últimas columnas repiten la validación con los volúmenes girados.'),
+  cabezaTabla('Tabla 4. Componentes de H6. Dice por fragmento en validación, semilla 42; las dos últimas columnas repiten la validación con los volúmenes girados.'),
   tabla([900, 1350, 1350, 1250, 1250, 1260, 1000, 1000],
     ['Modelo', 'Orientación canónica', 'Rotación al entrenar', 'Dice por fragmento', 'Dice secundarios', 'Secundarios sin pareja', 'Girada 30°', 'Girada 60°'], [
       ['D5', 'no', 'no', '0.851', '0.703', '9.0 %', '0.559', '0.127'],
@@ -149,21 +184,93 @@ const contenido = [
   dosFiguras(['fig/por_caso_test.png', 292, 254, 'Figura 2. Dice por fragmento de cada caso de test en la primera evaluación (D5) y en la segunda (H6).'],
     ['fig/estres_giro.png', 292, 254, 'Figura 3. Dice por fragmento en validación según el giro aplicado a los volúmenes.']),
 
-  H2('5.3 Ablaciones pedidas'),
-  P('Las tres se midieron en validación sobre la receta de D5, que comparte arquitectura y pérdida con H6. Sin CBAM, el F1 de clasificación baja de 0.988 a 0.975 y el mAP50:95 de 0.883 a 0.872; el Dice por fragmento no cambia (0.851). Con el backbone preentrenado en Intel Image Classification el Dice por fragmento es 0.851 y 0.856 en dos semillas, frente a 0.851 y 0.855 sin preentrenar, y los secundarios se mueven +0.011 y −0.008: no hay ganancia consistente, así que el modelo final no usa preentrenamiento. Duplicar los pesos de instancia y borde da 0.855, dentro del ruido, y baja el mAP50 de la cabeza de grid de 0.868 a 0.827.'),
+  H2('5.3 Estudio de ablación'),
+  P('Las ablaciones se midieron en validación sobre la receta de D5, que comparte arquitectura y pérdida con H6, cambiando una sola cosa (Tabla 5). CBAM mejora la clasificación y la detección y no cambia la segmentación. El backbone preentrenado en Intel Image Classification no da una ganancia consistente: los secundarios suben 0.011 con una semilla y bajan 0.008 con la otra, así que el modelo final no usa preentrenamiento.'),
+  cabezaTabla('Tabla 5. Ablaciones con y sin CBAM y con y sin transfer learning en el backbone (validación).'),
+  tabla([2700, 3330, 3330], ['Ablación', 'Con', 'Sin'], [
+    ['CBAM (semilla 42)', 'F1 0.988 · mAP50:95 0.883 · Dice por fragmento 0.851', 'F1 0.975 · mAP50:95 0.872 · Dice por fragmento 0.851'],
+    ['Transfer learning en el backbone (semillas 42 y 43)', 'Dice por fragmento 0.851 y 0.856 · secundarios 0.714 y 0.717', 'Dice por fragmento 0.851 y 0.855 · secundarios 0.703 y 0.724'],
+  ]),
+  aire(),
 
-  H2('5.4 Comparación con SAM, distancia y latencia'),
-  P('SAM ViT-B en modo zero-shot, con la caja de nuestro detector como indicación, obtiene en test un Dice por región de 0.89 frente a 0.93 de nuestra máscara semántica dentro de la misma caja (1 181 cortes, uno de cada tres; 3 002 pares corte-región). La mayor diferencia está en el sacro, 0.79 frente a 0.88. SAM no separa ni clasifica fragmentos.'),
-  P('En test hay 41 fragmentos secundarios reales y el modelo entrega distancia para 36. El error medio es 1.28 mm, la mediana 0.0 mm y la correlación con la distancia real 0.82. Un solo fragmento del caso 007, que está a 9.4 mm y el modelo sitúa a 45.8 mm, concentra el 79 % del error; sin él la media es 0.28 mm. En el volumen, el Dice 3D es 0.931 para el fragmento principal y 0.756 para los secundarios.'),
-  P('Un corte de 384 × 384 tarda 64 ms en una GPU L4 y 162 ms en una CPU de 12 hilos con un modelo, y 72 y 250 ms con TTA. En un portátil con Intel i9-9980HK y 8 hilos tarda 336 ms, y 696 ms con TTA.'),
+  H2('5.4 Comparación con SAM'),
+  P('SAM ViT-B [6] se ejecutó en modo zero-shot sobre test, con la caja de nuestro detector como indicación, y se comparó con nuestra máscara semántica dentro de la misma caja (1 181 cortes, uno de cada tres; 3 002 pares corte-región). El modelo propio gana en las tres regiones y la mayor diferencia está en el sacro (Tabla 6). SAM, además, no separa ni clasifica fragmentos y no forma parte del sistema.'),
+  cabezaTabla('Tabla 6. SAM zero-shot frente al modelo propio en test.'),
+  tabla([2760, 1650, 1650, 1650, 1650], ['Región', 'Dice SAM', 'Dice propio', 'IoU SAM', 'IoU propio'], [
+    ['Sacro', '0.792', '0.884', '0.690', '0.820'],
+    ['Coxal izquierdo', '0.915', '0.947', '0.859', '0.905'],
+    ['Coxal derecho', '0.930', '0.957', '0.879', '0.921'],
+    ['Las tres regiones', '0.889', '0.935', '0.823', '0.889'],
+  ], { negrita: 3 }),
+  aire(),
+
+  H2('5.5 Distancia de separación: predicción frente a ground truth'),
+  P('La distancia de cada fragmento secundario a su principal se calcula igual sobre la máscara predicha y sobre el ground truth del mismo caso, y se comparan (Tabla 7). En test hay 41 fragmentos secundarios y el modelo entrega distancia para 36. Con H6 el error medio es 1.28 mm y la correlación con la distancia real 0.82. Un solo fragmento del caso 007, que está a 9.4 mm y el modelo sitúa a 45.8 mm, concentra el 79 % del error; sin él la media es 0.28 mm. En validación solo 5 de los 41 secundarios están separados en el ground truth, así que esa columna es indicativa.'),
+  cabezaTabla('Tabla 7. Distancia predicha frente a la real y métricas de superficie por fragmento (41 secundarios en cada conjunto).'),
+  tabla([3900, 1820, 1820, 1820], ['Medida', 'Validación, H6', 'Test, D5', 'Test, H6'], [
+    ['Error medio de la distancia (mm)', '0.185', '2.956', '1.277'],
+    ['Error del percentil 90 (mm)', '0.000', '3.453', '0.556'],
+    ['Correlación con la distancia real', '0.972', '0.543', '0.818'],
+    ['Secundarios con distancia predicha', '38', '36', '36'],
+    ['Dice 3D, principal y secundarios', '0.921 y 0.701', '0.909 y 0.682', '0.931 y 0.756'],
+    ['ASSD medio (mm)', '4.08', '3.02', '2.06'],
+    ['HD95 medio (mm)', '17.99', '16.33', '11.55'],
+  ]),
+  aire(),
+
+  H2('5.6 Latencia por imagen'),
+  P('La Tabla 8 da el tiempo de la red por corte de 384 × 384, con lote de 1. La configuración entregada es un modelo con TTA.'),
+  cabezaTabla('Tabla 8. Latencia por corte (mediana, en ms).'),
+  tabla([3300, 2020, 2020, 2020], ['Configuración', 'GPU L4', 'CPU, 12 hilos', 'CPU portátil, 8 hilos'], [
+    ['Un modelo', '63.7', '161.7', '336.1'],
+    ['Un modelo con TTA (entregado)', '71.6', '249.6', '695.5'],
+    ['Ensamble de tres semillas con TTA', '87.4', '518.0', '—'],
+  ]),
+  aire(),
 
   // ---------- 6 ----------
   H('6. Análisis de error y limitaciones'),
-  P('La clasificación casi no confunde regiones: el F1 es 0.980 en el sacro, 0.997 en el coxal izquierdo y 0.995 en el derecho. En la máscara semántica, el 1.9 % del hueso se predice como fondo (3.3 % en el sacro) y la confusión entre coxal izquierdo y derecho queda por debajo del 0.1 %.'),
-  P('Los cinco peores casos de test son 039 (0.784), 061 (0.822), 007 (0.831), 054 (0.834) y 047 (0.854). En todos el fragmento principal se segmenta bien y el error está en los secundarios. El caso 039 (Figura 4) es un volumen de baja resolución cuyo sacro sale dividido en más fragmentos de los reales; en 061 y 054 el modelo intercambia principal y secundario entre dos fragmentos de tamaño parecido.'),
-  figura('../../outputs/s10/informe_h6_test/peor_039.png', 360, 244),
-  pie('Figura 4. Caso 039, el peor de test: imagen, fragmentos reales y fragmentos predichos en dos cortes.'),
-  P('Limitaciones que hay que declarar:'),
+  H2('6.1 Matriz de confusión de la clasificación'),
+  P('La cabeza de clasificación decide en cada corte si cada región está presente, así que hay una matriz de dos por dos por región (Tabla 9, sobre los 4 664 cortes de test). El error más frecuente es no detectar el sacro: pasa en 56 de los 2 294 cortes en que está.'),
+  cabezaTabla('Tabla 9. Matriz de confusión de la clasificación por región en test (H6, semilla 42).'),
+  tabla([1700, 1200, 1200, 1300, 1250, 900, 900, 910],
+    ['Región', 'Presente y predicha', 'Ausente y predicha', 'Presente y no predicha', 'Ausente y no predicha', 'Precisión', 'Recall', 'F1'], [
+      ['Sacro', '2 238', '37', '56', '2 333', '0.984', '0.976', '0.980'],
+      ['Coxal izquierdo', '3 372', '11', '12', '1 269', '0.997', '0.996', '0.997'],
+      ['Coxal derecho', '3 316', '28', '4', '1 316', '0.992', '0.999', '0.995'],
+    ]),
+  aire(),
+  P('A nivel de píxel (Tabla 10), casi todo el error de la máscara semántica es hueso que se predice como fondo, sobre todo en el sacro. La confusión entre coxal izquierdo y derecho, que con D5 llegaba al 13.7 % del hueso en el caso 012, queda por debajo del 0.1 %.'),
+  cabezaTabla('Tabla 10. Matriz de confusión de la segmentación semántica en test, en porcentaje de cada clase real (filas).'),
+  tabla([2760, 1650, 1650, 1650, 1650], ['Real \\ predicho', 'Fondo', 'Sacro', 'Coxal izquierdo', 'Coxal derecho'], [
+    ['Fondo', '99.93', '0.02', '0.02', '0.02'],
+    ['Sacro', '3.28', '96.65', '0.04', '0.04'],
+    ['Coxal izquierdo', '1.52', '0.01', '98.47', '0.00'],
+    ['Coxal derecho', '1.45', '0.02', '0.06', '98.47'],
+  ]),
+  aire(),
+
+  H2('6.2 Los cinco peores casos'),
+  P('La Tabla 11 y la Figura 4 muestran los cinco casos de test con menor Dice por fragmento. En los cinco el fragmento principal se segmenta bien (entre 0.87 y 0.91) y el error está en los secundarios: lo que falta resolver ya no es a qué hueso pertenece cada píxel, sino dónde se parte el hueso en fragmentos.'),
+  cabezaTabla('Tabla 11. Los cinco peores casos de test con H6 y la causa más probable de cada uno.'),
+  tabla([650, 750, 900, 1150, 1000, 4910], ['Caso', 'Dice', 'Principal', 'Secundarios', 'Sin pareja', 'Hipótesis'], [
+    ['039', '0.784', '0.890', '0.635', '7.7 %', 'Es el volumen de menor resolución en el plano (154 × 322 px, 1.22 mm). Al llevarlo a 384 px el sacro sale dividido en más fragmentos de los reales'],
+    ['061', '0.822', '0.891', '0.635', '17.4 %', 'El coxal derecho tiene dos fragmentos grandes. El modelo ve un corte a la vez y en parte de los cortes intercambia cuál es el principal'],
+    ['007', '0.831', '0.913', '0.545', '24.5 %', 'Fragmentos secundarios pequeños en las ramas púbicas, y un coxal que el modelo parte donde el hueso se adelgaza. Uno de cada cuatro secundarios queda sin pareja'],
+    ['054', '0.834', '0.899', '0.663', '16.2 %', 'Fragmentos en contacto: el modelo predice fragmentos de más y confunde principal y secundario donde se tocan'],
+    ['047', '0.854', '0.870', '0.753', '17.1 %', 'Hueso fino y poco denso en los extremos del volumen (0.745 en los extremos y 0.888 en el centro). El 5.4 % del hueso se predice como fondo'],
+  ], { izquierda: [5], partir: true }),
+  aire(),
+  galeria([
+    ['../../outputs/s10/informe_h6_test/peor_039.png', 'a) Caso 039'],
+    ['../../outputs/s10/informe_h6_test/peor_061.png', 'b) Caso 061'],
+    ['../../outputs/s10/informe_h6_test/peor_007.png', 'c) Caso 007'],
+    ['../../outputs/s10/informe_h6_test/peor_054.png', 'd) Caso 054'],
+    ['../../outputs/s10/informe_h6_test/peor_047.png', 'e) Caso 047'],
+  ]),
+  pie('Figura 4. Galería de los cinco peores casos de test. En cada panel: imagen, fragmentos reales y fragmentos predichos, en el corte del décimo percentil (arriba) y en el corte mediano (abajo). Azul: sacro; naranja: coxal izquierdo; verde: coxal derecho; tono claro: fragmento secundario.'),
+
+  H2('6.3 Limitaciones'),
   item([B('Fragmentos secundarios. '), 'Su Dice es 0.750 en test y el 7.8 % no tiene pareja en la predicción.']),
   item([B('Fragmentos en contacto. '), 'Cuando dos fragmentos se tocan, el modelo puede fusionarlos: el secundario se pierde y su distancia sale 0 mm o no existe.']),
   item([B('Fragmentos de más. '), 'El Dice por fragmento empareja cada fragmento real con uno predicho, pero no penaliza los fragmentos predichos que sobran.']),
@@ -176,7 +283,7 @@ const contenido = [
   H('7. Conclusiones'),
   P('Una red 2D propia de 2.74 millones de parámetros, sin frameworks de detección ni de segmentación, cumple en test los nueve objetivos del curso. La mejora que cerró la brecha no fue una red más grande: casi todas las variantes de arquitectura, pérdida y post-proceso que probamos quedaron dentro del ruido. Lo que funcionó fue revisar caso por caso por qué fallaba el modelo, encontrar que parte de los datos estaba en otra orientación y corregirlo con una regla fija. El trabajo pendiente está en los fragmentos secundarios en contacto, donde un modelo con contexto 3D debería ayudar.'),
 
-  P([B('Disponibilidad. '), 'El código, los pesos, los resultados de cada corrida y la bitácora de decisiones están en el repositorio. El uso de herramientas de IA durante el proyecto está documentado en IA_USAGE.md.'], { align: AlignmentType.LEFT }),
+  P([B('Disponibilidad. '), 'El código, los pesos, los resultados de cada corrida y la bitácora de decisiones están en el repositorio. El dashboard con los tres visualizadores está publicado en Streamlit Community Cloud y la inferencia en vivo corre en una API en AWS Lambda. El uso de herramientas de IA durante el proyecto está documentado en IA_USAGE.md.'], { align: AlignmentType.LEFT }),
 
   // ---------- Referencias ----------
   H('Referencias'),
@@ -189,7 +296,7 @@ const contenido = [
 ];
 
 const doc = new Document({
-  creator: 'Equipo PENGWIN', title: 'Mini-paper PENGWIN',
+  creator: 'Equipo PENGWIN', title: 'Informe técnico PENGWIN (mini-paper)',
   styles: { default: { document: { run: { font: FUENTE, size: 21 } } } },
   numbering: { config: [{ reference: 'lista', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•',
     alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 500, hanging: 260 } } } }] }] },

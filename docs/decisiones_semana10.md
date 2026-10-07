@@ -1,11 +1,34 @@
 # Bitácora de decisiones — Semana 10
 
-Registro cronológico de lo que se entrenó, lo que se decidió y por qué. Se actualiza a medida que
-avanza la semana. Las cifras son de **validación** (15 casos, 5047 cortes, subconjunto `todo`, con
-TTA espejo), salvo que se diga otra cosa. Test no se ha tocado.
+Registro cronológico de lo que se entrenó, lo que se decidió y por qué, desde la línea base hasta
+el modelo final (H6). Cerrada el 6 de octubre de 2026. Las cifras son de **validación** (15 casos,
+5047 cortes, subconjunto `todo`, con TTA espejo), salvo que se diga otra cosa. Las dos evaluaciones
+en test están en las secciones 11 y 12.5.
 
-Documentos relacionados: `outputs/s10/resumen_experimentos.md` (tabla viva de resultados),
-`docs/plan_semana10.md` (plan), `IA_USAGE.md` (uso de IA).
+Es el documento de la Semana 10. Lo demás está en un solo sitio cada cosa:
+
+| Qué | Dónde |
+|---|---|
+| El modelo final, sus resultados y sus limitaciones | `MODEL_CARD.md` |
+| Comandos para reproducir | `README.md`, sección 3 |
+| Tabla de todas las corridas | `outputs/s10/resumen_experimentos.md` |
+| Recorrido ejecutable, con tablas y figuras | `notebooks/04_semana10_pipeline_multitarea.ipynb` |
+| Uso de IA | `IA_USAGE.md` |
+
+### Qué archivo hace cada pieza
+
+| Pieza | Cómo quedó | Archivo |
+|---|---|---|
+| Backbone | Convolucional propio, 32 canales base, CBAM en una etapa antes de bifurcar. 2.74 M de parámetros en total | `src/week9_detection.py`, `src/week10_multitask.py` |
+| Clasificación | Qué regiones hay en el corte (sacro, coxal izquierdo, coxal derecho) | `ClassificationHead` |
+| Detección | Grid propio con una celda por región y NMS propio. Se reporta la caja cruda y la refinada con la semántica | `GridDetectionHead`, `src/pengwin_metrics.py` |
+| Segmentación semántica | Fondo y las tres regiones | `SegmentationHead` |
+| Segmentación de instancia | Por región, fragmento principal o secundario; los fragmentos salen por componentes conexas (`min_size` 12) | `src/instance_postprocess.py` |
+| Pérdida | Compuesta, con λ por término y peso ×3 a los secundarios | `src/train_s10.py` |
+| Orientación canónica | Endereza los 34 volúmenes guardados girados 180° | `src/orientacion.py` |
+| Volumen y distancia | Post-proceso 3D por región y distancia mínima borde a borde en mm | `src/volume_postprocess.py`, `src/fragment_distances.py`, `src/infer_volume.py` |
+| Evaluación | Las nueve métricas sobre todos los cortes del caso, con subconjuntos y tabla por caso | `src/evaluate_volumes.py` |
+| Análisis de error y tablas | Matriz de confusión, peores casos y tablas del notebook 04 | `src/informe_test.py`, `src/resumen_s10.py` |
 
 ## 1. Restricciones del proyecto (no negociables)
 
@@ -762,19 +785,23 @@ cortes); el 047 pierde en los extremos del volumen y deja 5.4 % del hueso como f
 repartidos por igual: 22 de 70 en entrenamiento, 10 de 15 en validación y 2 de 15 en test. La
 partición es por paciente con semilla fija y no se tocó.
 
-## 13. Pendiente (actualizado el 06-oct, cierre de la Semana 10)
+## 13. Cierre
 
-Hecho: evaluación en test (secciones 11 y 12.5), análisis de error (12.6), latencia en GPU y CPU,
-SAM zero-shot en validación y en test (sección 9), distancias sin relleno, notebook
-`04_semana10_pipeline_multitarea.ipynb`, `docs/resumen_semana10.md`, README,
-`resumen_experimentos.md` e `IA_USAGE.md` (entradas 15 a 18).
+Hecho en la Semana 10: las dos evaluaciones en test (secciones 11 y 12.5), el análisis de error
+(12.6), la latencia en GPU y CPU (8), SAM zero-shot en validación y en test (9), las distancias sin
+relleno (5 y 12.5) y el notebook `04_semana10_pipeline_multitarea.ipynb`.
 
-1. **Llevar H6 a la demo de la semana 11.** El dashboard y la API deben cargar
-   `h6_auggeo_rot35_canon_ema_w32_e60_s42.pth` y enderezar el volumen según la cabecera
-   (`orientacion.to_canonical`) antes de predecir; sin ese paso H6 falla en los volúmenes
-   guardados girados 180 grados. Lo hace la sesión de la Semana 11.
-2. Latencia en el Mac con `src/measure_latency.py`.
-3. Mirar el fragmento del caso 007 (coxal derecho, 9.4 mm reales, 45.8 mm predichos) y por qué
-   suben los secundarios perdidos en 3D en test (5.6 % → 7.8 %).
-4. Decidir si el ensamble entra a la demo (+0.003 en test y validación; triplica el costo).
-5. Opcionales: test de F1 y C2 s44 (una vez, sin elegir), resolución 512, más épocas.
+Lo que quedaba abierto y cómo terminó:
+
+| Punto | Cómo terminó |
+|---|---|
+| Llevar H6 a la demo | Hecho en la Semana 11: la demo y la API cargan H6 y `demo_export.py` endereza el volumen según la cabecera (`docs/semana11_dashboard.md`) |
+| Latencia en el portátil | Medida con `src/measure_latency.py`: 336 ms por corte y 696 ms con TTA (`MODEL_CARD.md`, sección 4.8) |
+| Ensamble de tres semillas en la demo | No entra: +0.003 en validación y en test, y triplica el costo. La demo muestra solo el modelo entregado |
+
+No se hizo y queda como trabajo futuro:
+
+- Entender el fragmento del caso 007 (coxal derecho, 9.4 mm reales y 45.8 mm predichos) y por qué
+  suben los secundarios perdidos en 3D en test (de 5.6 % a 7.8 %).
+- Asignación multi-celda en la detección, segundo pase por región, resolución 256 y 512, umbral de
+  clasificación por clase y pesos de FundidoraPC.

@@ -14,11 +14,7 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 
 > **Pendientes del equipo antes de entregar (borrar este bloque al cerrar):**
 > - Federico: sus entradas (no hay ninguna todavía).
-> - Gustavo: entrada de lo que falte de la Semana 11 (demo con H6, túnel de Cloudflare, latencia),
->   si se hace con IA. Revisar el análisis crítico de las entradas 21 a 24, que redactó la IA.
-> - Transparencia: la entrada 22 dice que en la primera evaluación también se pasaron por test los
->   demás checkpoints de D5 y ablaciones, solo para medir la variación. Confirmar que el informe lo
->   declare.
+> - Gustavo: revisar el análisis crítico de las entradas 21 a 24 y 31 a 33, que redactó la IA.
 > - Jacobo: el modelo de Claude que usó (entradas 1–7), los prompts exactos si los tiene, y una
 >   entrada para su versión del notebook 03 (Semana 9).
 > - Unificar la cifra del overfit de la Semana 9: la entrada 9 dice 1.687 → 0.002 (758×) y el
@@ -31,8 +27,13 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 |---|---|---|---|
 | Jacobo | Claude (claude.ai) | *(completar)* | 1–7 |
 | María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28 |
-| Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27 |
+| Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–33 |
 | Federico | *(completar)* | *(completar)* | 29 |
+
+Algunas entradas citan documentos que ya no están en el repositorio (`docs/plan_semana10.md`,
+`docs/plan_semana11.md`, `docs/resumen_semana10.md` y `notebooks/05_casos_dificiles_ejecutado.ipynb`).
+Se retiraron en la limpieza final (entrada 33) porque repetían lo que hoy está en la bitácora, el
+model card y los documentos de la Semana 11; siguen en el historial de git.
 
 ---
 
@@ -601,8 +602,9 @@ pedido de Gustavo con los prompts copiados tal cual.
   mediciones que ya estaban en `outputs/`; y una revisión del estado del repositorio contra los
   entregables.
 - **Qué se hizo a mano:** el equipo revisa la redacción del mini-paper y decide si el formato y la
-  extensión son los que pide el profesor; la IA no tenía el enunciado y eligió una estructura de
-  artículo corto.
+  extensión son los que pide el profesor; la IA no consultó el enunciado (estaba adjunto en la
+  conversación desde el 4 de octubre) y eligió una estructura de artículo corto. Se corrigió en la
+  entrada 33.
 - **Análisis crítico:** la licencia no se escribió de memoria: se consultó el registro de Zenodo del
   dataset, y ahí se vio que el DOI que aparecía en un README generado para Hugging Face
   (`10990767`) es el del documento de diseño del reto y no el de los datos. Las cifras del
@@ -610,6 +612,41 @@ pedido de Gustavo con los prompts copiados tal cual.
   resultados nuevos; repite el aviso de que el 0.875 es una segunda evaluación en test. La cifra
   del mejor método del reto (IoU 0.930) se tomó del resumen del artículo del reto y no es
   comparable con las nuestras.
+
+### 33. Limpieza de la documentación de las semanas 10 y 11
+
+- **Integrante y herramienta:** Gustavo · Claude (Cowork), `claude-opus-5-5`. 6 de octubre de 2026.
+- **Prompts exactos:**
+  > quisiera limpiar las documentaciones , revisar cuales  son las definitivas , de acuerdo con lo que hicimos ,  de la semana 10 para arriba ,  porque veo un poco de docs de semana 10  que no se cual o cuales son los definitivos , también se que algunos companeros estuvieron documentando , perro no habiamos terminado la semana 10 y 11 , entonces faltaba por documentar bien , entonces terminemos de documentar bien porfa y dejar solo lo que es y lo definitivo
+
+  > Lo importante es no duplicar información, sino dejar solo los docs que no dupliquen información, o sea, solo dejar los docs que expliquen cada parte de su proceso y no duplicar información.
+
+  > Pues aquí te paso lo que dicen los entregables finales. Dice nomás el tipo paper, pero me gusta ese informe, la verdad. […] Mira que el IA usage.md dice todavía Cloudflare, entonces creería yo que no está actualizado, ¿no? […] revisemos que IA use model card y README estén actualizados
+- **Qué produjo la IA:** el inventario de documentos y notebooks con su autor y fecha; la
+  integración de la rama `docs/latencia-distancia` de María; el retiro de los planes de las semanas
+  10 y 11, de los cambios de la primera versión de la Semana 10, del resumen de la Semana 10, de
+  dos copias del notebook 05 y de los cuadernos de Colab anteriores; el cuaderno de Colab regenerado
+  con la receta de H6; el cierre de la bitácora; las correcciones del informe técnico (orientación
+  en la demo, conteo de metal, tiempo de entrenamiento y consultas a test); la revisión de los
+  documentos contra la lista de entregables del enunciado; y la ampliación del mini-paper con lo
+  que el enunciado exige y le faltaba (motivo de cada decisión de arquitectura, justificación de los
+  pesos de la pérdida, matriz de confusión, galería de los cinco peores casos y tabla de distancias).
+- **Qué se hizo a mano:** Gustavo decidió borrar en vez de archivar, incluir los notebooks y el
+  criterio de un documento por tema sin repetir. La IA preguntó antes de borrar y mostró la lista.
+  También decidió que el entregable del enunciado es el mini-paper y que el informe largo queda
+  como versión extendida. Gustavo probó el dashboard publicado desde el celular y confirmó que la
+  API en Lambda ya corre con H6.
+- **Análisis crítico:** la IA había escrito el resumen de la Semana 10 un día antes y ese mismo
+  documento resultó ser el que más repetía a los demás; con el criterio de Gustavo se retiró. La
+  discrepancia del metal (41 casos en el informe y 25 en el model card) no era un error de ninguno
+  de los dos: son 41 casos con algún vóxel sobre 3000 HU y 25 con más de 100 mm³, y se comprobó
+  contra `data/eda_intensidades_detalle.csv` antes de corregir. Dos errores de la IA en este
+  tramo: escribió el mini-paper (entrada 32) sin releer el enunciado, que estaba adjunto, y por eso
+  le faltaban la matriz de confusión y la galería de los cinco peores casos; y la tabla 2.4 de este
+  archivo seguía dando el túnel de Cloudflare como decisión final cuando el despliegue real es
+  Streamlit Cloud y Lambda. Los dos los detectó Gustavo al volver a pasar la lista de entregables.
+  Al recalcular la matriz de confusión apareció además un redondeo mal hecho en el informe largo
+  (recall del coxal izquierdo 0.996, no 0.997).
 
 ---
 
@@ -694,7 +731,7 @@ su versión final:
 | Visualizador 1 | MIP estático → isosuperficie 3D | MIP en tres ejes + isosuperficie | 3 → 26, 28 |
 | Post-proceso | `min_size=1` y CASR mejoraban validación | `min_size=12`, sin CASR (no cumplieron la regla) | 18 → 20 |
 | Modelo principal | c2 → D5 | H6 s42 | 18, 21 → 23 |
-| Despliegue | Túnel de Cloudflare | Túnel de Cloudflare, que exige el enunciado; Streamlit Cloud + AWS Lambda queda como alternativa documentada | 25, 27 |
+| Despliegue | Túnel de Cloudflare desde el Mac | Streamlit Community Cloud + API en AWS Lambda, publicados y probados desde computador y celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado | 25, 27 → 30, 31 |
 | Detector de giro | Detectar el giro con geometría (`estimate_angle`) | Descartado; se usa la cabecera del `.mha` | 23 |
 
 **Consultas a test.** Por la regla de la entrada 19, test debía consultarse una sola vez. Se

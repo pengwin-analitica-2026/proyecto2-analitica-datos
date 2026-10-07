@@ -70,5 +70,5 @@ de H6 y para D5 (la primera evaluación en test).
   reconstruye la imagen (unos 8 minutos). Es intencional: `main` y la Lambda nunca quedan desfasadas.
 - **`main` protegida.** El enunciado pide merges con revisión por pares. Pendiente de activar en
   Settings → Branches: requerir PR con una aprobación antes de integrar.
-- **Al terminar el curso:** borrar la función Lambda, el repositorio ECR y los dos roles
-  (`github-actions-pelvis-api`, `pelvis-api-lambda-exec`), o al menos rotar `API_KEY`.
+- **Al terminar el curso:** borrar los recursos de AWS (lista en
+  `docs/despliegue_aws_streamlit.md`) o, al menos, rotar `API_KEY`.

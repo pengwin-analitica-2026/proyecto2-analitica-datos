@@ -1,7 +1,9 @@
 # Semana 11 — dashboard con tres visualizadores
 
 Estado al 6 de octubre de 2026. Modelo de la demo: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
-Plan y decisiones en `docs/plan_semana11.md`; despliegue en `docs/despliegue_aws_streamlit.md`.
+Es el documento de la Semana 11 para los visualizadores. El despliegue está en
+`docs/despliegue_aws_streamlit.md` y las pruebas y el despliegue automáticos en
+`docs/cicd_github_actions.md`.
 
 ## Cómo correrlo
 
@@ -113,8 +115,19 @@ funcionan, no para estimar el error (eso está en la pestaña de métricas, con 
 En 039 el modelo pierde el fragmento más separado del coxal derecho, uno de los fallos que siguen
 abiertos en test.
 
+## Decisiones
+
+| Tema | Decisión |
+|---|---|
+| Framework | Streamlit. El dashboard solo lee los archivos que deja `demo_export.py`, así que abre al instante y no necesita `torch` |
+| Dónde se endereza | Al exportar el caso, no en la API: así las tres vistas, el ground truth y la inferencia en vivo comparten orientación |
+| Orientación | Sale de la cabecera del `.mha`, no de la lista de casos, para que sirva con volúmenes que no sean de PENGWIN |
+| Modelos en la demo | Solo el entregado (H6). El selector de modelos se descartó y los casos exportados con D5 se borraron |
+| Casos | Tres de validación y uno de test (039), este último porque el modelo ya estaba congelado |
+| Videos de respaldo | `docs/video/demo_computador.mp4` (recorrido completo, 110 s) y `docs/video/demo_celular.mp4` (prueba en celular, 70 s) |
+| Publicación | Streamlit Community Cloud y una API en AWS Lambda, probados desde computador y celular (6 de octubre). El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado |
+
 ## Pendiente
 
-- Probar el dashboard publicado desde un celular.
-- Video de respaldo de la demo.
+- Material del pitch.
 - Línea entre el fragmento y su principal en el visualizador 3 (opcional).

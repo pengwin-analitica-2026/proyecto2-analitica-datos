@@ -1,6 +1,6 @@
-# Semana 10 — resumen de experimentos (actualizado el 6 de octubre de 2026, 19:00 UTC)
+# Semana 10 — tabla de experimentos
 
-**Cerrado.** Modelo final: H6 (sección 2). El registro detallado de cada decisión está en `docs/decisiones_semana10.md`; el notebook `notebooks/04_semana10_pipeline_multitarea.ipynb` lee estos mismos archivos.
+Una fila por corrida, con sus métricas de validación. Cada fila sale de un JSON de esta carpeta. Por qué se probó cada cosa y qué se decidió está en `docs/decisiones_semana10.md`; el modelo final y sus resultados en test, en `MODEL_CARD.md`. El notebook `notebooks/04_semana10_pipeline_multitarea.ipynb` lee estos mismos archivos.
 
 Validación, 15 casos completos (5 047 cortes), TTA espejo, métricas sobre el volumen. Objetivos: F1/AUC 0.85; IoU de detección y mAP50 0.65; mAP50:95 0.40; Dice de segmentación 0.85; Dice de instancia 0.85 e IoU 0.70.
 
@@ -41,7 +41,7 @@ Hallazgos:
 
 ## 1b. Serie H (6 de octubre): generalización
 
-Después de la primera evaluación en test (sección 2) se analizaron los fallos y se probaron cambios que atacan la causa, un cambio a la vez sobre D5 y decididos solo con validación. Todas las filas: c2 + EMA, 60 épocas, TTA.
+Después de la primera evaluación en test se analizaron los fallos y se probaron cambios que atacan la causa, un cambio a la vez sobre D5 y decididos solo con validación. Todas las filas: c2 + EMA, 60 épocas, TTA.
 
 | Experimento | Qué cambia frente a D5 | mAP50 ref. | mAP50:95 ref. | Dice seg. | Dice instancia | Dice secundarios | Lectura |
 |---|---|---|---|---|---|---|---|
@@ -74,71 +74,20 @@ Hallazgos de la serie H:
 - 34 de los 100 volúmenes están guardados girados 180° en el plano (lo dice la cabecera del `.mha`). Sin corregirlo, la red aprendía una regla por el aspecto de la imagen para decidir izquierda y derecha.
 - Descartado: detector geométrico de giro (`orientacion.estimate_angle`; al revisar a ojo, casi todo lo que marcaba eran pacientes bien colocados), filtros de post-proceso (≤ +0.002) y `min_size=1` (+0.002, por debajo del ruido).
 
-## 2. Modelo final y resultados
+## 2. Modelo final
 
-**Modelo final: H6** = c2 + EMA 0.999 (ancho 32, CBAM en 1 etapa, 2.74 M de parámetros, 60 épocas, secundarios ×3, λ por defecto, sin preentrenamiento) + aumento geométrico con rotación de ±35° + orientación canónica según la cabecera. Archivo: `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`. La arquitectura es la de D5; cambian el entrenamiento y el preprocesamiento.
+**H6** = c2 + EMA 0.999 (ancho 32, CBAM en 1 etapa, 2.74 M de parámetros, 60 épocas, secundarios ×3, λ por defecto, sin preentrenamiento) + aumento geométrico con rotación de ±35° + orientación canónica según la cabecera. La arquitectura es la de D5; cambian el entrenamiento y el preprocesamiento.
 
-```bash
-python src/train_s10.py --cache-root data/cache/s10 --size 384 --epochs 60 --base-channels 32 --cbam 1 \
-    --secondary-weight 3 --augment --cosine --batch-size 16 --per-epoch 2500 --ema 0.999 --seed 42 \
-    --aug-geo 1.0 --aug-rot-deg 35 --canonical --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth
-python src/evaluate_volumes.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
-    --cache-dir data/cache/s10/cache_384 --split test --tta --output outputs/s10/TEST2_h6_s42_tta.json
-```
-
-### Test (15 casos, 4 664 cortes, 1 modelo + TTA)
-
-| Métrica | Objetivo | Test, D5 (primera) | Test, H6 (segunda) | Validación, H6 s42 |
-|---|---|---|---|---|
-| F1 de clasificación (macro) | 0.85 | 0.984 | 0.990 | 0.992 |
-| AUC de clasificación (macro) | 0.85 | 0.998 | 0.999 | 0.999 |
-| IoU medio de detección (caja refinada) | 0.65 | 0.898 | 0.943 | 0.949 |
-| mAP50 de detección (refinada) | 0.65 | 0.920 | 0.961 | 0.971 |
-| mAP50:95 de detección (refinada) | 0.40 | 0.853 | 0.902 | 0.904 |
-| Dice de segmentación semántica (macro) | 0.85 | 0.949 | 0.971 | 0.971 |
-| IoU de segmentación semántica (macro) | 0.70 | 0.904 | 0.943 | 0.944 |
-| **Dice de instancia (por fragmento)** | **0.85** | 0.845 | **0.875** | 0.869 |
-| IoU de instancia (por fragmento) | 0.70 | 0.781 | 0.816 | 0.808 |
-| Dice primario / secundario | – | 0.894 / 0.692 | 0.915 / 0.750 | 0.905 / 0.764 |
-| Detección cruda (cabeza grid sin refinar) mAP50 / mAP50:95 | – | 0.866 / 0.511 | 0.912 / 0.556 | 0.887 / 0.506 |
-
-- **Primera evaluación (D5 s42):** configuración congelada antes de ver test. Es la cifra limpia: 0.845 en Dice de instancia, el único objetivo que no se cumplía.
-- **Segunda evaluación (H6 s42):** hecha después de analizar los fallos de la primera; el análisis miró los casos 012 y 039 de test, así que no es una estimación independiente. El modelo se eligió solo con validación y estrés. Cumple los nueve objetivos.
-- Las otras semillas de H6 en test dan 0.875 y 0.876; el ensamble de las tres, 0.879. Los demás checkpoints de la familia D/E/F quedaron entre 0.841 y 0.848.
-- Casos que hundían el test: 012 (paciente girado unos 26°) pasó de 0.692 a 0.865 y 039 de 0.710 a 0.784. El 039 sigue siendo el peor.
-
-### Ablaciones obligatorias
-
-Medidas sobre c2 y sobre el candidato con EMA (D5), **no repetidas sobre H6**: H6 comparte arquitectura, pérdida y λ con D5.
-
-| Ablación | Resultado |
+| Qué | Archivo en esta carpeta |
 |---|---|
-| CBAM (con/sin) | Aporta en clasificación (F1 +0.013) y detección refinada (mAP50:95 +0.011); segmentación igual |
-| Transfer learning (Intel, con/sin) | Sin ganancia consistente en segmentación (secundarios +0.011 y −0.008 con 2 semillas); detección cruda mixta |
-| λ (×2 instancia/borde) | Sin ganancia; empeora la detección cruda |
+| Pesos (semillas 42, 43 y 44) | `h6_auggeo_rot35_canon_ema_w32_e60_s4{2,3,4}.pth` |
+| Validación sobre el volumen completo | `h6_auggeo_rot35_canon_ema_w32_e60_s4{2,3,4}_val.json`, `h6_ensamble3_val.json` |
+| Test, primera evaluación (D5) | `TEST_d5_s42_tta.json`, `TEST_d5_s42_nofill.json` |
+| Test, segunda evaluación (H6) | `TEST2_h6_s4{2,3,4}_tta.json`, `TEST2_h6_ens3_tta.json`, `TEST2_h6_s42_nofill.json` |
+| Otros checkpoints pasados por test (solo para medir la variación) | `TEST_e2_s43.json`, `TEST_f2_s42.json` |
+| Pruebas de estrés | `estres2_*.json`, `estres_d5_rot60.json`, `estres_d5_rot180.json` |
+| Análisis de error en test | `informe_h6_test/` |
+| SAM zero-shot | `sam_baseline_test_h6.json`, `sam_baseline_val_h6.json`, `sam_baseline_val.json` |
+| Latencia | `latencia_gpu_L4.json`, `latencia_cpu_colab.json` |
 
-### Volumen: post-proceso 3D y distancia en mm
-
-Medición con `infer_volume.py --tta --distance-nofill --surface-metrics` (la versión original rellenaba los huecos entre fragmentos y dejaba todas las distancias predichas en 0 mm; ver `docs/decisiones_semana10.md`, sección 5).
-
-| Medida | Validación, D5 | Validación, H6 | Test, D5 | Test, H6 |
-|---|---|---|---|---|
-| Error medio de distancia (mm) | 0.518 | 0.185 | 2.956 | 1.277 |
-| Correlación real-predicha | 0.925 | 0.972 | 0.543 | 0.818 |
-| Fragmentos secundarios con distancia predicha | 38 de 41 | 38 de 41 | 36 de 41 | 36 de 41 |
-| Dice 3D principal / secundario | 0.911 / 0.605 | 0.921 / 0.701 | 0.909 / 0.682 | 0.931 / 0.756 |
-| ASSD / HD95 medios (mm) | 5.11 / 22.81 | 4.08 / 17.99 | 3.02 / 16.33 | 2.06 / 11.55 |
-
-En test, un solo fragmento (caso 007, coxal derecho: 9.4 mm reales, 45.8 mm predichos) concentra el 79 % del error; sin él el error medio sería 0.28 mm. En validación solo 5 de los 41 fragmentos están separados en el ground truth, así que esa cifra es indicativa.
-
-### SAM zero-shot y latencia
-
-- **SAM ViT-B con la caja predicha como prompt, sobre test con H6 (1 181 cortes, 3 002 pares corte-región):** Dice 0.889 e IoU 0.823 por región, frente a 0.934 y 0.889 de nuestra máscara semántica dentro de la misma caja. En validación con H6: 0.859 / 0.781 frente a 0.914 / 0.859; con D5: 0.847 / 0.769 frente a 0.898 / 0.839. Archivos `sam_baseline_test_h6.json`, `sam_baseline_val_h6.json` y `sam_baseline_val.json`.
-- **Latencia por corte (384², lote 1, medida con D5; H6 tiene la misma arquitectura):** GPU L4 64 / 72 / 87 ms (1 modelo / con TTA / ensamble de 3 con TTA); CPU de 12 hilos 162 / 250 / 518 ms. Falta medirla en el Mac.
-
-## 3. Pendiente
-
-- Latencia en el Mac con `src/measure_latency.py`.
-- Llevar H6 y el paso de orientación canónica a la demo y al dashboard de la Semana 11 (hoy usan D5).
-- Mirar el fragmento del caso 007 y por qué suben los secundarios perdidos en 3D en test (5.6 % → 7.8 %).
-- Opcionales que no se hicieron: asignación multi-celda en la detección, segundo pase por región, resolución 256 y 512, umbral de clasificación por clase, pesos de FundidoraPC.
+Las cifras de test, las ablaciones, la distancia en mm, SAM y la latencia están en `MODEL_CARD.md` (secciones 4.1 a 4.9); los comandos, en `README.md` (sección 3).

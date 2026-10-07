@@ -13,8 +13,17 @@ Las tres pestañas leen los casos ya exportados (`outputs/demo/<modelo>/<caso>/`
 repositorio. El modelo solo corre en vivo al pulsar el botón del visualizador 2. Si la API no
 responde, el resto del dashboard sigue funcionando.
 
-El túnel de Cloudflare que menciona el enunciado queda como opción y no se montó: la demo se hace
-con la app de Streamlit Cloud, que ya está publicada y se abre desde computador y celular.
+**Diferencia con el enunciado, aprobada por el profesor.** El enunciado pide el dashboard
+«desplegado en vivo mediante un túnel de Cloudflare». El profesor Carlos Ferro aprobó usar otro
+medio de despliegue, y el equipo usó Streamlit Cloud y AWS Lambda: una dirección fija que se abre
+desde computador y celular sin depender de que un equipo del grupo esté encendido. El túnel no se
+montó. Si hiciera falta, se abre en dos comandos desde un equipo con el repositorio y `cloudflared`
+instalados:
+
+```bash
+streamlit run app/dashboard.py
+cloudflared tunnel --url http://localhost:8501     # en otra terminal; imprime la dirección pública
+```
 
 ## 1. Dashboard en Streamlit Community Cloud
 
@@ -85,10 +94,16 @@ Contra la Lambda real, el 6 de octubre:
   equivocada. Ida y vuelta ~1.1 s ya caliente; 321 ms de modelo en la CPU de Lambda.
 - `deploy-api.yml` completo desde `main`: pruebas, imagen, ECR, actualización y prueba de humo.
 
+Después de integrar la demo con H6 a `main` (6 de octubre), comprobado por Gustavo:
+
+- La Lambda quedó redesplegada con H6 y la inferencia en vivo responde desde el dashboard.
+- El dashboard de Streamlit Cloud abre y funciona desde un celular: los tres visualizadores, la
+  tabla de distancias, la pestaña de métricas y la inferencia en vivo de un corte (753 ms de modelo
+  en la CPU de Lambda). La prueba está grabada en `docs/video/demo_celular.mp4` (70 segundos, sin
+  audio).
+
 Sin verificar todavía:
 
-- Con H6 en la Lambda: el redespliegue ocurre al integrar este cambio a `main`.
-- El dashboard de Streamlit Cloud abierto desde un celular.
 - Costos: con el uso de una demo deberían ser mínimos (Lambda cobra por invocación y ECR por
   almacenamiento, unos 0.5 GB por imagen). Las imágenes viejas de ECR se pueden borrar.
 

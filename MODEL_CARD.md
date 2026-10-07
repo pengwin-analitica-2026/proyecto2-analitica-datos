@@ -1,8 +1,5 @@
 # Model card — H6 (detección, segmentación y clasificación de fragmentos de fractura pélvica)
 
-> **Pendiente antes de entregar (borrar este bloque al cerrar):** probar el dashboard publicado
-> desde un celular.
-
 ## 1. Resumen
 
 | | |
@@ -39,8 +36,8 @@
   secundarios.
 - **Características que afectan al modelo:**
   - la mediana HU del hueso varía de 81 a 431 HU entre pacientes (CV 26.5 %);
-  - 25 casos tienen metal (19 en train, 3 en val y 3 en test), sin efecto medible sobre los HU del
-    hueso a nivel de volumen;
+  - 25 casos tienen metal de más de 100 mm³ (19 en train, 3 en val y 3 en test) y 41 tienen algún
+    vóxel sobre 3000 HU, sin efecto medible sobre los HU del hueso a nivel de volumen;
   - 34 de los 100 volúmenes están almacenados en orientación LPI, girados 180° en el plano axial
     respecto a los demás;
   - hay fragmentos desde 9 cortes axiales; la mediana es de 136.
@@ -71,17 +68,19 @@
 
 ### 4.1 Test (15 pacientes)
 
-| Métrica | H6 s42 (entregado) | Media de 3 semillas |
-|---|---|---|
-| Dice por fragmento | 0.875 | 0.875 ± 0.001 |
-| IoU por fragmento | 0.816 | 0.815 |
-| F1 de clasificación | 0.990 | 0.988 |
-| AUC de clasificación | 0.999 | 0.999 |
-| IoU de detección | 0.943 | 0.941 |
-| mAP50 | 0.961 | 0.958 |
-| mAP50:95 | 0.902 | 0.899 |
-| Dice semántico | 0.971 | 0.970 |
-| IoU semántico | 0.943 | 0.943 |
+| Métrica | Objetivo | H6 s42 (entregado) | H6, media de 3 semillas | D5 s42 (primera evaluación) |
+|---|---|---|---|---|
+| Dice por fragmento | 0.85 | 0.875 | 0.875 ± 0.001 | 0.845 |
+| IoU por fragmento | 0.70 | 0.816 | 0.815 | 0.781 |
+| F1 de clasificación | 0.85 | 0.990 | 0.988 | 0.984 |
+| AUC de clasificación | 0.85 | 0.999 | 0.999 | 0.998 |
+| IoU de detección | 0.65 | 0.943 | 0.941 | 0.898 |
+| mAP50 | 0.65 | 0.961 | 0.958 | 0.920 |
+| mAP50:95 | 0.40 | 0.902 | 0.899 | 0.853 |
+| Dice semántico | 0.85 | 0.971 | 0.970 | 0.949 |
+| IoU semántico | 0.70 | 0.943 | 0.943 | 0.904 |
+
+H6 cumple los nueve objetivos; D5 cumplía ocho (le faltaba el Dice por fragmento).
 
 El ensamble de las tres semillas llega a 0.879 de Dice por fragmento, pero triplica el costo de
 inferencia y no se usa.
@@ -94,10 +93,13 @@ pruebas de estrés, y su configuración se congeló por escrito antes de evaluar
 sola vez con H6, sin ajustar nada después (`docs/decisiones_semana10.md`, sección 12).
 
 En total, test se consultó cuatro veces durante el proyecto: receta c2 (0.848), EMA + CASR (0.847),
-D5 (0.845) y H6 (0.875).
+D5 (0.845) y H6 (0.875). En la evaluación de D5 también se pasaron por test otros cinco checkpoints
+(dos semillas más de D5 y las ablaciones E2 y F2), solo para medir la variación y con la regla
+escrita de antemano de que no servían para elegir modelo: quedaron entre 0.841 y 0.848.
 
 **Sobre la detección.** El mAP se mide sobre cajas refinadas con la máscara semántica. Con la
-cabeza grid sola, el mAP50 en validación es 0.887 (0.971 con refinamiento).
+cabeza grid sola, el mAP50 es 0.912 en test (0.961 con refinamiento) y 0.887 en validación (0.971);
+el mAP50:95 de la cabeza sola es 0.556 en test.
 
 ### 4.2 Validación (15 pacientes)
 
@@ -159,7 +161,7 @@ pares corte-región). SAM no forma parte del pipeline.
 | **Global** | **0.889** | **0.935** | **0.823** | **0.889** |
 
 El modelo propio supera a SAM en las tres regiones; la mayor diferencia está en el sacro. SAM tarda
-unos 520 ms por corte.
+unos 259 ms por corte en la GPU L4 solo en su parte, frente a unos 64 ms de todo el modelo propio.
 
 ### 4.7 Clasificación y peores casos (test)
 
@@ -172,22 +174,31 @@ unos 520 ms por corte.
   de tamaño parecido (061, 054), fragmentos pequeños en contacto (007) y hueso fino en los extremos
   del volumen (047). La galería y el análisis están en el informe, sección 8.
 
-### 4.8 Latencia
+### 4.8 Latencia (mediana por corte de 384 px, lote 1)
 
-Tiempo de la red por corte de 384 × 384, con lote de 1 (mediana). La columna con TTA es la
-configuración entregada.
+| Configuración | GPU (NVIDIA L4) | CPU (12 hilos, Colab) | CPU (portátil, i9-9980HK, 8 hilos) |
+|---|---|---|---|
+| 1 modelo | 63.7 ms | 161.7 ms | 336.1 ms |
+| 1 modelo + TTA de espejo (entregado) | 71.6 ms | 249.6 ms | 695.5 ms |
+| Ensamble de 3 semillas + TTA | 87.4 ms | 518.0 ms | — |
 
-| Equipo | 1 modelo | 1 modelo + TTA |
-|---|---|---|
-| GPU L4 (Colab) | 63.7 ms | 71.6 ms |
-| CPU, 12 hilos (Colab) | 161.7 ms | 249.6 ms |
-| CPU Intel i9-9980HK, 8 hilos (portátil) | 336.1 ms | 695.5 ms |
+GPU y CPU de Colab: 60 cortes reales de validación tras 5 pasadas de calentamiento
+(`outputs/s10/latencia_gpu_L4.json`, `latencia_cpu_colab.json`). Portátil: `src/measure_latency.py`
+con H6 (`outputs/demo/latency.json`). D5 y H6 comparten arquitectura, así que su latencia es la
+misma.
 
-Las dos primeras filas se midieron en la Semana 10 (`outputs/s10/latencia_gpu_L4.json` y
-`latencia_cpu_colab.json`) y la tercera con H6 en el portátil de la demo
-(`outputs/demo/latency.json`, `src/measure_latency.py`). H6 usa la misma red que D5, así que la
-latencia no depende de cuál de los dos pesos se cargue. El ensamble de tres semillas con TTA tarda
-87.4 ms en la GPU y 518.0 ms en la CPU de 12 hilos.
+### 4.9 Distancia de separación y métricas de superficie (41 secundarios)
+
+| Métrica | Val. H6 | Test D5 | Test H6 |
+|---|---|---|---|
+| Error medio de distancia | 0.185 mm | 2.956 mm | 1.277 mm |
+| Correlación con la distancia real | 0.972 | 0.543 | 0.818 |
+| Dice 3D principal / secundario | 0.921 / 0.701 | 0.909 / 0.682 | 0.931 / 0.756 |
+| ASSD / HD95 | 4.08 / 17.99 mm | 3.02 / 16.33 mm | 2.06 / 11.55 mm |
+
+La distancia se mide borde a borde en 3D con `distance_transform_edt` y el espaciado de la
+cabecera, en la predicción y en el ground truth. En test, un solo fragmento del caso 007 concentra el
+79 % del error: la predicción le agrega un componente aislado lejos del hueso.
 
 ## 5. Protocolo de evaluación
 
@@ -232,11 +243,26 @@ latencia no depende de cuál de los dos pesos se cargue. El ensamble de tres sem
 
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
-`main` (ver `docs/despliegue_aws_streamlit.md`). Se abre desde el navegador de un computador o de un
-celular. El túnel de Cloudflare quedó como opción y no se montó. La advertencia de uso no clínico
-está siempre visible en el dashboard.
+`main` (ver `docs/despliegue_aws_streamlit.md`). Se probó desde el navegador de un computador y de
+un celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
+enunciado. La advertencia de uso no clínico está siempre visible en el dashboard.
 
-## 9. Reproducción
+## 9. Modelos entrenados y pesos en el repositorio
+
+El sistema es un solo modelo multitarea, así que hay un model card. Los pesos versionados son:
+
+| Archivo | Qué es | En qué difiere del entregado |
+|---|---|---|
+| `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth` | **Modelo entregado** (H6, semilla 42) | — |
+| `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s43.pth` y `_s44.pth` | H6 con otras semillas | Solo la semilla; sirven para medir la variación (secciones 4.1 y 4.2) |
+| `outputs/s10/d5_ema_w32_e60_s42.pth` | D5, el modelo de la primera evaluación en test | Misma arquitectura; sin orientación canónica y sin aumento geométrico. Espera los volúmenes tal como están guardados |
+| `outputs/gamma/w10g_384neg.pth` y `w10g_sec3.pth` | Primera versión de la Semana 10, usada como línea base | Backbone de 16 canales y entrenamiento en etapas; evaluada sobre una muestra de cortes, no sobre el volumen completo |
+
+Datos de entrenamiento, alcances, limitaciones y advertencia de uso son los mismos para todos:
+los 70 casos de entrenamiento de PENGWIN (sección 2), las limitaciones de la sección 6 y el uso
+exclusivamente académico.
+
+## 10. Reproducción
 
 Los comandos para regenerar los datos, entrenar H6 y evaluarlo están en el `README.md`. La
 configuración congelada de la evaluación en test está en `docs/decisiones_semana10.md`

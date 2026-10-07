@@ -1,4 +1,8 @@
-"""Genera notebooks/colab/colab_s10_v3.ipynb con el código del repo embebido (el repo es privado)."""
+"""Genera notebooks/colab/colab_s10.ipynb con el código del repo embebido (el repo es privado).
+
+Uso, desde la raíz del repo:  python colab/hacer_cuaderno.py
+Volver a generarlo después de cambiar src/: el cuaderno lleva una copia del código.
+"""
 import json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kaggle"))
@@ -8,7 +12,7 @@ def code(src): return {"cell_type": "code", "metadata": {}, "execution_count": N
 def md(src): return {"cell_type": "markdown", "metadata": {}, "source": src.strip("\n").splitlines(True)}
 
 cells = [
- md("# PENGWIN Semana 10 — entrenamiento en Colab (GPU)\nEjecutar celdas en orden. Cambiar solo la celda **Experimento**."),
+ md("# PENGWIN — entrenamiento del modelo final (H6) en Colab (GPU)\nEjecutar las celdas en orden. Para otra receta, cambiar solo la celda **Experimento**."),
  code("!nvidia-smi\nimport torch; print(torch.__version__, torch.cuda.is_available())"),
  code(f'''
 # 1) Código del repo (embebido; el repo de GitHub es privado)
@@ -41,8 +45,9 @@ for intento in range(4):
 '''),
  code('''
 # 4) Experimento (cambiar solo esta celda)
-NOMBRE = "colab_cbam1_sec3_full_s42"
-ARGS = "--size 384 --epochs 30 --cbam 1 --secondary-weight 3 --augment --cosine --seed 42 --batch-size 16 --max-minutes 150 --eval-every 3"
+# Receta del modelo final (H6). Para las semillas 43 y 44, cambiar --seed y el nombre.
+NOMBRE = "h6_auggeo_rot35_canon_ema_w32_e60_s42"
+ARGS = "--size 384 --epochs 60 --base-channels 32 --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 16 --per-epoch 2500 --max-minutes 170 --eval-every 10 --ema 0.999 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical"
 '''),
  code('''
 # 5) Entrenar
@@ -58,7 +63,7 @@ cmd = f"cd {CODIGO} && python src/evaluate_volumes.py --checkpoint /content/sali
 !{cmd}
 '''),
  code('''
-# 7) Subir resultados a un dataset privado de Kaggle para que Claude los lea
+# 7) Subir resultados a un dataset privado de Kaggle (para bajarlos luego al repo)
 import json, pathlib
 d = pathlib.Path("/content/salida"); 
 (d / "dataset-metadata.json").write_text(json.dumps({"title": "pengwin-s10-colab", "id": "gustaveloper/pengwin-s10-colab", "licenses": [{"name": "CC0-1.0"}]}))
@@ -67,5 +72,6 @@ d = pathlib.Path("/content/salida");
 '''),
 ]
 nb = {"cells": cells, "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"}, "accelerator": "GPU"}, "nbformat": 4, "nbformat_minor": 5}
-out = ROOT / "notebooks" / "colab" / "colab_s10_v3.ipynb"
+out = ROOT / "notebooks" / "colab" / "colab_s10.ipynb"
+out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(nb, indent=1)); print(out, out.stat().st_size // 1024, "KB")
