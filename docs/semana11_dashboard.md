@@ -128,5 +128,7 @@ abiertos en test.
 
 ## Pendiente
 
-- Video de respaldo de la demo y material del pitch.
+- Video de respaldo para la sustentación, desde el computador y con el recorrido completo de la demo
+  (ya hay uno corto grabado en el celular: `docs/video/demo_celular.mp4`).
+- Material del pitch.
 - Línea entre el fragmento y su principal en el visualizador 3 (opcional).

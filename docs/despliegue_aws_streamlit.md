@@ -99,7 +99,8 @@ Después de integrar la demo con H6 a `main` (6 de octubre), comprobado por Gust
 - La Lambda quedó redesplegada con H6 y la inferencia en vivo responde desde el dashboard.
 - El dashboard de Streamlit Cloud abre y funciona desde un celular: los tres visualizadores, la
   tabla de distancias, la pestaña de métricas y la inferencia en vivo de un corte (753 ms de modelo
-  en la CPU de Lambda). Hay un video de la prueba, de 70 segundos.
+  en la CPU de Lambda). La prueba está grabada en `docs/video/demo_celular.mp4` (70 segundos, sin
+  audio).
 
 Sin verificar todavía:
 
