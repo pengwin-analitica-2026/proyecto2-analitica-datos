@@ -47,7 +47,7 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 1. Verificación de reproducibilidad de los datos
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrantes y herramienta:** Jacobo y Federico · Claude (claude.ai).
 - **Prompt (resumen del pedido):** confirmar que los datos descargados de Zenodo y colocados en
   `data/raw/` son idénticos a los que usó María, antes de empezar a modificar código.
 - **Qué produjo la IA:** el procedimiento: correr `build_manifest.py` sobre los datos locales,
