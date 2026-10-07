@@ -36,8 +36,8 @@
   secundarios.
 - **Características que afectan al modelo:**
   - la mediana HU del hueso varía de 81 a 431 HU entre pacientes (CV 26.5 %);
-  - 25 casos tienen metal (19 en train, 3 en val y 3 en test), sin efecto medible sobre los HU del
-    hueso a nivel de volumen;
+  - 25 casos tienen metal de más de 100 mm³ (19 en train, 3 en val y 3 en test) y 41 tienen algún
+    vóxel sobre 3000 HU, sin efecto medible sobre los HU del hueso a nivel de volumen;
   - 34 de los 100 volúmenes están almacenados en orientación LPI, girados 180° en el plano axial
     respecto a los demás;
   - hay fragmentos desde 9 cortes axiales; la mediana es de 136.
@@ -68,17 +68,19 @@
 
 ### 4.1 Test (15 pacientes)
 
-| Métrica | H6 s42 (entregado) | Media de 3 semillas |
-|---|---|---|
-| Dice por fragmento | 0.875 | 0.875 ± 0.001 |
-| IoU por fragmento | 0.816 | 0.815 |
-| F1 de clasificación | 0.990 | 0.988 |
-| AUC de clasificación | 0.999 | 0.999 |
-| IoU de detección | 0.943 | 0.941 |
-| mAP50 | 0.961 | 0.958 |
-| mAP50:95 | 0.902 | 0.899 |
-| Dice semántico | 0.971 | 0.970 |
-| IoU semántico | 0.943 | 0.943 |
+| Métrica | Objetivo | H6 s42 (entregado) | H6, media de 3 semillas | D5 s42 (primera evaluación) |
+|---|---|---|---|---|
+| Dice por fragmento | 0.85 | 0.875 | 0.875 ± 0.001 | 0.845 |
+| IoU por fragmento | 0.70 | 0.816 | 0.815 | 0.781 |
+| F1 de clasificación | 0.85 | 0.990 | 0.988 | 0.984 |
+| AUC de clasificación | 0.85 | 0.999 | 0.999 | 0.998 |
+| IoU de detección | 0.65 | 0.943 | 0.941 | 0.898 |
+| mAP50 | 0.65 | 0.961 | 0.958 | 0.920 |
+| mAP50:95 | 0.40 | 0.902 | 0.899 | 0.853 |
+| Dice semántico | 0.85 | 0.971 | 0.970 | 0.949 |
+| IoU semántico | 0.70 | 0.943 | 0.943 | 0.904 |
+
+H6 cumple los nueve objetivos; D5 cumplía ocho (le faltaba el Dice por fragmento).
 
 El ensamble de las tres semillas llega a 0.879 de Dice por fragmento, pero triplica el costo de
 inferencia y no se usa.
@@ -91,10 +93,13 @@ pruebas de estrés, y su configuración se congeló por escrito antes de evaluar
 sola vez con H6, sin ajustar nada después (`docs/decisiones_semana10.md`, sección 12).
 
 En total, test se consultó cuatro veces durante el proyecto: receta c2 (0.848), EMA + CASR (0.847),
-D5 (0.845) y H6 (0.875).
+D5 (0.845) y H6 (0.875). En la evaluación de D5 también se pasaron por test otros cinco checkpoints
+(dos semillas más de D5 y las ablaciones E2 y F2), solo para medir la variación y con la regla
+escrita de antemano de que no servían para elegir modelo: quedaron entre 0.841 y 0.848.
 
 **Sobre la detección.** El mAP se mide sobre cajas refinadas con la máscara semántica. Con la
-cabeza grid sola, el mAP50 en validación es 0.887 (0.971 con refinamiento).
+cabeza grid sola, el mAP50 es 0.912 en test (0.961 con refinamiento) y 0.887 en validación (0.971);
+el mAP50:95 de la cabeza sola es 0.556 en test.
 
 ### 4.2 Validación (15 pacientes)
 
@@ -239,8 +244,7 @@ cabecera, en la predicción y en el ground truth. En test, un solo fragmento del
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
 `main` (ver `docs/despliegue_aws_streamlit.md`). Se abre desde el navegador de un computador o de un
-celular. El túnel de Cloudflare quedó como opción y no se montó. La advertencia de uso no clínico
-está siempre visible en el dashboard.
+celular. La advertencia de uso no clínico está siempre visible en el dashboard.
 
 ## 9. Reproducción
 

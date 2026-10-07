@@ -74,7 +74,7 @@ const children = [
 
   // ---------- 1 ----------
   H1('1. Introducción'),
-  P(['Las fracturas pélvicas de alta energía tienen una discapacidad superior al 50 % y una mortalidad superior al 13 %. Para planear su reducción quirúrgica hay que saber cuántos fragmentos hay, a qué hueso pertenece cada uno y cuánto se separó del fragmento principal. El proyecto automatiza esa lectura con cuatro restricciones del curso: ',
+  P(['Según los organizadores del reto PENGWIN (Sang et al., 2026), las fracturas pélvicas de alta energía tienen una discapacidad superior al 50 % y una mortalidad superior al 13 %. Para planear su reducción quirúrgica hay que saber cuántos fragmentos hay, a qué hueso pertenece cada uno y cuánto se separó del fragmento principal. El proyecto automatiza esa lectura con cuatro restricciones del curso: ',
     B('arquitectura 2D'), ' corte a corte, ', B('backbone propio con CBAM'), ', ', B('tres cabezas entrenadas desde cero'), ' y ', B('ningún framework de alto nivel'), ' (SAM solo como línea base).']),
 
   // ---------- 2 ----------
@@ -91,7 +91,7 @@ const children = [
   image('nb_fragmentos.png', 600, 155),
   caption('Figura 1. Fragmentos por caso y por región (1 = sin fractura) y volumen de hueso por caso.'),
   H2('Cadena de preprocesamiento'),
-  P(['Cada volumen pasa por cuatro pasos fijos, idénticos en entrenamiento y evaluación: ', B('(1) orientación canónica'), ' según la cabecera, ', B('(2) recorte de HU'), ' a [−1024, 3000], ', B('(3) ventana ósea C400/W1800'), ' y ', B('(4) corrección gamma 1.5'), ', seguida del reescalado a 384 × 384. La orientación canónica no usa etiquetas: los 34 volúmenes guardados en orientación LPI se giran 180° en el plano, igual en la imagen y en la máscara y en todos los splits. En la demo todavía falta aplicarla (sección 9).']),
+  P(['Cada volumen pasa por cuatro pasos fijos, idénticos en entrenamiento y evaluación: ', B('(1) orientación canónica'), ' según la cabecera, ', B('(2) recorte de HU'), ' a [−1024, 3000], ', B('(3) ventana ósea C400/W1800'), ' y ', B('(4) corrección gamma 1.5'), ', seguida del reescalado a 384 × 384. La orientación canónica no usa etiquetas: los 34 volúmenes guardados en orientación LPI se giran 180° en el plano, igual en la imagen y en la máscara y en todos los splits. La demo aplica el mismo paso leyendo la cabecera de cada archivo.']),
   image('nb_preproc_ejemplos.png', 430, 321),
   caption('Figura 2. HU crudo, ventana ósea y entrada final al modelo (ventana + gamma 1.5) en tres casos: con más hueso, con metal y con relleno del escáner.'),
   P(['Gamma 1.5 reemplazó a CLAHE tras compararlos con dos criterios independientes (Figura 3): el contraste-ruido entre hueso y tejido blando y la calidad de una máscara de Otsu frente a la etiqueta. CLAHE triplicaba el ruido del tejido blando; gamma no pierde información y separa mejor el hueso.']),
@@ -120,7 +120,7 @@ const children = [
   H1('4. Entrenamiento'),
   table([3400, 5960], ['Parámetro', 'Valor (modelo H6)'], [
     ['Optimizador', 'AdamW, lr 2×10⁻³ con decaimiento coseno, batch 16, precisión mixta'],
-    ['Duración', '60 épocas × 2 500 cortes (≈ 65 min por modelo en una GPU T4)'],
+    ['Duración', '60 épocas × 2 500 cortes. Cada semilla de H6 tardó entre 97 y 124 min en una GPU L4 de Colab con dos entrenamientos a la vez; la receta anterior (D5) tardaba unos 65 min en una T4 de Kaggle'],
     ['Aumento de datos', 'Espejo sagital con intercambio de coxales; rotación hasta ±35°, escala, estiramiento y desplazamiento'],
     ['Pérdida', 'Detección + clasificación (0.5) + semántica CE/Dice (2.0 / 1.0) + instancia CE (secundarios ×3) / Dice + borde'],
     ['Promedio de pesos', 'EMA con decaimiento 0.999'],
@@ -231,7 +231,7 @@ const children = [
   H2('Los cinco peores casos'),
   P('Los cinco casos de test con menor Dice por fragmento con H6 comparten un patrón: el fragmento principal se segmenta bien (Dice 0.87 a 0.91) y el error se concentra en los fragmentos secundarios. Cada figura muestra el corte del décimo percentil y el corte mediano del caso (tono claro: fragmento secundario).'),
   table([800, 1100, 1100, 1150, 1300, 1250, 2660], ['Caso', 'Dice frag.', 'Primario', 'Secundario', 'Sec. sin pareja', 'Hueso → fondo', 'Hipótesis'], [
-    ['039', '0.784', '0.891', '0.635', '7.7 %', '3.2 %', 'Volumen de 154 × 322 px con el espaciado más grueso del dataset: al estirarlo a 384 px el sacro se sobrefragmenta (10 fragmentos predichos frente a 5 reales)'],
+    ['039', '0.784', '0.890', '0.635', '7.7 %', '3.2 %', 'Volumen de 154 × 322 px con el espaciado más grueso del dataset: al estirarlo a 384 px el sacro se sobrefragmenta (10 fragmentos predichos frente a 5 reales)'],
     ['061', '0.822', '0.891', '0.635', '17.4 %', '1.2 %', 'Dos fragmentos del coxal derecho de tamaño parecido: el modelo elige como principal el que en el corte parece más grande, que no es el mayor del volumen'],
     ['007', '0.831', '0.913', '0.545', '24.5 %', '1.6 %', 'Fragmentos secundarios pequeños y en contacto: uno de cada cuatro no se encuentra'],
     ['054', '0.834', '0.899', '0.663', '16.2 %', '2.9 %', 'Mismo intercambio principal/secundario que en 061, en los cortes donde los dos fragmentos se tocan'],
@@ -285,7 +285,7 @@ const children = [
   bullet([B('Fragmentos en contacto. '), 'Cuando dos fragmentos se tocan en la superficie de fractura, el esquema primario/secundario puede fusionarlos por error de segmentación; en esos casos la distancia medida no es confiable.']),
   bullet([B('Modelo 2D. '), 'Cada corte se procesa por separado; los mejores resultados del challenge vienen de redes 3D, fuera del alcance del curso.']),
   bullet([B('Datos. '), '100 casos de un solo dataset; validación sin casos tan atípicos como los peores de test.']),
-  bullet([B('Orientación en la demo. '), 'Los volúmenes LPI se identifican con una lista de los 34 casos del dataset, derivada de sus cabeceras, y la demo todavía no aplica el giro. Para un paciente nuevo, la orientación debe leerse de la cabecera de cada archivo.']),
+  bullet([B('Orientación. '), 'El modelo depende de la cabecera del archivo. En el entrenamiento y la evaluación los 34 volúmenes LPI se enderezaron con una lista derivada de sus cabeceras, y la demo lee la cabecera de cada archivo, así que también sirve para un paciente nuevo. Solo se contempla el giro de 180° en el plano: un volumen sin esa información, o un paciente girado más de lo que cubre el aumento de ±35°, entra mal orientado.']),
   bullet([B('Fragmentos secundarios y sobrantes. '), 'El secundario sigue siendo el punto débil (Dice 0.764 frente a 0.905 del primario, y el 6.9 % no se detecta). Además, el Dice por fragmento no penaliza los fragmentos predichos que sobran.']),
   bullet([B('Segunda evaluación en test. '), 'La cifra de H6 se obtuvo después de analizar los fallos de la primera evaluación; no es una estimación limpia (ver Transparencia).']),
   bullet([B('Uso no clínico. '), 'No validado clínicamente; solo para fines académicos.']),
@@ -302,8 +302,9 @@ const children = [
     ['C2, semilla 44', '0.848', 'Primera evaluación del modelo base'],
     ['Receta EMA + post-proceso (5 modelos)', '0.847 ± 0.003', 'Mejora consistente en validación; declarada'],
     ['D5 (EMA), semilla 42', '0.845', 'Cifra oficial de la Semana 10: configuración congelada antes de ver test'],
+    ['Otros cinco checkpoints, junto con D5 (D5 semillas 43 y 44, E2 en dos semillas y F2)', '0.841 a 0.848', 'Solo para medir la variación entre semillas y ablaciones, con la regla escrita de antemano de que no servían para elegir modelo'],
     ['H6 (3 semillas)', '0.875 ± 0.001', 'Segunda evaluación, posterior al análisis de fallos'],
-  ], { boldFirst: true, highlightRow: 3 }),
+  ], { boldFirst: true, highlightRow: 4 }),
   sp(),
   P(['La cifra de H6 se reporta como ', B('segunda evaluación, posterior al análisis de fallos'), ', sin reemplazar la de D5. H6 se diseñó después de estudiar por qué fallaban los casos 012 y 039 de test, pero se eligió solo con validación y pruebas de estrés. Su configuración se congeló por escrito antes de correrla, se evaluó una sola vez sin ajustar nada después, y se reportan también las semillas 43 y 44 y el ensamble, sin elegir entre ellos (docs/decisiones_semana10.md, secciones 12.3 a 12.5).']),
 
@@ -315,6 +316,8 @@ const children = [
     ['Pesos', 'h6_auggeo_rot35_canon_ema_w32_e60_s42.pth (entregado); s43 y s44 para medir la variabilidad'],
     ['Comandos', 'README.md (caché, entrenamiento, evaluación, SAM, latencia y demo)'],
     ['Modelo', 'MODEL_CARD.md'],
+    ['Bitácora de la Semana 10', 'docs/decisiones_semana10.md'],
+    ['Demo y despliegue', 'docs/semana11_dashboard.md, docs/despliegue_aws_streamlit.md y docs/cicd_github_actions.md'],
     ['Resultados', 'outputs/s10/*_val.json y TEST2_*.json'],
     ['Uso de IA', 'IA_USAGE.md'],
   ], { boldFirst: true }),
@@ -324,13 +327,13 @@ const children = [
   H1('Anexo. Trabajo por semana'),
   table([1300, 4760, 3300], ['Semana', 'Qué se hizo', 'Resultado clave'], [
     ['8 · Datos', 'Curaduría de los 100 volúmenes (.mha con SimpleITK) y manifiesto; partición por paciente estratificada (70/15/15, semilla 42); preprocesamiento unificado (recorte de HU y ventana ósea); EDA de intensidades; Visualizador 1 (reconstrucción 3D del volumen crudo).',
-      ['Mediana de HU del hueso entre 81 y 431 (CV 26.5 %): variación biológica, no de escáner. Metal en 41 casos, fuera de la pelvis. Máscara del visualizador: recall de 0.57 a 0.92. ', PEND('(confirmar el conteo de metal: el notebook 02 cuenta 25 casos)')]],
+      ['Mediana de HU del hueso entre 81 y 431 (CV 26.5 %): variación biológica, no de escáner. Vóxeles de metal (más de 3000 HU) en 41 casos, 25 de ellos con más de 100 mm³, casi siempre fuera del hueso pélvico. Máscara del visualizador: recall de 0.57 a 0.92.']],
     ['9 · Detector', 'Backbone propio con CBAM, cabeza de detección por grid y NMS propios; overfit intencional; primer entrenamiento con varios pacientes; pedidos de la asesoría: γ aprendible por etapa, Grad-CAM, fragmentos desplazados y justificación del preprocesamiento.',
       'Overfit: pérdida de 1.687 a 0.002 (758×). F1 de 0.31 a 0.57 (32 canales y umbral 0.40). Gamma 1.5 elegido por contraste-ruido (8.1), Otsu (0.486) y detector (F1 0.558 vs 0.515, 3 semillas).'],
     ['10 · Multitarea', 'Modelo con tres cabezas y salida de instancia primario/secundario; evaluación sobre el volumen completo; barrido de ancho, EMA, pérdidas y post-procesos (más de 25 experimentos); ablaciones de CBAM, transfer learning y λ.',
       'Dice por fragmento de 0.787 (31 IDs) a 0.859 en validación. Test: 0.848, con 8 de 9 métricas cumplidas. Diagnóstico: secundarios en contacto y dos casos atípicos (012 y 039).'],
-    ['11 · Modelo final y demo', 'Orientación canónica desde la cabecera y aumento geométrico (modelo H6, 3 semillas); visualizadores 2 y 3 y dashboard; despliegue en curso.',
-      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. Pendiente: demo con H6 y túnel de Cloudflare.'],
+    ['11 · Modelo final y demo', 'Orientación canónica desde la cabecera y aumento geométrico (modelo H6, 3 semillas); visualizadores 2 y 3 y dashboard; demo con H6 y orientación leída de la cabecera; dashboard en Streamlit Community Cloud y API de inferencia en AWS Lambda, con pruebas y despliegue automáticos.',
+      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. El túnel de Cloudflare quedó como opción y no se montó. Pendiente: probar el dashboard publicado desde un celular.'],
   ], { boldFirst: true, leftAll: true }),
   image('nb_100casos.png', 470, 474),
   caption('Figura A1. Revisión visual de los 100 casos tras el preprocesamiento (contorno rojo: hueso; b: brillo medio del hueso).'),

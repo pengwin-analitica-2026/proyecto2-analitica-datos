@@ -11,10 +11,6 @@ de su hueso. Usa el dataset [PENGWIN 2024](https://pengwin.grand-challenge.org/)
 > **Uso exclusivamente académico.** Este sistema no es un dispositivo médico, no ha sido validado
 > clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
 
-> **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Probar el dashboard publicado (Streamlit Cloud) desde un celular.
-> - Confirmar con `--help` el parámetro de split de `sam_baseline.py`.
-
 ## Resultado final
 
 El modelo entregado es **H6** (`outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`): backbone
@@ -45,9 +41,15 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
 | [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
 | [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |
-| [`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) | Bitácora de experimentos de la Semana 10, de la línea base a H6, y las dos evaluaciones en test |
-| [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Dashboard con los tres visualizadores |
-| `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles |
+| [`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) | Semana 10: bitácora de experimentos, de la línea base a H6, y las dos evaluaciones en test |
+| [`outputs/s10/resumen_experimentos.md`](outputs/s10/resumen_experimentos.md) | Semana 10: tabla de todas las corridas y dónde está cada archivo de resultados |
+| [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Semana 11: dashboard con los tres visualizadores, orientación y distancia |
+| [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) | Semana 11: despliegue en Streamlit Cloud y AWS Lambda |
+| [`docs/cicd_github_actions.md`](docs/cicd_github_actions.md) | Semana 11: pruebas y despliegue automáticos |
+| `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles (el 05 se hizo con D5) |
+
+Cada tema está en un solo documento. Los resultados del modelo están en el model card y no se
+repiten en los demás.
 
 ## Estructura del repositorio
 
@@ -56,13 +58,14 @@ src/        scripts y módulos (ver los comandos abajo)
 tests/      pruebas automáticas
 notebooks/  notebooks de seguimiento por semana
 kaggle/     kernels de entrenamiento en GPU (uno por receta)
+colab/      genera el cuaderno de Colab que entrena H6 (notebooks/colab/colab_s10.ipynb)
 app/        dashboard Streamlit
 api/        API de inferencia
 deploy/     scripts de despliegue
 data/       manifest, splits y CSVs del EDA (data/raw/ y data/cache/ NO se versionan)
 outputs/    figuras (figures/), EDA (eda/), resultados y checkpoints de la Semana 10 (s10/)
             y casos exportados para el dashboard (demo/)
-docs/       resúmenes y bitácoras de avance
+docs/       un documento por semana o por tema, informe técnico y mini-paper
 ```
 
 ## Instalación
@@ -151,8 +154,9 @@ Deja `data/cache/s10/cache_384/<caso>.npz`, `labels_native/` e `index.csv`.
 
 ### 3.2 Entrenamiento
 
-Requiere GPU (en el proyecto se usó Kaggle; `kaggle/gpu/h6_auggeo_rot35_canon_ema_w32_e60_s42.py`
-es el kernel exacto):
+Requiere GPU. Las tres semillas de H6 se entrenaron en Colab con una L4
+(`notebooks/colab/colab_s10.ipynb` lleva esta misma receta); las recetas anteriores, en Kaggle
+(`kaggle/gpu/`, un kernel por receta, incluido el de H6):
 
 ```bash
 python src/train_s10.py --cache-root data/cache/s10 \
@@ -205,11 +209,10 @@ Segment Anything.
 ```bash
 python src/sam_baseline.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
     --sam-checkpoint <ruta>/sam_vit_b_01ec64.pth --cache-dir data/cache/s10/cache_384 \
-    --stride 3 --output outputs/s10/sam_baseline_test.json
+    --split test --stride 3 --output outputs/s10/sam_baseline_test_h6.json
 ```
 
-El enunciado pide la comparación sobre test; revisar con `python src/sam_baseline.py --help` cómo
-se elige el split.
+El enunciado pide la comparación sobre test, por eso `--split test` (sin esa opción usa validación).
 
 ### 3.5 Pruebas automáticas
 
@@ -248,10 +251,9 @@ python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema
     --device cpu --device cuda
 ```
 
-Resultado con H6 (mediana por corte): 72 ms en GPU L4 y 250 ms en CPU de 12 hilos con TTA (64 y
-162 ms sin TTA); detalle en el notebook 04, sección 12. Mide un corte a la vez y reporta la mediana y
-el percentil 90. Escribe en
-`outputs/demo/latency.json`, que el dashboard muestra. Si no hay GPU, omite `cuda` y lo avisa.
+Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
+`outputs/demo/latency.json`, que el dashboard muestra. Si no hay GPU, omite `cuda` y lo avisa. Los
+resultados están en el [model card](MODEL_CARD.md), sección 4.8.
 
 ### Despliegue
 
@@ -261,9 +263,6 @@ pruebas y vuelve a desplegar los dos (GitHub Actions para la API, con OIDC y sin
 Streamlit Cloud para el dashboard). Detalle en
 [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) y
 [`docs/cicd_github_actions.md`](docs/cicd_github_actions.md).
-
-El túnel de Cloudflare que menciona el enunciado queda como opción y no se montó
-(`streamlit run app/dashboard.py` y, en otra terminal, `cloudflared tunnel --url http://localhost:8501`).
 
 ## Verificación de reproducibilidad
 
