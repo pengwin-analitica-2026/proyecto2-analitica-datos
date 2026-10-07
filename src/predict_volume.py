@@ -124,7 +124,10 @@ def load_pipeline(checkpoint: str | Path, device: torch.device | None = None, tt
     raw = torch.load(checkpoint, map_location="cpu")
     info = {"checkpoint": Path(checkpoint).name, "base_channels": int(raw["base_channels"]),
             "input_size": int(raw.get("input_size", 384)), "ema": raw.get("ema"),
-            "parameters": int(sum(p.numel() for p in model.parameters())), "tta": bool(tta)}
+            "parameters": int(sum(p.numel() for p in model.parameters())), "tta": bool(tta),
+            # True: el modelo espera cortes en orientación canónica (orientacion.py); quien lo llama
+            # endereza el volumen antes. predict_volume no gira nada.
+            "canonical": bool(getattr(model, "canonical", False))}
     return model, device, info
 
 

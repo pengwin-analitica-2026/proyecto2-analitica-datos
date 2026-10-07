@@ -4,7 +4,7 @@ Solo lleva el dashboard, ``demo_render.py`` y los casos ya exportados. No lleva 
 checkpoint: la inferencia en vivo la hace la API de AWS (``api/server.py``), cuya dirección y clave
 se configuran como secretos en Streamlit Cloud (``INFERENCE_URL`` e ``INFERENCE_KEY``).
 
-    python3 deploy/build_streamlit_cloud.py --model d5_ema_w32_e60_s42 --cases 024 099 044
+    python3 deploy/build_streamlit_cloud.py --model h6_auggeo_rot35_canon_ema_w32_e60_s42 --cases 024 044 099 039
 """
 from __future__ import annotations
 

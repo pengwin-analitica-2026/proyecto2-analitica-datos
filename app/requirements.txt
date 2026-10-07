@@ -1,6 +1,9 @@
+# Dependencias del dashboard en Streamlit Community Cloud (sin torch: la inferencia en vivo es la API).
+# Sin topes de versión: Streamlit Cloud usa Python 3.14 y scipy<1.15 / numpy<2 no tienen wheels ahí.
+# Los topes del requirements.txt de la raíz son por torch 2.2 en el Mac y no aplican aquí.
 streamlit
-numpy<2
-scipy<1.15
+numpy
+scipy
 plotly
 pillow
-pandas<3
+pandas

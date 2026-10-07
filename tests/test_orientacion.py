@@ -29,3 +29,17 @@ def test_la_lista_coincide_con_las_cabeceras_si_estan_los_datos():
         with open(path, "rb") as stream:
             lpi = b"AnatomicalOrientation = LPI" in stream.read(2048)
         assert lpi == is_rotated(path.stem), path.name
+
+
+def test_header_is_rotated_lee_la_cabecera(tmp_path):
+    from orientacion import flip_inplane, header_is_rotated
+    lpi, rai, sin = tmp_path / "lpi.mha", tmp_path / "rai.mha", tmp_path / "sin.mha"
+    lpi.write_bytes(b"ObjectType = Image\nTransformMatrix = -1 0 0 0 -1 0 0 0 1\nElementDataFile = LOCAL\n\x00\x01")
+    rai.write_bytes(b"ObjectType = Image\nTransformMatrix = 1 0 0 0 1 0 0 0 1\nElementDataFile = LOCAL\n\x00\x01")
+    sin.write_bytes(b"ObjectType = Image\nElementDataFile = LOCAL\n")
+    assert header_is_rotated(lpi) is True
+    assert header_is_rotated(rai) is False
+    assert header_is_rotated(sin) is None
+    volume = np.arange(2 * 3 * 4).reshape(2, 3, 4)
+    np.testing.assert_array_equal(flip_inplane(flip_inplane(volume)), volume)
+    np.testing.assert_array_equal(flip_inplane(volume)[:, 0, 0], volume[:, -1, -1])

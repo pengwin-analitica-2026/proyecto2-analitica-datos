@@ -4,7 +4,7 @@ Lee las carpetas que deja ``src/demo_export.py`` en ``outputs/demo/<modelo>/<cas
 desde la raíz del repo:
 
     pip install -r requirements.txt
-    python src/demo_export.py --case 024 --checkpoint outputs/s10/d5_ema_w32_e60_s42.pth --tta
+    python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
     streamlit run app/dashboard.py
 
 Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferencia en vivo del
@@ -29,6 +29,7 @@ from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, RE
 
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
 CHECKPOINT_DIR = ROOT / "outputs" / "s10"
+RESULTS_DIR = ROOT / "outputs" / "s10"          # JSON de la evaluación en test (Semana 10)
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
 
@@ -87,7 +88,7 @@ def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeou
         semantic = packed["semantic"]
     return {"semantic": semantic[None], "boxes_refined": [payload["boxes_refined"]],
             "boxes_raw": [payload["boxes_raw"]], "latency_ms": payload["latency_ms"],
-            "device": payload["device"], "round_trip_ms": round_trip}
+            "device": payload["device"], "round_trip_ms": round_trip, "model": payload.get("model")}
 
 
 @st.cache_resource(show_spinner="Cargando el modelo…")
@@ -112,6 +113,88 @@ def fragments_dataframe(rows: list[dict]):
                          for r in rows])
 
 
+def read_json(name: str) -> dict | None:
+    path = RESULTS_DIR / name
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+TEST_ROWS = (("F1 de clasificación", "classification_f1_macro", 0.85),
+             ("AUC de clasificación", "classification_auc_macro", 0.85),
+             ("IoU medio de detección", "detection_iou_mean", 0.65),
+             ("mAP50", "detection_map50", 0.65),
+             ("mAP50:95", "detection_map50_95", 0.40),
+             ("Dice de segmentación semántica", "segmentation_dice_macro", 0.85),
+             ("IoU de segmentación semántica", "segmentation_iou_macro", 0.70),
+             ("Dice por fragmento", "instance_dice_matched", 0.85),
+             ("IoU por fragmento", "instance_iou_matched", 0.70))
+
+
+def test_metrics_section() -> None:
+    """Las dos evaluaciones en test de la Semana 10, leídas de outputs/s10 (no se recalcula nada)."""
+    import pandas as pd
+    first, second = read_json("TEST_d5_s42_tta.json"), read_json("TEST2_h6_s42_tta.json")
+    if not first or not second:
+        return
+    a, b = first["subsets"]["todo"], second["subsets"]["todo"]
+    slices = f"{b['n_slices']:,}".replace(",", " ")
+    st.subheader(f"Resultados en test ({b['n_cases']} casos, {slices} cortes)")
+    st.dataframe(pd.DataFrame([{"Métrica": name, "Objetivo": f"{goal:.2f}",
+                                "1.ª evaluación (D5)": f"{a[key]:.3f}", "2.ª evaluación (H6)": f"{b[key]:.3f}",
+                                "Cumple (H6)": "sí" if b[key] >= goal else "no"} for name, key, goal in TEST_ROWS]),
+                 use_container_width=True, hide_index=True)
+    st.caption("**Cómo leer las dos columnas.** La primera evaluación (D5) se hizo con la configuración congelada "
+               "antes de ver test: es la cifra limpia, y no cumplía el Dice por fragmento (0.845). La segunda (H6, "
+               "el modelo de esta demo) se hizo después de analizar los fallos de la primera, y ese análisis miró "
+               "dos casos de test (012 y 039). H6 se eligió solo con validación y pruebas de estrés; sus tres "
+               "semillas dan 0.875, 0.875 y 0.876 en Dice por fragmento.")
+    c1, c2 = st.columns(2)
+    distances = read_json("TEST2_h6_s42_nofill.json")
+    if distances:
+        r = distances["resumen"]
+        c1.metric("Error de distancia en test (H6)", f"{r['error_distancia_mm_media']:.2f} mm",
+                  help=f"{r['n_con_distancia_predicha']} de {r['n_fragmentos_secundarios']} fragmentos secundarios "
+                       f"con distancia predicha · mediana {r['error_distancia_mm_mediana']:.1f} mm · "
+                       f"correlación {r['correlacion_distancia']:.2f}")
+        c1.caption(f"Correlación predicción–real {r['correlacion_distancia']:.2f}; un solo fragmento concentra "
+                   "la mayor parte del error medio.")
+    sam = read_json("sam_baseline_test_h6.json")
+    if sam:
+        c2.metric("Dice por región en test: propio vs SAM zero-shot",
+                  f"{sam['global_nuestro']['dice']:.3f} vs {sam['global_sam']['dice']:.3f}",
+                  help=f"{sam['global_sam']['n']} regiones en {sam['cortes']} cortes (uno de cada {sam['stride']}). "
+                       "SAM recibe como indicación la caja del ground truth.")
+
+
+def latency_section() -> None:
+    """Latencia por imagen: outputs/demo/latency.json (measure_latency.py) y las de Colab de la Semana 10."""
+    import pandas as pd
+    st.subheader("Latencia por imagen (384×384, lote 1)")
+    rows = []
+    measured = DEMO_ROOT / "latency.json"
+    for name in ("latencia_gpu_L4.json", "latencia_cpu_colab.json"):
+        data = read_json(name)
+        if not data:
+            continue
+        for config, values in data["config"].items():
+            rows.append({"Dispositivo": data["device"], "Configuración": config,
+                         "Mediana (ms)": values["mediana_ms"], "Percentil alto (ms)": f"p95 · {values['p95_ms']}",
+                         "Fuente": "Semana 10, Colab"})
+    if measured.exists():
+        for row in json.loads(measured.read_text()):       # filas de src/measure_latency.py
+            hilos = f", {row['Hilos CPU']} hilos" if row.get("Hilos CPU") not in (None, "—") else ""
+            rows.append({"Dispositivo": f"{row['Dispositivo'].lower()} ({row['Hardware']}{hilos})",
+                         "Configuración": "1 modelo" + (" + TTA" if row["TTA"] == "sí" else ""),
+                         "Mediana (ms)": row["Mediana (ms)"], "Percentil alto (ms)": f"p90 · {row['p90 (ms)']}",
+                         "Fuente": "measure_latency.py"})
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Aún no hay mediciones de latencia en CPU y GPU (`src/measure_latency.py`).")
+    st.caption(f"Al exportar este caso: {meta['ms_per_slice']:.0f} ms por corte ({meta['device']}, "
+               f"TTA {'sí' if meta['tta'] else 'no'}, lote de 8). La inferencia en vivo de la pestaña 2 mide un "
+               "corte suelto en el servicio de AWS Lambda.")
+
+
 # ----------------------------------------------------------------------------- encabezado
 st.title("Fracturas pélvicas en CT")
 st.caption("Detección, segmentación por fragmentos y distancia de separación en milímetros · dataset PENGWIN")
@@ -120,7 +203,7 @@ st.error(NON_CLINICAL, icon="⚠️")
 cases = discover_cases()
 if not cases:
     st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
-            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/d5_ema_w32_e60_s42.pth --tta`")
+            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta`")
     st.stop()
 
 with st.sidebar:
@@ -133,9 +216,13 @@ with st.sidebar:
                f"{meta['spacing_native_xyz'][2]:.2f} mm")
     st.caption(f"Modelo {meta['model']['checkpoint']} · {meta['model']['parameters'] / 1e6:.2f} M parámetros "
                f"· TTA {'sí' if meta['tta'] else 'no'}")
+    if meta.get("canonical"):
+        st.caption("Orientación canónica (sacro abajo): " + (
+            "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
+            "las tres vistas y el ground truth están enderezados." if meta.get("flipped")
+            else "este volumen ya venía en esa orientación."))
     st.markdown(legend_html(meta["fragments_pred"]), unsafe_allow_html=True)
 
-provisional = str(meta.get("distance_method", "")).startswith("provisional")
 all_fragments = meta["fragments_pred"]
 spacing = tuple(meta["spacing_cache_xyz"])
 has_gt = data.get("gt_ids") is not None
@@ -201,8 +288,6 @@ with tab2:
     st.caption("La distancia junto a cada fragmento es la mínima borde a borde, en mm, entre ese fragmento y el "
                "principal de su hueso, medida sobre el volumen 3D completo (spacing del header): es la misma en "
                "todos los cortes donde el fragmento aparece.")
-    if provisional:
-        st.warning("Distancia con método provisional: ver la pestaña de métricas.")
     st.dataframe(fragments_dataframe(fragments), use_container_width=True, hide_index=True)
 
     with st.expander("Inferir este corte en vivo (modelo real, con latencia)"):
@@ -216,6 +301,9 @@ with tab2:
                 if remote_url:
                     live = remote_predict_slice(remote_url, setting("INFERENCE_KEY"), data["images"][z])
                     where = f"{live['device']} del servicio remoto · ida y vuelta {live['round_trip_ms']:.0f} ms"
+                    if live.get("model") and live["model"] != meta["model"]["checkpoint"]:
+                        st.warning(f"El servicio usa {live['model']} y este caso se exportó con "
+                                   f"{meta['model']['checkpoint']}.")
                 else:
                     from predict_volume import predict_slice
                     model, device, info = load_live_model(str(checkpoint), False)
@@ -250,17 +338,11 @@ with tab3:
     fig = mesh_figure(data["meshes"], fragments, spacing, show_main=show_main, main_opacity=main_opacity,
                       show_gt=show_gt3, gt_fragments=meta["fragments_gt"], label_contacts=label_contacts)
     st.plotly_chart(fig, use_container_width=True)
-    if provisional:
-        st.warning("Distancia con método provisional: ver la pestaña de métricas.")
 
 # ----------------------------------------------------------------------------- métricas
 with tab4:
     st.subheader("Distancia de separación: predicción contra ground truth")
     st.caption(f"Método de la distancia: {meta.get('distance_method', 'desconocido')}")
-    if provisional:
-        st.warning("El volumen de IDs se arma conservando solo los vóxeles que la cabeza de instancia etiquetó, "
-                   "porque la corrección `fill_unlabeled` de `postprocess_3d` todavía no está en este repo. "
-                   "Volver a exportar los casos cuando llegue.")
     comparison = meta.get("comparison")
     if comparison:
         import pandas as pd
@@ -286,12 +368,5 @@ with tab4:
     else:
         st.info("Este caso no tiene ground truth.")
 
-    st.subheader("Latencia por imagen")
-    st.metric("Inferencia del volumen al exportar", f"{meta['ms_per_slice']:.0f} ms por corte",
-              help=f"{meta['device']} · TTA {'sí' if meta['tta'] else 'no'} · {meta['n_slices']} cortes")
-    latency = DEMO_ROOT / "latency.json"
-    if latency.exists():
-        import pandas as pd
-        st.dataframe(pd.DataFrame(json.loads(latency.read_text())), use_container_width=True, hide_index=True)
-    else:
-        st.caption("Aún no hay mediciones de latencia en CPU y GPU (`src/measure_latency.py`).")
+    test_metrics_section()
+    latency_section()

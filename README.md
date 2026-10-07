@@ -12,8 +12,7 @@ de su hueso. Usa el dataset [PENGWIN 2024](https://pengwin.grand-challenge.org/)
 > clínicamente y no debe usarse para apoyar decisiones quirúrgicas reales.
 
 > **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Confirmar el comando del túnel de Cloudflare y probar el acceso desde un celular.
-> - Cuando la demo lea la orientación de la cabecera, quitar la advertencia de la sección "Demo".
+> - Probar el dashboard publicado (Streamlit Cloud) desde un celular.
 > - Confirmar con `--help` el parámetro de split de `sam_baseline.py`.
 
 ## Resultado final
@@ -41,6 +40,8 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | Documento | Contenido |
 |---|---|
 | [`MODEL_CARD.md`](MODEL_CARD.md) | Modelo, datos, métricas, ablaciones, protocolo de test y limitaciones |
+| [`docs/mini_paper/Mini_paper_PENGWIN.pdf`](docs/mini_paper/Mini_paper_PENGWIN.pdf) | Mini-paper de 5 páginas: método, resultados y limitaciones (fuente en `.docx` y `build.js`) |
+| [`docs/informe/Informe_tecnico_PENGWIN.docx`](docs/informe/Informe_tecnico_PENGWIN.docx) | Informe técnico completo |
 | [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
 | [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
 | [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |
@@ -93,7 +94,7 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121
 ## Datos
 
 Los volúmenes están en formato `.mha` (no NIfTI; el profesor aprobó este formato). Se descargan de
-[Zenodo](https://doi.org/10.5281/zenodo.10927452) y **no se versionan**. Descomprimir con esta
+[Zenodo](https://doi.org/10.5281/zenodo.10927452) (licencia CC BY 4.0) y **no se versionan**. Descomprimir con esta
 estructura exacta:
 
 ```
@@ -218,11 +219,13 @@ python -m unittest discover -s tests -v
 
 ## 4. Demo y visualizadores (Semana 11)
 
-`demo_export.py` corre el pipeline completo una vez por caso (unos 4 minutos en CPU con TTA) y deja
-todo en `outputs/demo/<modelo>/<caso>/`. El dashboard solo lee esos archivos.
+`demo_export.py` corre el pipeline completo una vez por caso (de 4 a 25 minutos en CPU con TTA,
+según la máquina y el número de cortes) y deja todo en `outputs/demo/<modelo>/<caso>/`. El
+dashboard solo lee esos archivos. Casos versionados, todos con H6 y TTA: 024 (validación), 044 y 099
+(validación, guardados girados 180°) y 039 (test).
 
 ```bash
-python src/demo_export.py --case 024 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
 streamlit run app/dashboard.py
 ```
 
@@ -232,9 +235,10 @@ streamlit run app/dashboard.py
 | 2. Corte por corte | Cajas, máscaras por hueso, ground truth opcional e ID y distancia en mm de cada fragmento |
 | 3. Reconstrucción 3D | Una malla por fragmento, con su ID y su distancia en mm al principal |
 
-> **Advertencia:** por ahora la demo no endereza los volúmenes LPI (ver la limitación 1 del model
-> card). Para la presentación, usar casos que no estén en `LPI_CASES` de `src/orientacion.py`, como
-> el 024.
+Con H6 la demo endereza los volúmenes guardados girados 180° (cabecera `TransformMatrix = -1 0 0 0
+-1 0 0 0 1`) antes de predecir, una sola vez y para las tres vistas y el ground truth; el dashboard
+indica en la barra lateral si el caso se enderezó. Detalle en
+[`docs/semana11_dashboard.md`](docs/semana11_dashboard.md).
 
 ### Latencia por imagen
 
@@ -249,17 +253,15 @@ Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
 
 ### Despliegue
 
-El enunciado pide el dashboard en vivo mediante un **túnel de Cloudflare**, accesible desde un
-computador y un celular. Con el dashboard corriendo en otra terminal:
+El dashboard está publicado en **Streamlit Community Cloud** (app `app/dashboard.py`, rama `main`) y
+la inferencia en vivo corre en una **API en AWS Lambda** con H6. Cada push a `main` corre las
+pruebas y vuelve a desplegar los dos (GitHub Actions para la API, con OIDC y sin claves guardadas;
+Streamlit Cloud para el dashboard). Detalle en
+[`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) y
+[`docs/cicd_github_actions.md`](docs/cicd_github_actions.md).
 
-```bash
-streamlit run app/dashboard.py            # terminal 1: queda en http://localhost:8501
-cloudflared tunnel --url http://localhost:8501   # terminal 2: imprime una URL pública trycloudflare.com
-```
-
-`cloudflared` se instala con `brew install cloudflared` (macOS) o desde la página de Cloudflare.
-Como extra, el equipo dejó documentada una alternativa con Streamlit Cloud y una API en AWS Lambda
-(`docs/despliegue_aws_streamlit.md`, CI en `docs/cicd_github_actions.md`).
+El túnel de Cloudflare que menciona el enunciado queda como opción y no se montó
+(`streamlit run app/dashboard.py` y, en otra terminal, `cloudflared tunnel --url http://localhost:8501`).
 
 ## Verificación de reproducibilidad
 

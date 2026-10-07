@@ -1,12 +1,42 @@
 # Plan de la Semana 11 — visualizadores y dashboard
 
-Versión 2, 5 de octubre de 2026 (20:30, hora de Colombia). Rama revisada:
+Versión 3, 6 de octubre de 2026 (la versión 2 era del 5 de octubre, 20:30, hora de Colombia). Rama revisada:
 `semana10-multiples-pruebas-working` (commit `30fdad3` más los resultados sin commitear de
 `outputs/s10/`). Complementa `docs/plan_semana10.md` y `docs/decisiones_semana10.md`.
 
 Cambios frente a la versión 1: entran las decisiones del equipo (sección 8), el candidato
 con EMA ya está en disco, y se incorpora el hallazgo de `decisiones_semana10.md` sobre la
 distancia en mm.
+
+## Estado al 6 de octubre (versión 3)
+
+Lo que cambió desde la versión 2 (las secciones de abajo quedan como historial del plan):
+
+| Tema | Versión 2 (5 de octubre) | Ahora |
+|---|---|---|
+| Modelo de la demo | D5 | **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`), el modelo final de la Semana 10 |
+| Orientación | La demo no enderezaba nada | `demo_export.py` lee la cabecera del `.mha` y endereza los volúmenes LPI una vez, para las tres vistas y el ground truth (`meta.json`: `canonical`, `flipped`) |
+| Distancia en mm | Método provisional en `demo_export.py` | `postprocess_3d(fill_unlabeled=False)`, el mismo de `infer_volume.py --distance-nofill` |
+| Casos | 024, 044, 099 (validación) con D5 | 024, 044, 099 (validación; 044 y 099 girados) y 039 (test, ya con el modelo congelado), con H6 y TTA |
+| Métricas en el dashboard | Solo la tabla de distancias del caso | Además, las dos evaluaciones en test (D5 y H6) explicadas, el error de distancia y SAM sobre test, leídos de `outputs/s10/` |
+| Latencia | «Aún no hay mediciones» | GPU L4 y CPU de Colab (Semana 10) y CPU del Mac (`outputs/demo/latency.json`) |
+| Despliegue | Túnel de Cloudflare | **Streamlit Community Cloud + API en AWS Lambda**, redesplegados en cada push a `main` (GitHub Actions con OIDC). El túnel queda como opción y no se montó |
+| Selector de modelos | Planeado | Descartado: la demo muestra solo el modelo entregado |
+
+Decisiones:
+
+- **Se endereza al exportar, no en la API.** El volumen se gira una sola vez al cargarlo, así el
+  visualizador 1 (MIP), el 2, el 3 y el ground truth quedan en la misma orientación y la inferencia
+  en vivo recibe cortes ya enderezados. La API no gira nada y declara `canonical: true`. No se
+  devuelve el resultado a la orientación original (`from_canonical`): para mirar, la canónica (sacro
+  abajo en todos los casos) es la más clara, y la distancia en mm no cambia con un giro de 180°.
+- **La orientación sale de la cabecera**, no de `orientacion.LPI_CASES`, para que un volumen que no
+  sea de PENGWIN también se enderece. Si la cabecera no trae `TransformMatrix`, se usa la lista.
+- **D5 no se endereza** (se entrenó sin ese paso). La marca `canonical` del checkpoint decide.
+- **Se borraron los casos de D5** (`outputs/demo/d5_*`, unos 62 MB). D5 queda en el repo solo como
+  checkpoint de la primera evaluación en test.
+
+Pendiente: probar el dashboard publicado desde un celular, video de respaldo, pitch y mini-paper.
 
 ## Estado al 5 de octubre (noche)
 

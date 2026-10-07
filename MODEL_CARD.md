@@ -1,10 +1,7 @@
 # Model card — H6 (detección, segmentación y clasificación de fragmentos de fractura pélvica)
 
-> **Pendientes antes de entregar (borrar este bloque al cerrar):**
-> - Latencia por imagen en GPU y CPU (sección 4.8).
-> - Licencia exacta del dataset PENGWIN (sección 2).
-> - Limitación 1: actualizar cuando la demo lea la orientación de la cabecera de cada archivo.
-> - Despliegue: confirmar la URL del túnel de Cloudflare y la prueba desde celular.
+> **Pendiente antes de entregar (borrar este bloque al cerrar):** probar el dashboard publicado
+> desde un celular.
 
 ## 1. Resumen
 
@@ -21,7 +18,19 @@
 
 - **Fuente:** PENGWIN 2024, Task 1 (CT), 100 volúmenes con su máscara de fragmentos, en formato
   `.mha`. El enunciado menciona NIfTI; el profesor aprobó trabajar con `.mha`, cuya cabecera trae
-  la misma información de espaciado y orientación. Licencia: *(completar)*.
+  la misma información de espaciado y orientación.
+- **Licencia de los datos:** Creative Commons Atribución 4.0 Internacional (**CC BY 4.0**), según el
+  registro del dataset en Zenodo (*PENGWIN Task 1: Pelvic Fracture Segmentation on CT*, versión 1,
+  7 de abril de 2024, [doi:10.5281/zenodo.10927452](https://doi.org/10.5281/zenodo.10927452)).
+  Permite usar, compartir y adaptar los datos siempre que se cite a sus autores. Los volúmenes
+  originales no se versionan en este repositorio; los cuatro casos exportados para la demo
+  (`outputs/demo/`) y los pesos son material derivado de PENGWIN y llevan la misma atribución.
+- **Cómo citar los datos** (referencias que pide el sitio del reto):
+  - Y. Sang, Y. Liu, S. Yibulayimu *et al.*, «Benchmark of Segmentation Techniques for Pelvic
+    Fracture in CT and X-Ray: Summary of the PENGWIN 2024 Challenge», *IEEE Transactions on Medical
+    Imaging*, 45(5):2212-2228, 2026. doi:10.1109/TMI.2025.3650126.
+  - Y. Liu, S. Yibulayimu, G. Zhu *et al.*, «Automatic pelvic fracture segmentation: a deep
+    learning approach and benchmark dataset», *Frontiers in Medicine*, 12:1511487, 2025.
 - **Partición:** 70 / 15 / 15 por paciente (semilla 42), sin solapamiento. El volumen óseo medio es
   parecido entre splits (770 476, 780 222 y 795 543 mm³ en test, train y val).
 - **Etiquetas:** las del dataset, sin etiquetas nuevas. Tres regiones (sacro, coxal izquierdo,
@@ -165,7 +174,20 @@ unos 520 ms por corte.
 
 ### 4.8 Latencia
 
-*(Completar: latencia por imagen en GPU y en CPU, con TTA incluido.)*
+Tiempo de la red por corte de 384 × 384, con lote de 1 (mediana). La columna con TTA es la
+configuración entregada.
+
+| Equipo | 1 modelo | 1 modelo + TTA |
+|---|---|---|
+| GPU L4 (Colab) | 63.7 ms | 71.6 ms |
+| CPU, 12 hilos (Colab) | 161.7 ms | 249.6 ms |
+| CPU Intel i9-9980HK, 8 hilos (portátil) | 336.1 ms | 695.5 ms |
+
+Las dos primeras filas se midieron en la Semana 10 (`outputs/s10/latencia_gpu_L4.json` y
+`latencia_cpu_colab.json`) y la tercera con H6 en el portátil de la demo
+(`outputs/demo/latency.json`, `src/measure_latency.py`). H6 usa la misma red que D5, así que la
+latencia no depende de cuál de los dos pesos se cargue. El ensamble de tres semillas con TTA tarda
+87.4 ms en la GPU y 518.0 ms en la CPU de 12 hilos.
 
 ## 5. Protocolo de evaluación
 
@@ -177,9 +199,12 @@ unos 520 ms por corte.
 
 ## 6. Limitaciones
 
-1. **Orientación en la demo.** La orientación canónica se identifica con una lista de los 34 casos
-   LPI del dataset, derivada de sus cabeceras. Para un volumen nuevo, la demo debe leer la
-   orientación de la cabecera de cada archivo. *(Actualizar cuando esté corregido.)*
+1. **Orientación de la entrada.** El modelo espera los volúmenes en orientación canónica. En el
+   entrenamiento y la evaluación se enderezaron con la lista de los 34 casos LPI; la demo
+   (`src/demo_export.py`) lee la `TransformMatrix` de la cabecera de cada archivo, así que también
+   sirve para volúmenes nuevos. Solo se contempla el giro de 180° en el plano: un volumen guardado con
+   otra dirección, o un paciente girado dentro del escáner, no se corrige (el aumento de ±35° cubre
+   solo parte de lo segundo).
 2. **Fragmentos en contacto en la superficie de fractura.** Cuando dos fragmentos se tocan, la
    segmentación puede fusionarlos en uno solo. En ese caso se pierde el fragmento secundario y su
    distancia de separación al principal no es confiable (puede salir 0 mm o no existir).
@@ -205,9 +230,11 @@ unos 520 ms por corte.
 
 ## 8. Despliegue
 
-El dashboard se sirve con Streamlit y se publica con un túnel de Cloudflare, como pide el enunciado,
-accesible desde el navegador de un computador y de un celular. La advertencia de uso no clínico está
-siempre visible en el dashboard.
+El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
+corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
+`main` (ver `docs/despliegue_aws_streamlit.md`). Se abre desde el navegador de un computador o de un
+celular. El túnel de Cloudflare quedó como opción y no se montó. La advertencia de uso no clínico
+está siempre visible en el dashboard.
 
 ## 9. Reproducción
 

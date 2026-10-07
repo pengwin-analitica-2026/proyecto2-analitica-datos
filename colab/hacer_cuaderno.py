@@ -1,4 +1,4 @@
-"""Genera notebooks/colab_s10.ipynb con el código del repo embebido (el repo es privado)."""
+"""Genera notebooks/colab/colab_s10_v3.ipynb con el código del repo embebido (el repo es privado)."""
 import json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kaggle"))
@@ -67,5 +67,5 @@ d = pathlib.Path("/content/salida");
 '''),
 ]
 nb = {"cells": cells, "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"}, "accelerator": "GPU"}, "nbformat": 4, "nbformat_minor": 5}
-out = ROOT / "notebooks" / "colab_s10_v3.ipynb"
+out = ROOT / "notebooks" / "colab" / "colab_s10_v3.ipynb"
 out.write_text(json.dumps(nb, indent=1)); print(out, out.stat().st_size // 1024, "KB")
