@@ -6,8 +6,8 @@ de ``--repeats`` pasadas. En GPU se sincroniza antes de leer el reloj.
 
 Uso:
 
-    python src/measure_latency.py --checkpoint outputs/s10/d5_ema_w32_e60_s42.pth \\
-        --volume outputs/demo/d5_ema_w32_e60_s42/024/volume.npz --device cpu --device cuda
+    python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \\
+        --volume outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/volume.npz --device cpu --device cuda
 
 Escribe (y acumula) las filas en ``outputs/demo/latency.json``, que el dashboard muestra. Si pides
 ``cuda`` y no hay GPU, lo dice y lo omite; no inventa la cifra.

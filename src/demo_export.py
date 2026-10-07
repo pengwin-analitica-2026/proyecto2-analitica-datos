@@ -10,21 +10,24 @@ solo lee lo que este script dejó en ``outputs/demo/<modelo>/<caso>/``:
 
 Uso (desde la raíz del repo, con los datos en data/raw):
 
-    python src/demo_export.py --case 024 --checkpoint outputs/s10/d5_ema_w32_e60_s42.pth --tta
+    python src/demo_export.py --case 024 044 099 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
 
-DISTANCIA EN MM. ``volume_postprocess.postprocess_3d`` rellena por defecto cada vóxel de la región
-sin etiqueta con el fragmento principal, lo que pega los fragmentos y deja todas las distancias en
-0.0 mm (ver docs/decisiones_semana10.md, sección 5). La corrección es un parámetro
-``fill_unlabeled``. Mientras no exista en ``volume_postprocess``, este módulo usa una versión
-provisional (conserva solo los vóxeles que la cabeza de instancia etiquetó) y lo deja escrito en
-``meta.json`` (``distance_method``). Cuando llegue la corrección, ``build_id_volume`` la detecta
-sola y no hay que tocar nada más.
+ORIENTACIÓN. H6 se entrenó con los volúmenes en orientación canónica (``orientacion.py``): los .mha
+guardados en LPI (girados 180 grados en el plano) se enderezan antes de predecir. Si el checkpoint lo
+pide (``model.canonical``), el caso se endereza UNA vez al cargarlo (imagen, ground truth y vista
+cruda), así los tres visualizadores muestran la misma orientación y la inferencia en vivo recibe
+cortes ya enderezados. Si un volumen está girado se decide con la cabecera del .mha, no con la
+lista fija de PENGWIN. D5 se entrenó sin ese paso: con D5 no se endereza. ``meta.json`` guarda
+``canonical`` (si el modelo lo pide) y ``flipped`` (si este caso se giró).
+
+DISTANCIA EN MM. ``postprocess_3d(fill_unlabeled=False)``: los vóxeles de la región que no son ni
+principal ni fragmento quedan sin etiqueta, así no se rellena el hueco entre fragmentos (ver
+docs/decisiones_semana10.md, sección 5). Es el mismo método de ``infer_volume.py --distance-nofill``.
 """
 
 from __future__ import annotations
 
 import argparse
-import inspect
 import json
 import sys
 import time
@@ -40,9 +43,7 @@ from volume_postprocess import match_fragments, postprocess_3d
 
 REGION_LABELS = {"sacro": "Sacro", "coxal_izquierdo": "Coxal izquierdo", "coxal_derecho": "Coxal derecho"}
 REGION_STARTS = {"sacro": 1, "coxal_izquierdo": 11, "coxal_derecho": 21}
-PROVISIONAL = ("provisional: se conservan solo los vóxeles que la cabeza de instancia etiquetó "
-               "(sin el relleno de postprocess_3d) y el principal se reduce a su mayor componente conexa; "
-               "reemplazar por fill_unlabeled=False")
+DISTANCE_METHOD = "postprocess_3d(fill_unlabeled=False)"
 
 
 def region_of(fragment_id: int) -> str:
@@ -59,20 +60,7 @@ def build_id_volume(semantic: np.ndarray, primary_secondary: np.ndarray,
     Devuelve (volumen, descripción del método). Lo que se ve en los visualizadores es el mismo
     volumen sobre el que se mide la distancia.
     """
-    if "fill_unlabeled" in inspect.signature(postprocess_3d).parameters:
-        volume = postprocess_3d(semantic, primary_secondary, min_voxels, fill_unlabeled=False)
-        return volume, "postprocess_3d(fill_unlabeled=False)"
-    filled = postprocess_3d(semantic, primary_secondary, min_voxels)
-    volume = np.where(primary_secondary > 0, filled, 0).astype(np.uint8)
-    # postprocess_3d absorbe en el principal los pedazos menores a min_voxels. Sueltos junto a un
-    # fragmento lo hacen parecer en contacto (en el caso 024 una fuga de 7 vóxeles llevó de 19.0 a
-    # 0.0 mm). El principal es la mayor componente conexa de su ID, igual que en postprocess_3d.
-    for start in REGION_STARTS.values():
-        labeled, n = ndi.label(volume == start, structure=np.ones((3, 3, 3), np.uint8))
-        if n > 1:
-            sizes = np.bincount(labeled.ravel())[1:]
-            volume[(volume == start) & (labeled != int(np.argmax(sizes)) + 1)] = 0
-    return volume, PROVISIONAL
+    return postprocess_3d(semantic, primary_secondary, min_voxels, fill_unlabeled=False), DISTANCE_METHOD
 
 
 def fragment_table(volume: np.ndarray, spacing_xyz: tuple[float, float, float]) -> list[dict]:
@@ -152,6 +140,12 @@ def fragment_meshes(volume: np.ndarray, spacing_xyz: tuple[float, float, float],
     return meshes
 
 
+def checkpoint_is_canonical(checkpoint: str | Path) -> bool:
+    """Lo mismo que deja ``evaluate_volumes.load_model`` en ``model.canonical``, sin cargar el modelo."""
+    import torch
+    return bool(torch.load(checkpoint, map_location="cpu").get("canonical", False))
+
+
 def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", size: int = 384,
                 tta: bool = True, batch_size: int = 8, min_voxels: int = 30, raw_view: bool = True,
                 reuse: bool = False, progress=None) -> Path:
@@ -161,7 +155,8 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     ``predictions.npz`` y rehace solo el post-proceso, las distancias y las mallas. Es lo que se usa
     cuando cambia el post-proceso 3D.
     """
-    from pengwin_io import load_case, resize_label_slice
+    from orientacion import flip_inplane, header_is_rotated, is_rotated
+    from pengwin_io import find_image_path, load_case, resize_label_slice
     from predict_volume import (cache_spacing_xyz, load_pipeline, predict_volume,
                                 preprocess_volume)
 
@@ -169,6 +164,16 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     log = progress or (lambda message: print(message, flush=True))
     started = time.perf_counter()
     case = load_case(case_id, load_label=True)
+    canonical = checkpoint_is_canonical(checkpoint)
+    flipped = False
+    if canonical:
+        from_header = header_is_rotated(find_image_path(case_id))
+        flipped = is_rotated(case_id) if from_header is None else from_header
+        if flipped:
+            case.image = flip_inplane(case.image)
+            if case.label is not None:
+                case.label = flip_inplane(case.label)
+            log(f"[{case_id}] guardado girado 180° (cabecera LPI): enderezado a la orientación canónica")
     spacing = cache_spacing_xyz(case.spacing_xyz, case.image.shape, size)
     log(f"[{case_id}] volumen {case.image.shape} spacing nativo {tuple(round(float(s), 3) for s in case.spacing_xyz)} mm")
 
@@ -189,6 +194,7 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     else:
         images = preprocess_volume(case.image, size)
         model, device, info = load_pipeline(checkpoint, tta=tta)
+        assert info["canonical"] == canonical, "el checkpoint y el modelo cargado no coinciden en orientación"
         log(f"[{case_id}] modelo {info['checkpoint']} ({info['parameters'] / 1e6:.2f} M parámetros) en {device}, TTA={tta}")
         pred = predict_volume(model, images, device, batch_size=batch_size,
                               progress=lambda done, total: log(f"[{case_id}] cortes {done}/{total}")
@@ -240,7 +246,7 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
             "orig_shape_zyx": [int(s) for s in case.image.shape], "tta": tta,
             "device": str(device), "seconds_model": pred["seconds"],
             "ms_per_slice": 1000 * pred["seconds"] / len(images), "min_voxels": min_voxels,
-            "distance_method": method,
+            "distance_method": method, "canonical": canonical, "flipped": flipped,
             "bone_z_range": [int(bone_z[0]), int(bone_z[-1])] if len(bone_z) else None,
             "fragments_pred": rows, "fragments_gt": gt_rows, "comparison": comparison,
             "slices": [{"z": z, "classification": [round(float(p), 4) for p in pred["classification"][z]],

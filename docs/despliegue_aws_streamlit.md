@@ -1,98 +1,98 @@
-# Despliegue: API de inferencia en AWS + dashboard en Streamlit Community Cloud
+# Despliegue: Streamlit Community Cloud y API en AWS Lambda
 
-Estado al 5 de octubre de 2026. Hugging Face Spaces quedó descartado: en cuentas gratis el SDK
-Docker y CPU Basic están como "Paid".
+Estado al 6 de octubre de 2026. Modelo desplegado: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
 
 ```
-Celular / computador ──► Streamlit Community Cloud (dashboard, datos exportados, sin torch)
-                                   │  solo al pulsar «Inferir este corte en vivo»
-                                   ▼
-                         AWS Lambda (contenedor con el modelo, api/server.py)
+Celular / computador ──► Streamlit Community Cloud (app/dashboard.py, sin torch)
+                                 │  solo al pulsar «Inferir el corte seleccionado»
+                                 ▼
+                       AWS Lambda pelvis-api (contenedor con H6, api/server.py)
 ```
 
-Las tres pestañas leen los casos ya exportados (`outputs/demo/…`), que viajan con el dashboard.
-La API solo atiende el botón de inferencia en vivo del visualizador 2 y devuelve la latencia del
-modelo. Si la API no está configurada o está caída, el resto del dashboard sigue funcionando.
+Las tres pestañas leen los casos ya exportados (`outputs/demo/<modelo>/<caso>/`), que viajan en el
+repositorio. El modelo solo corre en vivo al pulsar el botón del visualizador 2. Si la API no
+responde, el resto del dashboard sigue funcionando.
 
-## 1. API en AWS (Lambda con contenedor)
+El túnel de Cloudflare que menciona el enunciado queda como opción y no se montó: la demo se hace
+con la app de Streamlit Cloud, que ya está publicada y se abre desde computador y celular.
 
-Requisitos en el Mac: Docker Desktop y AWS CLI con credenciales (`aws configure`). La imagen se
-construye desde la raíz del repo y necesita `outputs/s10/d5_ema_w32_e60_s42.pth` en disco.
+## 1. Dashboard en Streamlit Community Cloud
 
-```bash
-export AWS_REGION=us-east-1
-export ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-export REPO=pelvis-api
-
-aws ecr create-repository --repository-name $REPO --region $AWS_REGION
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com
-
-# --provenance=false: Lambda rechaza las imágenes con atestaciones de buildx
-docker build --platform linux/amd64 --provenance=false -f api/Dockerfile -t $REPO .
-docker tag $REPO:latest $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO:latest
-docker push $ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$REPO:latest
-```
-
-Crear la función (consola de AWS o CLI). Valores recomendados:
-
-- Tipo: imagen de contenedor, la que se acaba de subir.
-- Memoria 3008 MB (da algo más de un vCPU), tiempo máximo 60 s.
-- Variable de entorno `API_KEY` con una clave larga y aleatoria (`openssl rand -hex 24`).
-- URL de función con tipo de autenticación `NONE`. La clave `X-API-Key` es lo que protege la API.
-
-Comprobación:
-
-```bash
-curl https://<tu-url>.lambda-url.us-east-1.on.aws/health
-```
-
-La primera llamada después de un rato sin uso es lenta (arranque en frío: carga torch y el modelo).
-Antes de la demo conviene llamar a `/health` una vez para dejarla caliente.
-
-Alternativa sin Lambda: la misma imagen corre en una instancia EC2 pequeña
-(`docker run -p 8080:8080 -e API_KEY=… pelvis-api`), con HTTPS aparte. Es más simple de entender pero
-hay que apagarla para que no cobre.
-
-## 2. Dashboard en Streamlit Community Cloud
-
-```bash
-python3 deploy/build_streamlit_cloud.py --model d5_ema_w32_e60_s42 --cases 024 099 044
-```
-
-Genera `build/streamlit_cloud/` (≈65 MB, el archivo más grande pesa 28 MB, bajo el límite de 100 MB
-de GitHub). Esa carpeta es un repositorio aparte:
-
-```bash
-cd build/streamlit_cloud
-git init && git add . && git commit -m "Dashboard Semana 11"
-# crear un repo vacío en GitHub (privado sirve) y:
-git remote add origin git@github.com:<usuario>/<repo>.git
-git push -u origin main
-```
-
-En share.streamlit.io: New app → ese repo, rama `main`, archivo principal `app/dashboard.py`.
-En Advanced settings: Python 3.11 y, en Secrets:
+- App en el espacio de trabajo `pengwin-analitica-2026` de share.streamlit.io.
+- Repositorio `pengwin-analitica-2026/proyecto2-analitica-datos`, rama `main`, archivo
+  `app/dashboard.py`, Python 3.11.
+- Dependencias: `app/requirements.txt` (sin torch). Streamlit lo prefiere al `requirements.txt` de la
+  raíz porque está junto al archivo principal.
+- Se vuelve a desplegar sola con cada push a `main`.
+- Secretos (App → Settings → Secrets):
 
 ```toml
-INFERENCE_URL = "https://<tu-url>.lambda-url.us-east-1.on.aws"
-INFERENCE_KEY = "<la misma clave que API_KEY>"
+INFERENCE_URL = "https://xr3mjj5zdgwq2q4jfgxjddad7a0dljsj.lambda-url.us-east-2.on.aws"
+INFERENCE_KEY = "<el valor de API_KEY de la Lambda>"
 ```
 
-Sin esos secretos el expander de inferencia en vivo avisa que no está configurado y todo lo demás
-funciona.
+La clave se lee con:
 
-## Pruebas hechas (en el entorno de desarrollo, no en AWS ni en Streamlit Cloud)
+```bash
+AWS_PROFILE=almia aws lambda get-function-configuration --function-name pelvis-api --region us-east-2 --query 'Environment.Variables.API_KEY' --output text
+```
 
-- La API local responde 401 con clave incorrecta, 400 con un cuerpo que no es `.npy` y 200 con un
-  corte válido (≈190 ms de modelo en CPU de 2 núcleos).
-- El dashboard armado en `build/streamlit_cloud/`, con `import torch` bloqueado a propósito,
-  arranca, muestra las tres pestañas y completa la inferencia en vivo contra la API.
+**Primer despliegue.** Falló con «Deploy keys are disabled for this repository or organization»:
+Streamlit Cloud lee los repos privados con una *deploy key* y la organización las tenía desactivadas.
+Se habilitaron en la configuración de la organización y el despliegue pasó.
 
-## Sin verificar
+`deploy/build_streamlit_cloud.py` sigue sirviendo para publicar el dashboard desde un repositorio
+aparte, solo con la app y los casos, si algún día el repo principal no puede conectarse.
 
-- Que Lambda y la imagen funcionen tal cual (no hay AWS en el entorno donde se desarrolló).
-- La memoria disponible en Streamlit Community Cloud con los casos cargados.
-- Costos actuales de AWS: con el uso de una demo deberían ser mínimos, pero conviene mirar la
-  consola de facturación.
-- La latencia de Lambda: es la que hay que reportar como "CPU en la nube", medida con la API ya
-  desplegada.
+## 2. API de inferencia en AWS Lambda
+
+| Recurso | Valor |
+|---|---|
+| Cuenta / región | Almia (`050752608083`) / `us-east-2` |
+| Repositorio ECR | `pelvis-api` (escaneo de vulnerabilidades al subir) |
+| Función Lambda | `pelvis-api`: imagen de contenedor, 3008 MB, tiempo máximo 120 s |
+| Rol de ejecución | `pelvis-api-lambda-exec` (solo `AWSLambdaBasicExecutionRole`, para los logs) |
+| URL | Function URL pública con autenticación `NONE`; `/predict_slice` exige la cabecera `X-API-Key` |
+
+La función se creó una vez a mano (imagen `bootstrap`); desde entonces la actualiza
+`deploy-api.yml` en cada push a `main` (ver `docs/cicd_github_actions.md`).
+
+Una Function URL pública necesita **dos** permisos en la política de la función: `lambda:InvokeFunctionUrl`
+y `lambda:InvokeFunction` con la condición `lambda:InvokedViaFunctionUrl`. Con solo el primero
+responde 403. El AWS CLI 2.27 no tiene la opción del segundo; se agregó con boto3 reciente.
+
+### Orientación
+
+H6 espera cortes en orientación canónica. La API no gira nada: el dashboard le manda cortes del
+caso exportado, y `demo_export.py` ya enderezó el volumen. `/health?deep=1` devuelve
+`"canonical": true` para que se pueda comprobar.
+
+### Comprobación
+
+```bash
+URL=https://xr3mjj5zdgwq2q4jfgxjddad7a0dljsj.lambda-url.us-east-2.on.aws
+curl $URL/health              # al instante: {"ok": true, "loaded": false|true}
+curl "$URL/health?deep=1"     # carga el modelo; en frío tarda hasta ~90 s
+```
+
+## Qué se probó de verdad
+
+Contra la Lambda real, el 6 de octubre:
+
+- `/health` responde 200 en 2.8 s; `/health?deep=1` en frío tardó 93 s y devolvió el modelo,
+  `cpu` y 2 736 958 parámetros.
+- `/predict_slice` con un corte de 384×384: 200 con la clave y 401 sin ella o con una clave
+  equivocada. Ida y vuelta ~1.1 s ya caliente; 321 ms de modelo en la CPU de Lambda.
+- `deploy-api.yml` completo desde `main`: pruebas, imagen, ECR, actualización y prueba de humo.
+
+Sin verificar todavía:
+
+- Con H6 en la Lambda: el redespliegue ocurre al integrar este cambio a `main`.
+- El dashboard de Streamlit Cloud abierto desde un celular.
+- Costos: con el uso de una demo deberían ser mínimos (Lambda cobra por invocación y ECR por
+  almacenamiento, unos 0.5 GB por imagen). Las imágenes viejas de ECR se pueden borrar.
+
+## Al terminar el curso
+
+Borrar la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
+`github-actions-pelvis-api` y `pelvis-api-lambda-exec`, y la app de Streamlit Cloud.

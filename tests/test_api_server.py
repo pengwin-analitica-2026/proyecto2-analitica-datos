@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKPOINT = ROOT / "outputs" / "s10" / "d5_ema_w32_e60_s42.pth"
+CHECKPOINT = ROOT / "outputs" / "s10" / "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth"
 
 try:
     from fastapi.testclient import TestClient
@@ -37,6 +37,7 @@ class ApiServer(unittest.TestCase):
         body = self.client.get("/health?deep=1").json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["model"], CHECKPOINT.name)
+        self.assertTrue(body["canonical"])          # H6 espera cortes enderezados
 
     def test_wrong_key_is_rejected(self):
         response = self.client.post("/predict_slice", content=self.npy(np.zeros((384, 384), np.uint8)),

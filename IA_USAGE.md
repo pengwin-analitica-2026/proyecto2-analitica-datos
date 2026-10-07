@@ -536,6 +536,60 @@ pedido de Gustavo con los prompts copiados tal cual.
 - **Integrante y herramienta:** Federico · *(completar)*.
 - **Prompt / qué produjo la IA / qué se hizo a mano:** *(completar o declarar que no usó IA)*.
 
+### 30. Despliegue real en AWS (cuenta de Almia) y CI/CD con OIDC
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-sonnet-5-5`.
+  6 de octubre de 2026.
+- **Prompts exactos:**
+  > estamos haciendo acá la semana 11 , quiero desplegarel streamlit y el modelo en lambda o lo que veas mejor  la idea es que sea con un CI/CD cuando se pushee a main
+
+  > Sii ejecuta eso en la cuenta de almia ,       2.  yo ya ttengo admin en ese proyecto , de eso ahora se llama : https://github.com/pengwin-analitica-2026/proyecto2-analitica-datos/tree/semana11-visualizadores
+
+  > 1. dale prueba y mira  si puedes hacer todo , intentalo ,         2. hiciste el commit dandote autoria , eso no se deberría hacer , no debes darte autoría ,  si podemos cambiar el commit buenisimo
+- **Qué produjo la IA:** en la cuenta de AWS de Almia (`us-east-2`) creó el repositorio ECR
+  `pelvis-api`, la función Lambda `pelvis-api` con su Function URL, el rol de ejecución y un rol de
+  despliegue que GitHub asume por OIDC, limitado a la rama `main` de este repositorio y a ese ECR y
+  esa Lambda (`deploy/aws/`). Cambió `deploy-api.yml` de claves de acceso a OIDC y a desplegar en
+  cada push a `main`. Al probar contra la Lambda real encontró y corrigió cuatro fallos: permisos de
+  archivo en la imagen (502), el arranque en frío más largo que el chequeo del adaptador (`/health`
+  liviano y `/health?deep=1`), `pytest` faltante en el CI y el formato inmutable del `sub` de OIDC
+  en este repositorio. Detalle en `docs/cicd_github_actions.md`.
+- **Qué se hizo a mano:** Gustavo eligió Streamlit Community Cloud para el dashboard y la cuenta de
+  Almia para la API, autorizó crear cada recurso y la URL pública, integró el PR #6 a `main` y
+  habilitó las *deploy keys* de la organización para que Streamlit Cloud pudiera leer el repo
+  privado. Pidió quitar la coautoría de la IA de los commits; el commit se reescribió.
+- **Análisis crítico:** la IA puso en el commit una línea de coautoría que el equipo no quería, y su
+  primera política OIDC usaba el `sub` por nombre, que este repositorio no emite; el error solo
+  apareció en el primer despliegue real. Los dos bloqueos de permisos (URL pública y merge sin
+  revisión) los detuvo el propio entorno y se resolvieron con autorización explícita.
+
+### 31. Demo con H6: orientación desde la cabecera, distancia definitiva y métricas de test
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  6 de octubre de 2026.
+- **Prompt exacto (resumen del mensaje, que incluía las instrucciones de la sesión de la Semana 10
+  y la revisión del PR #6 de María):**
+  > Listo, ya está desplegando. Ahorita nosotros tenemos pendientes las cosas en la semana 11 y varias cositas que cambiaron, entonces sería bueno cambiarlo.  Acá te pongo lo que me pidió otra sesión que te pusiera, sí, la sesión que está terminando la semana 10. […] también, en el anterior PR que subimos, me hicieron estos comentarios. Sería bueno revisar esto. También sé que se subió algo. Se han subido cambios de parte de otra compañera. Sería bueno revisar y mirar que no haya conflictos y demás.
+
+  > No, no, no, no vamos a montar nada en Cloudflare. Ya montamos todo en la lambda. Cloudflare es opcional.
+- **Qué produjo la IA:** `orientacion.header_is_rotated` y `flip_inplane`; el enderezado en
+  `demo_export.py` (una sola vez al cargar, para imagen, ground truth y vista cruda, decidido por la
+  marca `canonical` del checkpoint y la cabecera del `.mha`); el reemplazo del método provisional
+  de distancia por `postprocess_3d(fill_unlabeled=False)`; la reexportación de 024, 044, 099 y 039
+  con H6 y TTA y el borrado de los casos de D5; H6 como checkpoint por defecto en la API, el
+  Dockerfile y el dashboard; la pestaña de métricas con las dos evaluaciones en test, la distancia,
+  SAM y la latencia; el orden de los notebooks (Colab en `notebooks/colab/`, 05 rotulado como D5);
+  los pesos de H6 s43 y s44 en el repo; y la actualización de esta documentación.
+- **Qué se hizo a mano:** Gustavo descartó montar el túnel de Cloudflare (la IA había empezado un
+  script para eso y se borró): la demo es Streamlit Cloud + Lambda. La comprobación visual de los
+  casos girados la hace el equipo en el dashboard.
+- **Análisis crítico:** la revisión de María pedía `from_canonical` a la salida; la IA propuso no
+  volver a la orientación original y mostrar todo en la canónica, porque así las tres vistas y el
+  ground truth coinciden y la distancia no cambia. Es una decisión de presentación que el equipo
+  puede revertir. La IA creyó muerta la primera exportación (su salida quedaba retenida por un
+  `grep` en el pipe), la relanzó y las dos corrieron a la vez sobre la misma carpeta; se detectó al
+  llegar el aviso de fin y se verificó que los archivos finales quedaran íntegros.
+
 ---
 
 # Parte 2. Análisis crítico

@@ -1,37 +1,73 @@
 # Semana 11 — dashboard con tres visualizadores
 
-Estado al 5 de octubre de 2026. Plan completo en `docs/plan_semana11.md`.
+Estado al 6 de octubre de 2026. Modelo de la demo: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
+Plan y decisiones en `docs/plan_semana11.md`; despliegue en `docs/despliegue_aws_streamlit.md`.
 
 ## Cómo correrlo
 
-Desde la raíz del repo, con el `.venv` activo:
+Publicado: la app de Streamlit Community Cloud (rama `main`, ver `docs/despliegue_aws_streamlit.md`).
+
+En local, desde la raíz del repo, con el `.venv` activo:
 
 ```bash
-pip install -r requirements.txt                       # agrega streamlit
-python src/demo_export.py --case 024 --checkpoint outputs/s10/d5_ema_w32_e60_s42.pth --tta
+pip install -r requirements.txt
+python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
 streamlit run app/dashboard.py
 ```
 
 - `demo_export.py` corre el pipeline completo una vez por caso y deja todo en
-  `outputs/demo/<modelo>/<caso>/`. En CPU toma unos 4 minutos por caso con TTA. El dashboard solo
-  lee esos archivos, así que abre al instante.
-- `--reuse` rehace solo el post-proceso, las distancias y las mallas, sin volver a correr el modelo.
-  Es lo que hay que usar cuando llegue la corrección de la distancia.
+  `outputs/demo/<modelo>/<caso>/`. En la CPU del Mac de Gustavo tarda unos 4 s por corte con TTA,
+  es decir, de 15 a 25 minutos por caso. El dashboard solo lee esos archivos, así que abre al
+  instante.
+- `--reuse` rehace solo el post-proceso, las distancias y las mallas, sin volver a correr el modelo
+  (necesita el `predictions.npz` local, que no se versiona).
 - `DEMO_ROOT=<carpeta>` cambia dónde busca el dashboard los casos exportados.
-- El botón «Inferir este corte en vivo» del visualizador 2 carga el modelo real y muestra la
-  latencia; necesita `torch` y el checkpoint en `outputs/s10/`.
+- El botón «Inferir el corte seleccionado» del visualizador 2 usa la API de AWS si están
+  `INFERENCE_URL` e `INFERENCE_KEY` (variables de entorno o secretos de Streamlit); si no, carga el
+  modelo local, que necesita `torch` y el checkpoint en `outputs/s10/`.
+
+Casos versionados en `outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/`, todos con H6 y TTA:
+
+| Caso | Split | Guardado girado 180° | Para qué |
+|---|---|---|---|
+| 024 | validación | no | Caso de referencia, con dos fragmentos separados (19 y 3 mm) |
+| 044 | validación | sí | Comprobar el enderezado |
+| 099 | validación | sí | Comprobar el enderezado |
+| 039 | test | no | Uno de los dos casos que hundían test con D5; se exporta porque el modelo ya está congelado |
+
+## Orientación
+
+H6 se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están
+guardados girados 180° en el plano (`TransformMatrix = -1 0 0 0 -1 0 0 0 1`, orientación LPI) y
+`SimpleITK.GetArrayFromImage` no aplica esa dirección.
+
+`demo_export.py` lo resuelve al cargar el caso:
+
+1. Lee la marca `canonical` del checkpoint (`True` en H6, `False` en D5). Con D5 no se endereza nada.
+2. Si el modelo la pide, lee la `TransformMatrix` de la cabecera del `.mha`
+   (`orientacion.header_is_rotated`). Si la cabecera no la trae, usa la lista
+   `orientacion.LPI_CASES`.
+3. Si el volumen está girado, gira 180° en el plano la imagen en HU y el ground truth, una sola vez.
+   Todo lo que sigue sale de ese volumen enderezado: la vista cruda (visualizador 1), los cortes del
+   modelo (visualizador 2), las mallas (visualizador 3) y los cortes que se mandan a la API en vivo.
+4. `meta.json` guarda `canonical` y `flipped`; la barra lateral del dashboard dice si el caso se
+   enderezó.
+
+No se devuelve el resultado a la orientación original: en la canónica todos los casos se ven igual
+(sacro abajo) y la distancia en mm no cambia con un giro de 180°.
 
 ## Qué hay
 
 | Archivo | Para qué |
 |---|---|
-| `src/predict_volume.py` | Inferencia sobre un volumen crudo, sin ground truth: preprocesa como el entrenamiento, corre las tres cabezas con NMS propio y devuelve semántica, mapa primario/secundario, cajas y clasificación por corte |
-| `src/demo_export.py` | Exportador por caso: volumen de IDs, distancias en mm, comparación con el ground truth, mallas por fragmento y vista cruda |
+| `src/predict_volume.py` | Inferencia sobre un volumen, sin ground truth: preprocesa como el entrenamiento, corre las tres cabezas con NMS propio y devuelve semántica, mapa primario/secundario, cajas y clasificación por corte. `load_pipeline` informa `canonical` |
+| `src/demo_export.py` | Exportador por caso: orientación, volumen de IDs, distancias en mm, comparación con el ground truth, mallas por fragmento y vista cruda |
+| `src/orientacion.py` | `header_is_rotated` (cabecera del `.mha`), `flip_inplane`, `to_canonical` y la lista de los 34 casos LPI |
 | `src/demo_render.py` | Dibujo del visualizador 2 (corte con cajas, máscaras y etiquetas), del 3 (mallas Plotly) y de la isosuperficie cruda |
 | `src/raw_view.py` | Visualizador 1: MIP en tres ejes e isosuperficie del hueso, sobre el volumen sin procesar |
 | `src/measure_latency.py` | Latencia por imagen en CPU y GPU (mediana y p90); escribe `outputs/demo/latency.json` |
 | `app/dashboard.py` | Dashboard Streamlit con tres pestañas, métricas y latencia, y la advertencia de uso no clínico siempre visible |
-| `tests/test_demo_*.py`, `tests/test_predict_volume.py` | 15 pruebas: distancias con spacing anisotrópico, fuga de vóxeles, etiquetas, mallas en mm, forma de las salidas |
+| `api/server.py` | API de inferencia por corte (AWS Lambda) |
 
 ## Lo que se ve en cada visualizador
 
@@ -45,43 +81,40 @@ streamlit run app/dashboard.py
    rótulo `ID · mm` con flecha en cada fragmento. Interruptores para el fragmento principal, su
    opacidad y el ground truth superpuesto.
 
-La distancia es la mínima borde a borde entre el fragmento y el principal de su hueso, con
-`distance_transform_edt` y el spacing del header (ajustado al estiramiento a 384 px). Es una
-medida del fragmento entero en 3D: en el visualizador 2 se repite en todos los cortes donde aparece.
+Pestaña **Métricas y latencia**: distancia predicha contra la real en el caso elegido; las dos
+evaluaciones en test (D5 con la configuración congelada antes de ver test, 0.845 de Dice por
+fragmento, y H6 después del análisis de fallos, 0.875), el error de distancia y SAM sobre test,
+leídos de `outputs/s10/`; y la latencia por imagen.
 
-## Pendiente de la corrección de distancia
+## Distancia en mm
 
-`volume_postprocess.postprocess_3d` rellena por defecto cada vóxel de la región sin etiqueta con el
-fragmento principal, y eso deja todas las distancias predichas en 0.0 mm
-(`docs/decisiones_semana10.md`, sección 5). La corrección (`fill_unlabeled`) la está haciendo otra
-sesión y todavía no está en `src/`.
+Mínima borde a borde entre el fragmento y el principal de su hueso, con `distance_transform_edt` y
+el spacing del header (ajustado al estiramiento a 384 px). El volumen de IDs sale de
+`postprocess_3d(fill_unlabeled=False)`: los vóxeles que no son ni principal ni fragmento quedan sin
+etiqueta, así no se rellena el hueco entre fragmentos. Es una medida del fragmento entero en 3D: en
+el visualizador 2 se repite en todos los cortes donde aparece.
 
-Mientras tanto `demo_export.build_id_volume` usa una versión **provisional**: conserva solo los
-vóxeles que la cabeza de instancia etiquetó y reduce el principal a su mayor componente conexa. Esto
-último importa: sin ello, una fuga de 7 vóxeles del principal dentro de un fragmento llevó su
-distancia de 19.0 a 0.0 mm en el caso 024. El método queda escrito en `meta.json`
-(`distance_method`) y el dashboard muestra un aviso mientras sea el provisional. Cuando
-`postprocess_3d` acepte `fill_unlabeled`, `build_id_volume` la detecta sola; basta con
-`python src/demo_export.py --case <caso> --checkpoint <pth> --reuse` para rehacer cada caso.
+## Resultado por caso (H6, TTA)
 
-## Resultado en el caso 024 (validación, candidato D5, TTA)
+Generado en la CPU del Mac. Dice por macro-hueso de la semántica 3D contra el ground truth y
+fragmentos secundarios reales con su distancia (real → predicha). «Cruce» es el Dice entre el coxal
+izquierdo predicho y el derecho real: si la orientación estuviera mal, sería alto.
 
-Distancias con el método provisional, predicción contra ground truth, solo fragmentos secundarios
-separados del principal:
+| Caso | Enderezado | Dice sacro / coxal izq. / coxal der. | Cruce | Secundarios separados del principal (real → predicho) |
+|---|---|---|---|---|
+| 024 | no | 0.965 / 0.981 / 0.980 | 0.000 | F3 coxal izq.: 19.0 → 19.0 mm; F4 coxal izq.: 3.2 → 4.5 mm |
+| 044 | sí | 0.958 / 0.970 / 0.966 | 0.000 | ninguno (su único secundario está en contacto: 0.0 → 0.0 mm) |
+| 099 | sí | 0.971 / 0.976 / 0.978 | 0.000 | F2 coxal izq.: 12.8 → 13.3 mm |
+| 039 (test) | no | 0.953 / 0.958 / 0.965 | 0.004 | F3 coxal der.: 33.7 mm, **no detectado** |
 
-| Fragmento real | Real | Predicho | Error |
-|---|---|---|---|
-| Coxal izquierdo F2 | 19.0 mm | 19.0 mm | 0.0 mm |
-| Coxal izquierdo F3 | 3.2 mm | 3.9 mm | 0.8 mm |
-
-Son dos fragmentos de un solo caso: sirven para comprobar que la medición funciona, no para
-estimar su error. El Dice 3D de esos dos fue 0.90 y 0.91. Los otros cuatro secundarios reales de
-este caso están en contacto con el principal (0.0 mm); el modelo no detectó uno de ellos (coxal
-derecho F2) y en el sacro y el coxal derecho F1 el Dice 3D fue bajo (0.49 y 0.52).
+En 044 y 099 el sacro queda abajo y las regiones izquierda y derecha coinciden con el ground truth
+después de enderezar. Son cuatro casos: sirven para comprobar que la orientación y la distancia
+funcionan, no para estimar el error (eso está en la pestaña de métricas, con los 15 casos de test).
+En 039 el modelo pierde el fragmento más separado del coxal derecho, uno de los fallos que siguen
+abiertos en test.
 
 ## Pendiente
 
-- Casos de la demo final (con test, después de congelar el modelo) y selector con varios modelos.
-- Latencia en CPU del Mac y en GPU (Kaggle o Colab) con `src/measure_latency.py`.
-- Túnel de Cloudflare y prueba desde un celular.
+- Probar el dashboard publicado desde un celular.
+- Video de respaldo de la demo.
 - Línea entre el fragmento y su principal en el visualizador 3 (opcional).

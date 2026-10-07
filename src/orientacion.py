@@ -17,6 +17,7 @@ orientación que su imagen); ``tests/test_orientacion.py`` la comprueba cuando d
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -38,6 +39,28 @@ def to_canonical(volume: np.ndarray, case_id: str | int) -> np.ndarray:
 
 
 from_canonical = to_canonical   # el giro de 180 grados es su propia inversa
+
+
+def header_is_rotated(path: str | Path) -> bool | None:
+    """Lee la cabecera de texto de un .mha y dice si está guardado girado 180 grados (LPI).
+
+    Sirve para volúmenes que no son de los 100 de PENGWIN, donde ``LPI_CASES`` no aplica.
+    Devuelve None si la cabecera no trae ``TransformMatrix``.
+    """
+    with open(path, "rb") as stream:
+        for line in stream.read(4096).split(b"\n"):
+            key, _, value = line.decode("ascii", errors="replace").partition("=")
+            if key.strip() == "TransformMatrix":
+                matrix = [float(v) for v in value.split()]
+                return matrix[0] < 0 and matrix[4] < 0
+            if key.strip() == "ElementDataFile":
+                break
+    return None
+
+
+def flip_inplane(volume: np.ndarray) -> np.ndarray:
+    """El giro de ``to_canonical`` sin consultar la lista: para cuando la orientación sale de la cabecera."""
+    return np.ascontiguousarray(volume[..., ::-1, ::-1])
 
 
 def estimate_angle(images_u8: np.ndarray, mm_y: float = 1.0, mm_x: float = 1.0,

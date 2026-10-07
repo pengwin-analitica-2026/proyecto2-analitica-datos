@@ -177,9 +177,12 @@ unos 520 ms por corte.
 
 ## 6. Limitaciones
 
-1. **Orientación en la demo.** La orientación canónica se identifica con una lista de los 34 casos
-   LPI del dataset, derivada de sus cabeceras. Para un volumen nuevo, la demo debe leer la
-   orientación de la cabecera de cada archivo. *(Actualizar cuando esté corregido.)*
+1. **Orientación de la entrada.** El modelo espera los volúmenes en orientación canónica. En el
+   entrenamiento y la evaluación se enderezaron con la lista de los 34 casos LPI; la demo
+   (`src/demo_export.py`) lee la `TransformMatrix` de la cabecera de cada archivo, así que también
+   sirve para volúmenes nuevos. Solo se contempla el giro de 180° en el plano: un volumen guardado con
+   otra dirección, o un paciente girado dentro del escáner, no se corrige (el aumento de ±35° cubre
+   solo parte de lo segundo).
 2. **Fragmentos en contacto en la superficie de fractura.** Cuando dos fragmentos se tocan, la
    segmentación puede fusionarlos en uno solo. En ese caso se pierde el fragmento secundario y su
    distancia de separación al principal no es confiable (puede salir 0 mm o no existir).
@@ -205,9 +208,11 @@ unos 520 ms por corte.
 
 ## 8. Despliegue
 
-El dashboard se sirve con Streamlit y se publica con un túnel de Cloudflare, como pide el enunciado,
-accesible desde el navegador de un computador y de un celular. La advertencia de uso no clínico está
-siempre visible en el dashboard.
+El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
+corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
+`main` (ver `docs/despliegue_aws_streamlit.md`). Se abre desde el navegador de un computador o de un
+celular. El túnel de Cloudflare quedó como opción y no se montó. La advertencia de uso no clínico
+está siempre visible en el dashboard.
 
 ## 9. Reproducción
 
