@@ -158,7 +158,14 @@ const children = [
     ' El ensamble de las tres alcanza 0.879, pero triplica el costo de inferencia, por lo que no se usa en la demo en tiempo real.']),
   P(['La detección se mide con cajas refinadas con la máscara semántica. Con la cabeza grid sola, en validación (H6 s42), el mAP@0.5 es 0.887, el mAP@[0.5:0.95] 0.506 y el IoU 0.766 (0.971, 0.904 y 0.949 refinados): la cabeza cruda también cumple los objetivos, y el refinamiento es un post-proceso.']),
   H2('Desempeño computacional'),
-  P(['Latencia por imagen en GPU y CPU: ', PEND('[pendiente: medir y completar]'), '.']),
+  P('Latencia por corte de 384 × 384 px, con lote de 1, sobre 60 cortes reales de validación y 5 pasadas de calentamiento descartadas (mediana, en ms). D5 y H6 tienen la misma arquitectura (2.74 M de parámetros), así que su latencia es la misma.'),
+  table([3600, 2880, 2880], ['Configuración', 'GPU (NVIDIA L4)', 'CPU (12 hilos)'], [
+    ['1 modelo', '63.7', '161.7'],
+    ['1 modelo + TTA de espejo', '71.6', '249.6'],
+    ['Ensamble de 3 semillas + TTA', '87.4', '518.0'],
+  ], { boldFirst: true }),
+  sp(),
+  P('El modelo entregado (un modelo con TTA) procesa un corte en 72 ms en GPU y en 250 ms en CPU: un volumen de 300 cortes tarda unos 22 s en GPU y 75 s en CPU. El ensamble mejora apenas el Dice por fragmento (0.879 frente a 0.875) y duplica el tiempo en CPU, por eso no se usa.'),
 
   // ---------- 6 ----------
   H1('6. Estudio de ablación'),
@@ -250,7 +257,18 @@ const children = [
   image('nb_giro012.png', 440, 197),
   caption('Figura 15. Caso 012: Dice de instancias según el giro aplicado a la imagen antes del modelo (modelo previo, D5).'),
   H2('Distancia de separación: predicción frente a ground truth'),
-  P([PEND('[pendiente: distancia mínima borde a borde, en mm, de cada fragmento al principal, con distance_transform_edt y el spacing del header, en predicción y GT]')]),
+  P('La distancia de cada fragmento secundario a su principal se mide borde a borde en 3D, con distance_transform_edt y el espaciado de la cabecera, sobre la máscara predicha y sobre el ground truth del mismo caso. Como métricas adicionales del challenge se reportan ASSD y HD95 por fragmento.'),
+  table([2900, 1615, 1615, 1615, 1615], ['Métrica (41 secundarios)', 'Val. D5', 'Val. H6', 'Test D5', 'Test H6'], [
+    ['Error medio de distancia (mm)', '0.518', '0.185', '2.956', '1.277'],
+    ['Error p90 (mm)', '0.388', '0.000', '3.453', '0.556'],
+    ['Correlación con la distancia real', '0.925', '0.972', '0.543', '0.818'],
+    ['Secundarios con distancia predicha', '38', '38', '36', '36'],
+    ['Dice 3D principal / secundario', '0.911 / 0.605', '0.921 / 0.701', '0.909 / 0.682', '0.931 / 0.756'],
+    ['ASSD (mm)', '5.11', '4.08', '3.02', '2.06'],
+    ['HD95 (mm)', '22.81', '17.99', '16.33', '11.55'],
+  ], { boldFirst: true, highlightRow: 0 }),
+  sp(),
+  P(['En test, H6 reduce el error medio de 2.96 a 1.28 mm y sube la correlación de 0.54 a 0.82. De los 36 secundarios con distancia predicha, solo 4 tienen un error mayor a 1 mm, y ', B('uno solo concentra el 79 % del error'), ': en el caso 007, un fragmento del coxal derecho a 9.4 mm del principal se mide a 45.8 mm, porque la predicción le agrega un componente aislado lejos del hueso. Los otros errores grandes son del caso 054, con fragmentos en contacto (distancia real 0 mm) que la predicción separa por unos milímetros, la situación que el enunciado pide declarar como limitación.']),
   H2('Comparación con SAM'),
   P('SAM ViT-B se ejecutó en modo zero-shot sobre test, con la caja que predice nuestro detector como prompt, y se comparó región por región con la máscara semántica de H6 dentro de la misma caja (1 181 cortes, uno de cada tres; 3 002 pares corte-región). SAM no forma parte del pipeline.'),
   table([2400, 1740, 1740, 1740, 1740], ['Región', 'Dice SAM', 'Dice H6', 'IoU SAM', 'IoU H6'], [
@@ -260,7 +278,7 @@ const children = [
     ['Global', '0.889', '0.935', '0.823', '0.889'],
   ], { boldFirst: true, highlightRow: 3 }),
   sp(),
-  P('El modelo propio supera a SAM en las tres regiones, y la diferencia es mayor en el sacro, la región con forma más irregular y bordes menos nítidos. SAM, entrenado con imágenes naturales, delimita bien los coxales cuando la caja es buena, pero no distingue fragmentos ni regiones, y tarda unos 520 ms por corte frente a los milisegundos del modelo propio.'),
+  P('El modelo propio supera a SAM en las tres regiones, y la diferencia es mayor en el sacro, la región con forma más irregular y bordes menos nítidos. SAM, entrenado con imágenes naturales, delimita bien los coxales cuando la caja es buena, pero no distingue fragmentos ni regiones, y en la misma GPU L4 tarda unos 259 ms por corte solo en su parte, frente a unos 64 ms de todo el modelo propio.'),
 
   // ---------- 9 ----------
   H1('9. Limitaciones'),
@@ -312,7 +330,7 @@ const children = [
     ['10 · Multitarea', 'Modelo con tres cabezas y salida de instancia primario/secundario; evaluación sobre el volumen completo; barrido de ancho, EMA, pérdidas y post-procesos (más de 25 experimentos); ablaciones de CBAM, transfer learning y λ.',
       'Dice por fragmento de 0.787 (31 IDs) a 0.859 en validación. Test: 0.848, con 8 de 9 métricas cumplidas. Diagnóstico: secundarios en contacto y dos casos atípicos (012 y 039).'],
     ['11 · Modelo final y demo', 'Orientación canónica desde la cabecera y aumento geométrico (modelo H6, 3 semillas); visualizadores 2 y 3 y dashboard; despliegue en curso.',
-      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Pendiente: demo con H6, túnel de Cloudflare y latencia.'],
+      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. Pendiente: demo con H6 y túnel de Cloudflare.'],
   ], { boldFirst: true, leftAll: true }),
   image('nb_100casos.png', 470, 474),
   caption('Figura A1. Revisión visual de los 100 casos tras el preprocesamiento (contorno rojo: hueso; b: brillo medio del hueso).'),
