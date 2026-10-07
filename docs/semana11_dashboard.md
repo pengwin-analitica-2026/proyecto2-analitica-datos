@@ -124,11 +124,10 @@ abiertos en test.
 | Orientación | Sale de la cabecera del `.mha`, no de la lista de casos, para que sirva con volúmenes que no sean de PENGWIN |
 | Modelos en la demo | Solo el entregado (H6). El selector de modelos se descartó y los casos exportados con D5 se borraron |
 | Casos | Tres de validación y uno de test (039), este último porque el modelo ya estaba congelado |
+| Videos de respaldo | `docs/video/demo_computador.mp4` (recorrido completo, 110 s) y `docs/video/demo_celular.mp4` (prueba en celular, 70 s) |
 | Publicación | Streamlit Community Cloud y una API en AWS Lambda, probados desde computador y celular (6 de octubre). El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado |
 
 ## Pendiente
 
-- Video de respaldo para la sustentación, desde el computador y con el recorrido completo de la demo
-  (ya hay uno corto grabado en el celular: `docs/video/demo_celular.mp4`).
 - Material del pitch.
 - Línea entre el fragmento y su principal en el visualizador 3 (opcional).

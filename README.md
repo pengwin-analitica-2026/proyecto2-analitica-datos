@@ -46,6 +46,7 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Semana 11: dashboard con los tres visualizadores, orientación y distancia |
 | [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) | Semana 11: despliegue en Streamlit Cloud y AWS Lambda |
 | [`docs/cicd_github_actions.md`](docs/cicd_github_actions.md) | Semana 11: pruebas y despliegue automáticos |
+| [`docs/video/demo_computador.mp4`](docs/video/demo_computador.mp4) | Semana 11: recorrido completo del dashboard publicado, grabado en el computador (110 s, con audio): inferencia corte a corte, tres visualizadores, métricas, latencia y tabla de distancias |
 | [`docs/video/demo_celular.mp4`](docs/video/demo_celular.mp4) | Semana 11: video del dashboard publicado, grabado desde un celular |
 | `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles (el 05 se hizo con D5) |
 
