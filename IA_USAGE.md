@@ -731,7 +731,7 @@ su versión final:
 | Visualizador 1 | MIP estático → isosuperficie 3D | MIP en tres ejes + isosuperficie | 3 → 26, 28 |
 | Post-proceso | `min_size=1` y CASR mejoraban validación | `min_size=12`, sin CASR (no cumplieron la regla) | 18 → 20 |
 | Modelo principal | c2 → D5 | H6 s42 | 18, 21 → 23 |
-| Despliegue | Túnel de Cloudflare desde el Mac | Streamlit Community Cloud + API en AWS Lambda, publicados y probados desde computador y celular. El túnel de Cloudflare que nombra el enunciado no se montó; el comando queda documentado como respaldo | 25, 27 → 30, 31 |
+| Despliegue | Túnel de Cloudflare desde el Mac | Streamlit Community Cloud + API en AWS Lambda, publicados y probados desde computador y celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado | 25, 27 → 30, 31 |
 | Detector de giro | Detectar el giro con geometría (`estimate_angle`) | Descartado; se usa la cabecera del `.mha` | 23 |
 
 **Consultas a test.** Por la regla de la entrada 19, test debía consultarse una sola vez. Se

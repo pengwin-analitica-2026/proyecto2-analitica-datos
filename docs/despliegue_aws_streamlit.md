@@ -13,11 +13,12 @@ Las tres pestañas leen los casos ya exportados (`outputs/demo/<modelo>/<caso>/`
 repositorio. El modelo solo corre en vivo al pulsar el botón del visualizador 2. Si la API no
 responde, el resto del dashboard sigue funcionando.
 
-**Diferencia con el enunciado.** El enunciado pide el dashboard «desplegado en vivo mediante un
-túnel de Cloudflare». No se montó: la demo está publicada en Streamlit Cloud, con una dirección
-fija que se abre desde computador y celular sin depender de que un equipo del grupo esté encendido.
-Si en la sustentación se pide el túnel, se abre en dos comandos desde un equipo con el repositorio y
-`cloudflared` instalados:
+**Diferencia con el enunciado, aprobada por el profesor.** El enunciado pide el dashboard
+«desplegado en vivo mediante un túnel de Cloudflare». El profesor Carlos Ferro aprobó usar otro
+medio de despliegue, y el equipo usó Streamlit Cloud y AWS Lambda: una dirección fija que se abre
+desde computador y celular sin depender de que un equipo del grupo esté encendido. El túnel no se
+montó. Si hiciera falta, se abre en dos comandos desde un equipo con el repositorio y `cloudflared`
+instalados:
 
 ```bash
 streamlit run app/dashboard.py
@@ -96,11 +97,12 @@ Contra la Lambda real, el 6 de octubre:
 Después de integrar la demo con H6 a `main` (6 de octubre), comprobado por Gustavo:
 
 - La Lambda quedó redesplegada con H6 y la inferencia en vivo responde desde el dashboard.
-- El dashboard de Streamlit Cloud abre y funciona desde un celular.
+- El dashboard de Streamlit Cloud abre y funciona desde un celular: los tres visualizadores, la
+  tabla de distancias, la pestaña de métricas y la inferencia en vivo de un corte (753 ms de modelo
+  en la CPU de Lambda). Hay un video de la prueba, de 70 segundos.
 
 Sin verificar todavía:
 
-- El túnel de Cloudflare (no se montó).
 - Costos: con el uso de una demo deberían ser mínimos (Lambda cobra por invocación y ECR por
   almacenamiento, unos 0.5 GB por imagen). Las imágenes viejas de ECR se pueden borrar.
 

@@ -333,7 +333,7 @@ const children = [
     ['10 · Multitarea', 'Modelo con tres cabezas y salida de instancia primario/secundario; evaluación sobre el volumen completo; barrido de ancho, EMA, pérdidas y post-procesos (más de 25 experimentos); ablaciones de CBAM, transfer learning y λ.',
       'Dice por fragmento de 0.787 (31 IDs) a 0.859 en validación. Test: 0.848, con 8 de 9 métricas cumplidas. Diagnóstico: secundarios en contacto y dos casos atípicos (012 y 039).'],
     ['11 · Modelo final y demo', 'Orientación canónica desde la cabecera y aumento geométrico (modelo H6, 3 semillas); visualizadores 2 y 3 y dashboard; demo con H6 y orientación leída de la cabecera; dashboard en Streamlit Community Cloud y API de inferencia en AWS Lambda, con pruebas y despliegue automáticos.',
-      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. El dashboard publicado se probó desde computador y celular. El túnel de Cloudflare no se montó; el comando queda documentado como respaldo.'],
+      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. El dashboard publicado se probó desde computador y celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado.'],
   ], { boldFirst: true, leftAll: true }),
   image('nb_100casos.png', 470, 474),
   caption('Figura A1. Revisión visual de los 100 casos tras el preprocesamiento (contorno rojo: hueso; b: brillo medio del hueso).'),

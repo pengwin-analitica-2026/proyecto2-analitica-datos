@@ -244,7 +244,8 @@ cabecera, en la predicción y en el ground truth. En test, un solo fragmento del
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
 `main` (ver `docs/despliegue_aws_streamlit.md`). Se probó desde el navegador de un computador y de
-un celular. La advertencia de uso no clínico está siempre visible en el dashboard.
+un celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
+enunciado. La advertencia de uso no clínico está siempre visible en el dashboard.
 
 ## 9. Modelos entrenados y pesos en el repositorio
 
