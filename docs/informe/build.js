@@ -217,7 +217,7 @@ const children = [
   P('La cabeza de clasificación decide en cada corte si cada región está presente. Sobre los 4 664 cortes de test (15 casos), con H6 semilla 42:'),
   table([2100, 1050, 1050, 1050, 1050, 1020, 1020, 1020], ['Región', 'VP', 'FP', 'FN', 'VN', 'Precisión', 'Recall', 'F1'], [
     ['Sacro', '2 238', '37', '56', '2 333', '0.984', '0.976', '0.980'],
-    ['Coxal izquierdo', '3 372', '11', '12', '1 269', '0.997', '0.997', '0.997'],
+    ['Coxal izquierdo', '3 372', '11', '12', '1 269', '0.997', '0.996', '0.997'],
     ['Coxal derecho', '3 316', '28', '4', '1 316', '0.992', '0.999', '0.995'],
   ], { boldFirst: true }),
   sp(),
@@ -333,7 +333,7 @@ const children = [
     ['10 · Multitarea', 'Modelo con tres cabezas y salida de instancia primario/secundario; evaluación sobre el volumen completo; barrido de ancho, EMA, pérdidas y post-procesos (más de 25 experimentos); ablaciones de CBAM, transfer learning y λ.',
       'Dice por fragmento de 0.787 (31 IDs) a 0.859 en validación. Test: 0.848, con 8 de 9 métricas cumplidas. Diagnóstico: secundarios en contacto y dos casos atípicos (012 y 039).'],
     ['11 · Modelo final y demo', 'Orientación canónica desde la cabecera y aumento geométrico (modelo H6, 3 semillas); visualizadores 2 y 3 y dashboard; demo con H6 y orientación leída de la cabecera; dashboard en Streamlit Community Cloud y API de inferencia en AWS Lambda, con pruebas y despliegue automáticos.',
-      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. El túnel de Cloudflare quedó como opción y no se montó. Pendiente: probar el dashboard publicado desde un celular.'],
+      'Validación 0.870 y test 0.875 ± 0.001: 9 de 9 métricas cumplidas. Latencia: 72 ms por corte en GPU y 250 ms en CPU. El dashboard publicado se probó desde computador y celular. El túnel de Cloudflare no se montó; el comando queda documentado como respaldo.'],
   ], { boldFirst: true, leftAll: true }),
   image('nb_100casos.png', 470, 474),
   caption('Figura A1. Revisión visual de los 100 casos tras el preprocesamiento (contorno rojo: hueso; b: brillo medio del hueso).'),

@@ -243,10 +243,25 @@ cabecera, en la predicción y en el ground truth. En test, un solo fragmento del
 
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda con H6 en CPU; los dos se vuelven a desplegar en cada push a
-`main` (ver `docs/despliegue_aws_streamlit.md`). Se abre desde el navegador de un computador o de un
-celular. La advertencia de uso no clínico está siempre visible en el dashboard.
+`main` (ver `docs/despliegue_aws_streamlit.md`). Se probó desde el navegador de un computador y de
+un celular. La advertencia de uso no clínico está siempre visible en el dashboard.
 
-## 9. Reproducción
+## 9. Modelos entrenados y pesos en el repositorio
+
+El sistema es un solo modelo multitarea, así que hay un model card. Los pesos versionados son:
+
+| Archivo | Qué es | En qué difiere del entregado |
+|---|---|---|
+| `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth` | **Modelo entregado** (H6, semilla 42) | — |
+| `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s43.pth` y `_s44.pth` | H6 con otras semillas | Solo la semilla; sirven para medir la variación (secciones 4.1 y 4.2) |
+| `outputs/s10/d5_ema_w32_e60_s42.pth` | D5, el modelo de la primera evaluación en test | Misma arquitectura; sin orientación canónica y sin aumento geométrico. Espera los volúmenes tal como están guardados |
+| `outputs/gamma/w10g_384neg.pth` y `w10g_sec3.pth` | Primera versión de la Semana 10, usada como línea base | Backbone de 16 canales y entrenamiento en etapas; evaluada sobre una muestra de cortes, no sobre el volumen completo |
+
+Datos de entrenamiento, alcances, limitaciones y advertencia de uso son los mismos para todos:
+los 70 casos de entrenamiento de PENGWIN (sección 2), las limitaciones de la sección 6 y el uso
+exclusivamente académico.
+
+## 10. Reproducción
 
 Los comandos para regenerar los datos, entrenar H6 y evaluarlo están en el `README.md`. La
 configuración congelada de la evaluación en test está en `docs/decisiones_semana10.md`

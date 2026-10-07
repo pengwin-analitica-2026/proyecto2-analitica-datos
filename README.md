@@ -36,8 +36,8 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | Documento | Contenido |
 |---|---|
 | [`MODEL_CARD.md`](MODEL_CARD.md) | Modelo, datos, métricas, ablaciones, protocolo de test y limitaciones |
-| [`docs/mini_paper/Mini_paper_PENGWIN.pdf`](docs/mini_paper/Mini_paper_PENGWIN.pdf) | Mini-paper de 5 páginas: método, resultados y limitaciones (fuente en `.docx` y `build.js`) |
-| [`docs/informe/Informe_tecnico_PENGWIN.docx`](docs/informe/Informe_tecnico_PENGWIN.docx) | Informe técnico completo |
+| [`docs/mini_paper/Mini_paper_PENGWIN.pdf`](docs/mini_paper/Mini_paper_PENGWIN.pdf) | **Informe técnico corto con estructura de mini-paper** (entregable, 8 páginas): decisiones de arquitectura, ablación, matriz de confusión, cinco peores casos y distancia predicha contra la real. Fuente en `.docx` y `build.js` |
+| [`docs/informe/Informe_tecnico_PENGWIN.docx`](docs/informe/Informe_tecnico_PENGWIN.docx) | Versión extendida del informe (21 páginas), con el preprocesamiento, la investigación del Dice por fragmento y el trabajo por semana |
 | [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
 | [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
 | [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |

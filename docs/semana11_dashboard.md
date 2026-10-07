@@ -124,10 +124,9 @@ abiertos en test.
 | Orientación | Sale de la cabecera del `.mha`, no de la lista de casos, para que sirva con volúmenes que no sean de PENGWIN |
 | Modelos en la demo | Solo el entregado (H6). El selector de modelos se descartó y los casos exportados con D5 se borraron |
 | Casos | Tres de validación y uno de test (039), este último porque el modelo ya estaba congelado |
-| Publicación | Streamlit Community Cloud y una API en AWS Lambda; el túnel de Cloudflare no se montó |
+| Publicación | Streamlit Community Cloud y una API en AWS Lambda, probados desde computador y celular (6 de octubre). El túnel de Cloudflare no se montó; el comando está en `docs/despliegue_aws_streamlit.md` |
 
 ## Pendiente
 
-- Probar el dashboard publicado desde un celular.
 - Video de respaldo de la demo y material del pitch.
 - Línea entre el fragmento y su principal en el visualizador 3 (opcional).
