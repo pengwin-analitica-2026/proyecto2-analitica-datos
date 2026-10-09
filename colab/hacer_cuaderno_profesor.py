@@ -15,6 +15,7 @@ El token de Kaggle se lee de los secretos de Colab; nunca se escribe en el noteb
 Uso, desde la raíz del repo:  python colab/hacer_cuaderno_profesor.py
 Volver a generarlo después de cambiar src/: el cuaderno lleva una copia del código.
 """
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "kaggle"))
 from lanzar import ROOT, current_commit, pack_code
 
 H6 = "h6_auggeo_rot35_canon_ema_w32_e60_s42"
+SHA_H6 = hashlib.sha256((ROOT / "outputs" / "s10" / f"{H6}.pth").read_bytes()).hexdigest()
 BASE = ("--size 384 --epochs 60 --base-channels 32 --secondary-weight 3 --augment --cosine "
         "--batch-size 16 --per-epoch 2500 --max-minutes 170 --eval-every 10 --seed 42 "
         "--aug-geo 1.0 --aug-rot-deg 35 --canonical")
@@ -77,14 +79,23 @@ for intento in range(4):
 '''),
     code(f'''
 # 4) Checkpoint de H6: subir outputs/s10/{H6}.pth desde el repo (botón de archivos o este diálogo)
-import pathlib, shutil
+# El archivo pesa 11 MB: se puede subir entero o en dos partes (h6.pth.part0 y .part1, de `split`).
+import hashlib, pathlib, shutil
 SALIDA = pathlib.Path("/content/salida"); SALIDA.mkdir(exist_ok=True)
 H6 = SALIDA / "{H6}.pth"
 if not H6.exists():
     from google.colab import files
-    for nombre in files.upload():
-        shutil.move(nombre, H6)
-print(H6, H6.stat().st_size // 1024, "KB")
+    for _ in range(2):
+        for nombre in files.upload():
+            shutil.move(nombre, SALIDA / nombre)
+        if H6.exists():
+            break
+    partes = sorted(SALIDA.glob("*.part*"))
+    if not H6.exists() and partes:
+        H6.write_bytes(b"".join(p.read_bytes() for p in partes))
+huella = hashlib.sha256(H6.read_bytes()).hexdigest()
+assert huella == "{SHA_H6}", "el checkpoint no es el de H6 del repo"
+print(H6, H6.stat().st_size // 1024, "KB | sha256 correcto")
 '''),
     code(f'''
 # 5) Lanzar los dos entrenamientos en segundo plano (comparten la L4, como en la semana 10)
