@@ -57,7 +57,8 @@
   (`torch.cuda.amp`), sin preentrenamiento.
 - **Pérdida compuesta:** detección 1.0, clasificación 0.5, semántica 2.0 (CE) y 1.0 (Dice), instancia
   1.0 (CE, con secundarios ×3 y fondo ×0.1) y 1.0 (Dice). Cada peso se justifica con una medida del
-  dataset o un barrido; la tabla de calibración está en el informe (sección 4).
+  dataset o un barrido; la tabla de calibración está en el informe (sección 4). Los números que no
+  se barrieron están marcados así en `docs/hiperparametros.md`.
 - **Aumento de datos (solo en entrenamiento):** aumento geométrico (escala, proporción, traslación
   y rotación de ±35°) e intensidad. No se aplica en validación ni en test.
 - **Pesos:** promedio exponencial (EMA 0.999).
@@ -196,7 +197,9 @@ misma.
 | Dice 3D principal / secundario | 0.921 / 0.701 | 0.909 / 0.682 | 0.931 / 0.756 |
 | ASSD / HD95 | 4.08 / 17.99 mm | 3.02 / 16.33 mm | 2.06 / 11.55 mm |
 
-La distancia se mide borde a borde en 3D con `distance_transform_edt` y el espaciado de la
+ASSD y HD95 de esta tabla son de los secundarios emparejados. La versión del challenge, con todos los
+fragmentos (principales incluidos), se calcula con `infer_volume.py --surface-metrics` (sección 14 de
+la bitácora). La distancia se mide borde a borde en 3D con `distance_transform_edt` y el espaciado de la
 cabecera, en la predicción y en el ground truth. En test, un solo fragmento del caso 007 concentra el
 79 % del error: la predicción le agrega un componente aislado lejos del hueso.
 

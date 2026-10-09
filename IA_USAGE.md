@@ -27,7 +27,7 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 |---|---|---|---|
 | Jacobo | Claude (claude.ai) | *(completar)* | 1–7 |
 | María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28 |
-| Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–33 |
+| Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–34 |
 | Federico | *(completar)* | *(completar)* | 29 |
 
 Algunas entradas citan documentos que ya no están en el repositorio (`docs/plan_semana10.md`,
@@ -647,6 +647,34 @@ pedido de Gustavo con los prompts copiados tal cual.
   Streamlit Cloud y Lambda. Los dos los detectó Gustavo al volver a pasar la lista de entregables.
   Al recalcular la matriz de confusión apareció además un redondeo mal hecho en el informe largo
   (recall del coxal izquierdo 0.996, no 0.997).
+
+### 34. Pedidos del profesor: γ del CBAM, EMA, hiperparámetros, HD95/ASSD y cuantización
+
+- **Integrante y herramienta:** Gustavo · Claude (Cowork), `claude-sonnet-5-5` y `claude-opus-5-5`.
+  8 y 9 de octubre de 2026.
+- **Prompts exactos (extractos):**
+  > Añadir poder visualizar el aporte del CBAM por cada bloque de la red, para ver su aporte ( El profesor lo llama el valor gamma OJO no es el valor gamma 1.5, no confundirse) […] Justificación de la selección de Ema […] autorizado por el profe solo en la segmentación […] el profe dio la idea de compactar es decir Quantizar el modelo
+
+  > lo que dijo el profe es que no había que realizarlo cada época, sino que el final sí igual
+
+  > ya que vamos a reentrenar, hace sentido sacar estas métricas que dan bonificación […] En la cuantización, ¿por qué probar solo `int8`? […] preparemos todo para que podamos hacerlo y volver a sacar todas las métricas
+- **Qué produjo la IA:** la lectura del γ final de las dos corridas que ya lo tenían (una de ellas
+  sacada del checkpoint, porque el JSON no lo guardaba); el guardado del γ final en
+  `train_s10.py`; la opción `--ema-scope segmentacion`; HD95 y ASSD para todos los fragmentos;
+  `src/cuantizar.py` con sus pruebas; `docs/hiperparametros.md`, `docs/cuantizacion.md`; los kernels
+  `g1` y `e1`; y el cuaderno de Colab que corre todo en una sesión.
+- **Qué se hizo a mano:** Gustavo trajo los pedidos del profesor y la aclaración de que basta el γ
+  final, no el de cada época. Él lanza el cuaderno de Colab y decide en grupo la métrica principal.
+- **Análisis crítico:** tres hallazgos salieron al revisar el código en vez de responder de
+  memoria. (1) H6 aplica el EMA a toda la red, no solo a la segmentación como lo autorizó el
+  profesor; por eso existe la corrida `e1`. (2) En el multitarea el γ sale del rango [0, 1]
+  (−1.32 en el último bloque), así que no se puede presentar como "porcentaje de atención" sin
+  aclararlo. (3) La primera prueba de int8 destruyó la segmentación (Dice 0.02). Se localizó la
+  causa dejando en fp32 un bloque a la vez: las convoluciones transpuestas. Una prueba con datos
+  aleatorios había dado 96 % de acuerdo y escondía el problema; el fallo solo apareció con cortes
+  reales. Al escribir la tabla de hiperparámetros, la IA había marcado como "sin barrer" pesos que
+  el mini-paper ya justificaba con medidas (clasificación 0.5). Se corrigió contra el mini-paper.
+  El token de Kaggle se pegó en el chat: la IA no lo usó y recomendó revocarlo.
 
 ---
 

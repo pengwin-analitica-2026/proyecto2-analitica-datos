@@ -5,7 +5,8 @@ Por caso: predice todos los cortes (``evaluate_case``), arma el volumen de IDs c
 
 - Dice e IoU 3D por fragmento (principal y secundarios);
 - distancia en mm de cada fragmento secundario al principal de su región, predicha y real,
-  con su error absoluto; opcionalmente ASSD y HD95 contra el fragmento real.
+  con su error absoluto; opcionalmente ASSD y HD95 contra el fragmento real;
+- con ``--surface-metrics``, además, ASSD y HD95 de todos los fragmentos (como en el challenge).
 
 El spacing sale de ``index.csv`` ajustado a la resolución del caché estirado. Uso:
 
@@ -30,7 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_case_cache import load_case_cache
 from evaluate_volumes import cases_of_split, evaluate_case, load_model
 from volume_postprocess import (cache_spacing_xyz, fragment_distance_table, postprocess_3d,
-                                summarize_volume)
+                                summarize_surface, summarize_volume, surface_metrics_table)
 
 
 def read_index(cache_dir: Path) -> dict[str, dict]:
@@ -57,6 +58,9 @@ def aggregate(cases: list[dict]) -> dict:
         values = [r[key] for r in rows if key in r]
         if values:
             out[f"{key}_media"] = float(np.mean(values))
+    surface = [r for c in cases for r in c.get("superficie", [])]
+    if surface:   # todos los fragmentos reales del split, sobre el volumen entregado
+        out["superficie"] = summarize_surface(surface)
     gt = [r["ground_truth_mm"] for r in rows if r["predicted_mm"] is not None]
     pred = [r["predicted_mm"] for r in rows if r["predicted_mm"] is not None]
     if len(gt) > 2 and np.std(gt) > 0 and np.std(pred) > 0:
@@ -76,7 +80,8 @@ def main() -> None:
     parser.add_argument("--min-voxels", type=int, default=30)
     parser.add_argument("--distance-nofill", action="store_true",
                         help="Mide las distancias sobre el volumen sin rellenar huecos entre fragmentos.")
-    parser.add_argument("--surface-metrics", action="store_true", help="Agrega ASSD y HD95.")
+    parser.add_argument("--surface-metrics", action="store_true", help="Agrega ASSD y HD95: de los secundarios en la tabla de distancias "
+                        "y de todos los fragmentos (principales y secundarios) en 'superficie'.")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -105,7 +110,9 @@ def main() -> None:
         dist_volume = (postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels,
                                       fill_unlabeled=False) if args.distance_nofill else volume)
         distances = fragment_distance_table(dist_volume, case["labels"], spacing, args.surface_metrics)
-        cases.append({"case_id": case_id, "n_slices": int(len(volume)),
+        surface = (surface_metrics_table(volume, case["labels"], spacing)
+                   if args.surface_metrics else None)
+        cases.append({**({"superficie": surface} if surface is not None else {}),"case_id": case_id, "n_slices": int(len(volume)),
                       "spacing_xyz_mm": spacing, "segundos_modelo": round(t_model, 1),
                       "segundos_total": round(t_total, 1),
                       "volumen": summarize_volume(volume, case["labels"]), "distancias": distances})

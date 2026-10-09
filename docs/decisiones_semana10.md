@@ -1,7 +1,8 @@
 # Bitácora de decisiones — Semana 10
 
 Registro cronológico de lo que se entrenó, lo que se decidió y por qué, desde la línea base hasta
-el modelo final (H6). Cerrada el 6 de octubre de 2026. Las cifras son de **validación** (15 casos,
+el modelo final (H6). Cerrada el 6 de octubre de 2026; la sección 14 agrega los pedidos del
+profesor del 8 de octubre. Las cifras son de **validación** (15 casos,
 5047 cortes, subconjunto `todo`, con TTA espejo), salvo que se diga otra cosa. Las dos evaluaciones
 en test están en las secciones 11 y 12.5.
 
@@ -14,6 +15,8 @@ Es el documento de la Semana 10. Lo demás está en un solo sitio cada cosa:
 | Tabla de todas las corridas | `outputs/s10/resumen_experimentos.md` |
 | Recorrido ejecutable, con tablas y figuras | `notebooks/04_semana10_pipeline_multitarea.ipynb` |
 | Uso de IA | `IA_USAGE.md` |
+| Por qué cada número del modelo | `docs/hiperparametros.md` |
+| Cuantización | `docs/cuantizacion.md` |
 
 ### Qué archivo hace cada pieza
 
@@ -805,3 +808,28 @@ No se hizo y queda como trabajo futuro:
   suben los secundarios perdidos en 3D en test (de 5.6 % a 7.8 %).
 - Asignación multi-celda en la detección, segundo pase por región, resolución 256 y 512, umbral de
   clasificación por clase y pesos de FundidoraPC.
+
+## 14. Pedidos del profesor después de la entrega (8 de octubre)
+
+| Pedido | Respuesta | Dónde |
+|---|---|---|
+| Ver el aporte del CBAM en cada bloque con el valor γ (no el gamma 1.5 de la imagen) y reportar el valor final | `train_s10.py` guarda `gamma_final` y `gamma_checkpoint` en el JSON. Corrida `g1`: receta de H6 con CBAM en los 3 bloques y γ aprendible | `docs/hiperparametros.md`, sección 3 |
+| Justificar el EMA, autorizado solo para la segmentación | La ganancia medida del EMA está en la segmentación (secundarios +0.024 de media con 3 semillas). H6 promedia toda la red, así que se agregó `--ema-scope segmentacion` y la corrida `e1` para compararlo | `docs/hiperparametros.md`, sección 5 |
+| Elegir la métrica principal | Propuesta: Dice por fragmento (instancias), que ya es la que decide todo el protocolo. Falta la confirmación del grupo | — |
+| Justificar cada número de la arquitectura | Una fila por número con su origen: experimento propio, literatura, cómputo o sin barrer | `docs/hiperparametros.md` |
+| Limitaciones y mejoras | Ya están en `MODEL_CARD.md` (sección 6). Falta decir, para cada mejora, si se aplica o no y por qué | — |
+| Cuantizar el modelo sin perder Dice | `src/cuantizar.py` compara fp32, fp16, bf16 e int8. Hallazgo: las convoluciones transpuestas no toleran int8 y se dejan en fp32 | `docs/cuantizacion.md` |
+| HD95 y ASSD por fragmento (extensión opcional del enunciado) | Antes solo se medían en los secundarios emparejados (sección 4.9 del model card). `infer_volume.py --surface-metrics` ahora los da para todos los fragmentos, con los perdidos contados aparte | `src/volume_postprocess.py` |
+
+**γ final ya medido.** Detección sola (semana 9): 0.089 / −0.106 / 0.108 en los bloques 1/4, 1/8 y
+1/16. Multitarea B0 (sección 3.2, sacado del checkpoint): −0.630 / 0.716 / −1.319. En el multitarea
+γ sale del rango [0, 1], así que no se puede leer como una fracción de atención. `g1` lo repite con
+la receta de H6.
+
+**Cómo se corre todo.** En una sola sesión de Colab con L4:
+`notebooks/colab/colab_pedidos_profesor.ipynb` (se genera con `python colab/hacer_cuaderno_profesor.py`).
+Entrena `g1` y `e1` a la vez y, mientras tanto, calcula HD95/ASSD de H6 en validación y test. Al
+final evalúa `g1` y `e1` en validación y cuantiza H6 en CPU. Los kernels equivalentes para Kaggle
+están en `kaggle/gpu/g1_*.py` y `kaggle/gpu/e1_*.py`. En test solo se agregan métricas al modelo ya
+congelado: nada de esto elige con test.
+

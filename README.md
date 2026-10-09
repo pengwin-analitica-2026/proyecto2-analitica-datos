@@ -42,6 +42,8 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | [`docs/resumen_semana8.md`](docs/resumen_semana8.md) | Dataset, preprocesamiento, EDA y Visualizador 1 |
 | [`docs/resumen_semana9.md`](docs/resumen_semana9.md) | Backbone, CBAM, detección y overfit intencional |
 | [`docs/decisiones_semana10.md`](docs/decisiones_semana10.md) | Semana 10: bitácora de experimentos, de la línea base a H6, y las dos evaluaciones en test |
+| [`docs/hiperparametros.md`](docs/hiperparametros.md) | Por qué cada número del modelo (arquitectura, pérdida, entrenamiento, umbrales) y cuáles no se barrieron |
+| [`docs/cuantizacion.md`](docs/cuantizacion.md) | Cuantización de H6 (fp16, bf16, int8) y por qué no int4 |
 | [`outputs/s10/resumen_experimentos.md`](outputs/s10/resumen_experimentos.md) | Semana 10: tabla de todas las corridas y dónde está cada archivo de resultados |
 | [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Semana 11: dashboard con los tres visualizadores, orientación y distancia |
 | [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) | Semana 11: despliegue en Streamlit Cloud y AWS Lambda |
@@ -60,7 +62,8 @@ src/        scripts y módulos (ver los comandos abajo)
 tests/      pruebas automáticas
 notebooks/  notebooks de seguimiento por semana
 kaggle/     kernels de entrenamiento en GPU (uno por receta)
-colab/      genera el cuaderno de Colab que entrena H6 (notebooks/colab/colab_s10.ipynb)
+colab/      genera los cuadernos de Colab: el que entrena H6 (colab_s10.ipynb) y el de los pedidos
+            del profesor (colab_pedidos_profesor.ipynb)
 app/        dashboard Streamlit
 api/        API de inferencia
 deploy/     scripts de despliegue

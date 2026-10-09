@@ -2,6 +2,7 @@
 profunda, EMA, sobremuestreo de secundarios) deben entrenar, guardar y evaluarse de punta a punta."""
 
 import csv
+import json
 import subprocess
 import sys
 import tempfile
@@ -125,6 +126,38 @@ class EndToEndTests(unittest.TestCase):
                  "--cache-dir", str(root / "cache_64"), "--split", "val", "--batch-size", "4",
                  "--output", str(result)], check=True, capture_output=True)
             self.assertTrue(result.exists())
+
+    def test_ema_only_on_segmentation_head(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_cache(root)
+            out = root / "e.pth"
+            subprocess.run(
+                [sys.executable, str(SRC / "train_s10.py"), "--cache-root", str(root), "--size", "64",
+                 "--epochs", "1", "--batch-size", "4", "--base-channels", "4", "--margin", "1",
+                 "--val-stride", "2", "--per-epoch", "8", "--ema", "0.9", "--ema-scope", "segmentacion",
+                 "--output", str(out)], check=True, capture_output=True)
+            self.assertEqual(torch.load(out, map_location="cpu", weights_only=False)["ema_scope"], "segmentacion")
+
+    def test_learnable_gamma_final_values_are_saved(self):
+        """Con CBAM en 3 bloques y gamma aprendible, el JSON guarda el gamma final de cada bloque."""
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_cache(root)
+            out = root / "g.pth"
+            subprocess.run(
+                [sys.executable, str(SRC / "train_s10.py"), "--cache-root", str(root), "--size", "64",
+                 "--epochs", "2", "--batch-size", "4", "--base-channels", "4", "--margin", "1",
+                 "--val-stride", "2", "--eval-every", "1", "--per-epoch", "10", "--ema", "0.9",
+                 "--cbam", "3", "--learnable-gamma", "--output", str(out)], check=True, capture_output=True)
+            result = json.loads(out.with_suffix(".json").read_text())
+            self.assertEqual(set(result["gamma_final"]), {"etapa_4", "etapa_8", "etapa_16"})
+            self.assertEqual(set(result["gamma_checkpoint"]), {"etapa_4", "etapa_8", "etapa_16"})
+            self.assertIn("gamma_etapa_16", result["history"][-1])
+            # El gamma final es el de la última evaluación (pesos EMA), que se hace en la última época.
+            self.assertEqual(result["history"][-1]["epoch"], 2)
+            for k, v in result["gamma_final"].items():
+                self.assertEqual(result["history"][-1][f"gamma_{k}"], v)
 
 
 if __name__ == "__main__":

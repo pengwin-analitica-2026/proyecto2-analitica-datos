@@ -6,7 +6,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from volume_postprocess import (cache_spacing_xyz, fragment_distance_table, match_fragments,
-                                postprocess_3d, surface_distances)
+                                postprocess_3d, summarize_surface, surface_distances,
+                                surface_metrics_table)
 
 
 def synthetic_volume():
@@ -64,6 +65,25 @@ class PostprocessTests(unittest.TestCase):
         self.assertEqual((assd, hd95), (0.0, 0.0))
         assd, hd95 = surface_distances(a, b, (1, 1, 1))
         self.assertGreater(assd, 0); self.assertLessEqual(assd, hd95 + 1e-6)
+
+    def test_surface_metrics_cover_primary_and_secondary(self):
+        truth = synthetic_volume()
+        rows = {r["gt_id"]: r for r in surface_metrics_table(truth, truth, (1.0, 1.0, 1.0))}
+        self.assertEqual(set(rows), {11, 12})
+        self.assertTrue(rows[11]["primary"]); self.assertFalse(rows[12]["primary"])
+        self.assertEqual((rows[11]["assd_mm"], rows[11]["hd95_mm"]), (0.0, 0.0))
+
+    def test_surface_metrics_count_missed_fragment_apart(self):
+        truth = synthetic_volume()
+        pred = truth.copy(); pred[pred == 12] = 0
+        pred = np.roll(pred, 2, axis=2)          # principal desplazado 2 vóxeles en x
+        rows = surface_metrics_table(pred, truth, (0.5, 1.0, 1.0))
+        summary = summarize_surface(rows)
+        self.assertEqual(summary["perdidos_secundario"], 1)
+        self.assertEqual(summary["perdidos_principal"], 0)
+        self.assertNotIn("hd95_mm_secundario_media", summary)
+        # 2 vóxeles de 0.5 mm en x: el HD95 del principal es 1 mm.
+        self.assertAlmostEqual(summary["hd95_mm_principal_media"], 1.0, places=6)
 
     def test_match_fragments_uses_each_prediction_once(self):
         truth = synthetic_volume()

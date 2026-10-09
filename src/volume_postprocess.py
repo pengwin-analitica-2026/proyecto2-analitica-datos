@@ -10,7 +10,8 @@ hueso, ni si un fragmento pequeño que aparece en un solo corte es real. Aquí s
    se absorben en el principal, así no se pierden píxeles de la región.
 
 Las distancias salen de ``fragment_distances`` (EDT con el spacing del header). Se agregan
-ASSD y HD95 por fragmento, que el enunciado deja como opcionales.
+ASSD y HD95 por fragmento, que el enunciado deja como opcionales: ``surface_metrics_table`` los
+calcula para todos los fragmentos reales (principales y secundarios), como en el challenge.
 """
 
 from __future__ import annotations
@@ -131,6 +132,43 @@ def match_fragments(prediction: np.ndarray, truth: np.ndarray) -> list[dict]:
             rows.append({"gt_id": gt_id, "pred_id": best, "dice": dice, "iou": best_iou,
                          "volume_voxels": int(gt.sum()), "primary": gt_id in REGION_STARTS})
     return rows
+
+
+def surface_metrics_table(prediction: np.ndarray, truth: np.ndarray,
+                          spacing_xyz: tuple[float, float, float]) -> list[dict]:
+    """ASSD y HD95 (mm) de **cada** fragmento real, principal o secundario, como en el challenge.
+
+    Cada fragmento real se empareja en 3D con el predicho de mayor IoU de su región
+    (``match_fragments``). Si no tiene pareja, ASSD y HD95 quedan en None y se cuenta aparte
+    como perdido: así no se mezcla "lo encontró mal" con "no lo encontró".
+    """
+    rows = []
+    for match in match_fragments(prediction, truth):
+        row = {"gt_id": match["gt_id"], "primary": match["primary"], "pred_id": match["pred_id"],
+               "dice": match["dice"], "volume_voxels": match["volume_voxels"],
+               "assd_mm": None, "hd95_mm": None}
+        if match["pred_id"] is not None:
+            row["assd_mm"], row["hd95_mm"] = surface_distances(
+                prediction == match["pred_id"], truth == match["gt_id"], spacing_xyz)
+        rows.append(row)
+    return rows
+
+
+def summarize_surface(rows: list[dict]) -> dict:
+    """Media y mediana de ASSD/HD95 por grupo (todos, principal, secundario) y fragmentos perdidos."""
+    out: dict = {}
+    for label, keep in (("todos", lambda r: True), ("principal", lambda r: r["primary"]),
+                        ("secundario", lambda r: not r["primary"])):
+        group = [r for r in rows if keep(r)]
+        found = [r for r in group if r["assd_mm"] is not None]
+        out[f"n_{label}"] = len(group)
+        out[f"perdidos_{label}"] = len(group) - len(found)
+        for key in ("assd_mm", "hd95_mm"):
+            if found:
+                values = [r[key] for r in found]
+                out[f"{key}_{label}_media"] = float(np.mean(values))
+                out[f"{key}_{label}_mediana"] = float(np.median(values))
+    return out
 
 
 def fragment_distance_table(prediction: np.ndarray, truth: np.ndarray,

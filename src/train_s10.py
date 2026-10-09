@@ -18,6 +18,7 @@ ellas el comportamiento es el de B1):
 - ``--focal-gamma`` y ``--tversky-beta``: pérdidas para fragmentos pequeños;
 - ``--deep-supervision-weight``: salidas auxiliares en el decodificador;
 - ``--ema``: promedio móvil exponencial de los pesos (se evalúa y guarda el promedio);
+  ``--ema-scope segmentacion`` lo limita a la cabeza de segmentación;
 - ``--secondary-oversample``: muestrea más los cortes con fragmentos secundarios;
 - ``--backbone-init``: pesos del backbone preentrenados con ``pretrain_backbone.py``.
 
@@ -235,6 +236,8 @@ def main() -> None:
     parser.add_argument("--tversky-beta", type=float, default=0.0)
     parser.add_argument("--deep-supervision-weight", type=float, default=0.0)
     parser.add_argument("--ema", type=float, default=0.0, help="Decaimiento del promedio móvil (0 = apagado).")
+    parser.add_argument("--ema-scope", choices=["todo", "segmentacion"], default="todo",
+                        help="Pesos que promedia el EMA: toda la red (H6) o solo la cabeza de segmentación.")
     parser.add_argument("--secondary-oversample", type=float, default=1.0)
     parser.add_argument("--canonical", action="store_true",
                         help="Lleva los 34 casos guardados en LPI a la orientación común (orientacion.py).")
@@ -311,10 +314,15 @@ def main() -> None:
                  if args.ema > 0 else None)
     updates = 0
 
+    def ema_key(key: str) -> bool:
+        """--ema-scope segmentacion: solo la cabeza de segmentación se promedia; el resto queda
+        con los pesos del último paso (el backbone es compartido, así que no se promedia)."""
+        return args.ema_scope == "todo" or key.startswith("segmentation_head.")
+
     def ema_update() -> None:
         decay = min(args.ema, (1 + updates) / (10 + updates))
         for key, value in model.state_dict().items():
-            if value.dtype.is_floating_point:
+            if value.dtype.is_floating_point and ema_key(key):
                 ema_state[key].mul_(decay).add_(value.detach(), alpha=1 - decay)
             else:
                 ema_state[key].copy_(value)
@@ -340,12 +348,19 @@ def main() -> None:
         return {"model": state, "base_channels": args.base_channels, "instance_mode": args.instance_mode,
                 "in_channels": in_channels, "context": args.context,
                 "deep_supervision": args.deep_supervision_weight > 0, "ema": args.ema,
+                "ema_scope": args.ema_scope,
                 "use_cbam": use_cbam, "cbam_stages": cbam_stages, "canonical": args.canonical,
                 "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "cosine": args.cosine,
                 "input_size": args.size, "mode": args.mode, "seed": args.seed,
                 "fracture_weight": args.fracture_weight, "secondary_weight": args.secondary_weight,
                 "best_validation": metrics, "args": vars(args)}
 
+    def gamma_values(state: dict) -> dict[str, float]:
+        """gamma por bloque leído de un state_dict (vacío si no hay gamma aprendible)."""
+        prefix = "backbone.gammas."
+        return {k[len(prefix):]: round(float(v), 6) for k, v in state.items() if k.startswith(prefix)}
+
+    gammas: dict[str, float] = {}
     stopped_early = False
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -395,7 +410,9 @@ def main() -> None:
                 eval_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             score = (metrics["segmentation_dice_macro"] + metrics["detection_map50"]
                      + metrics["instance_dice_matched"])
-            history.append({"epoch": epoch, "loss": float(np.mean(losses)), "score": score, **metrics})
+            gammas = gamma_values(eval_state)
+            history.append({"epoch": epoch, "loss": float(np.mean(losses)), "score": score, **metrics,
+                            **{f"gamma_{k}": v for k, v in gammas.items()}})
             if score > best_score:
                 best_score, best_metrics = score, metrics
                 best_state = eval_state
@@ -411,7 +428,13 @@ def main() -> None:
             break
 
     metrics_path = Path(args.metrics_output) if args.metrics_output else out_path.with_suffix(".json")
+    if args.learnable_gamma:
+        # Lo que pidió el profesor: el valor final de gamma en cada bloque (pesos EMA si --ema),
+        # y el del checkpoint guardado, que es el que se evalúa.
+        print("γ final por bloque: " + " ".join(f"{k}={v:+.4f}" for k, v in gammas.items()), flush=True)
     metrics_path.write_text(json.dumps({"best": best_metrics, "history": history,
+                                        "gamma_final": gammas if args.learnable_gamma else {},
+                                        "gamma_checkpoint": gamma_values(best_state) if best_state else {},
                                         "stopped_early": stopped_early, "args": vars(args),
                                         "minutes": (time.time() - started) / 60}, indent=2))
     print(f"Checkpoint: {out_path} | métricas: {metrics_path}", flush=True)
