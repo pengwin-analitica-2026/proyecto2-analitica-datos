@@ -1,0 +1,60 @@
+{
+  "casos": [
+    {
+      "caso": "012",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": 22.75,
+      "simetria": 0.754,
+      "simetria_sin_girar": 0.561,
+      "corregir": true,
+      "error_-60": 0.25,
+      "error_-30": 0.25,
+      "error_-20": 0.0,
+      "error_-10": 0.25,
+      "error_+10": 0.0,
+      "error_+20": 1.75,
+      "error_+30": 0.25,
+      "error_+60": 0.25
+    }
+  ],
+  "resumen_giros": {
+    "-60°": {
+      "error_medio_abs": 0.25,
+      "error_max_abs": 0.25
+    },
+    "-30°": {
+      "error_medio_abs": 0.25,
+      "error_max_abs": 0.25
+    },
+    "-20°": {
+      "error_medio_abs": 0.0,
+      "error_max_abs": 0.0
+    },
+    "-10°": {
+      "error_medio_abs": 0.25,
+      "error_max_abs": 0.25
+    },
+    "+10°": {
+      "error_medio_abs": 0.0,
+      "error_max_abs": 0.0
+    },
+    "+20°": {
+      "error_medio_abs": 1.75,
+      "error_max_abs": 1.75
+    },
+    "+30°": {
+      "error_medio_abs": 0.25,
+      "error_max_abs": 0.25
+    },
+    "+60°": {
+      "error_medio_abs": 0.25,
+      "error_max_abs": 0.25
+    }
+  }
+}
