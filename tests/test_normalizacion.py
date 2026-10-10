@@ -156,6 +156,59 @@ class TestPaso2GiroAxial(unittest.TestCase):
         self.assertEqual(s.shape, (50, 50))     # x a 0.5 mm → la mitad de píxeles a 1 mm
 
 
+def _a_pixeles(silueta_mm, mm_x, mm_y):
+    """Dibuja una silueta física (1 mm/píxel) en una grilla de píxeles no cuadrados, como el caché."""
+    return (ndi.zoom(silueta_mm, (1 / mm_y, 1 / mm_x), order=0) > 0.5).astype(np.uint8)
+
+
+def _dice(a, b):
+    a, b = a > 0, b > 0
+    return 2 * np.logical_and(a, b).sum() / (a.sum() + b.sum())
+
+
+class TestPaso2EnCache(unittest.TestCase):
+    """El paso 2 aplicado al caché del modelo (uint8, píxeles posiblemente no cuadrados)."""
+
+    def test_giro_en_mm_igual_a_rotate_con_pixeles_cuadrados(self):
+        v = np.zeros((2, 80, 80), dtype=np.float32)
+        v[:, 20:35, 15:60] = 1
+        v[:, 50:70, 30:40] = 2
+        for angulo in (20, -35):
+            esperado = ndi.rotate(v, -angulo, axes=(1, 2), reshape=False, order=1)
+            obtenido = nz.corregir_giro_axial(v, angulo, relleno=0, mm_xy=(0.7, 0.7))
+            np.testing.assert_allclose(obtenido, esperado, atol=1e-5)
+
+    def test_umbral_u8_de_250_hu(self):
+        self.assertAlmostEqual(nz.umbral_u8(250), 68.58, places=1)
+        self.assertEqual(nz.umbral_u8(-1000), 0.0)
+        self.assertEqual(nz.umbral_u8(2000), 255.0)
+
+    def test_endereza_caso_con_pixeles_no_cuadrados(self):
+        """Paciente girado 25° en mm, guardado en píxeles de 1.0 × 1.5 mm: se recupera y endereza."""
+        mm_xy = (1.0, 1.5)
+        recta = _a_pixeles(_pelvis_sintetica(0), *mm_xy)
+        girada = _a_pixeles(_pelvis_sintetica(25), *mm_xy)
+        imagenes = (girada * 200)[None].repeat(3, axis=0).astype(np.uint8)
+        etiquetas = (girada * 11)[None].repeat(3, axis=0).astype(np.uint8)
+        img2, lab2, est = nz.enderezar_caso(imagenes, etiquetas, mm_xy)
+        self.assertAlmostEqual(est.angulo, 25, delta=2.0)
+        self.assertTrue(est.corregir)
+        self.assertEqual(img2.dtype, np.uint8)
+        self.assertTrue(set(np.unique(lab2)) <= {0, 11})
+        self.assertGreater(_dice(lab2[0], recta), 0.90)
+        # Girar en píxeles (sin mm) deforma la pelvis y queda peor.
+        en_pixeles = nz.corregir_giro_axial(etiquetas, est.angulo, es_etiqueta=True)
+        self.assertGreater(_dice(lab2[0], recta), _dice(en_pixeles[0], recta))
+
+    def test_paciente_recto_no_se_toca(self):
+        recta = _a_pixeles(_pelvis_sintetica(0), 0.9, 1.2)
+        imagenes = (recta * 200)[None].repeat(2, axis=0).astype(np.uint8)
+        img2, lab2, est = nz.enderezar_caso(imagenes, None, (0.9, 1.2))
+        self.assertFalse(est.corregir)
+        self.assertIs(img2, imagenes)
+        self.assertIsNone(lab2)
+
+
 DATOS = RAIZ / "data" / "raw"
 
 

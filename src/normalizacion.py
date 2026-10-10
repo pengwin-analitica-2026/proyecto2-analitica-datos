@@ -219,15 +219,78 @@ def estimar_giro_axial(silueta: np.ndarray, rango: float = 89.0, paso: float = 1
 
 
 def corregir_giro_axial(volumen: np.ndarray, angulo: float, es_etiqueta: bool = False,
-                        relleno: float | None = None) -> np.ndarray:
-    """Gira cada corte axial en -``angulo`` grados (endereza). Etiqueta: vecino más cercano."""
+                        relleno: float | None = None, mm_xy: tuple[float, float] | None = None
+                        ) -> np.ndarray:
+    """Gira cada corte axial en -``angulo`` grados (endereza). Etiqueta: vecino más cercano.
+
+    ``mm_xy`` = mm por píxel (x, y). Si se da, el giro se hace en milímetros reales:
+
+        entrada = D⁻¹ · R · D · (salida − centro) + centro,     D = diag(mm_y, mm_x)
+
+    así una pelvis con píxeles no cuadrados (caso del caché, que estira cada corte a S×S) gira
+    sin deformarse. Con píxeles cuadrados da lo mismo que ``ndi.rotate`` (ver las pruebas).
+    """
     if angulo == 0:
         return volumen
     if relleno is None:
         relleno = 0 if es_etiqueta else float(volumen.min())
-    return ndi.rotate(volumen, -angulo, axes=(1, 2), reshape=False,
-                      order=0 if es_etiqueta else 1, mode="constant", cval=relleno
-                      ).astype(volumen.dtype)
+    orden = 0 if es_etiqueta else 1
+    if mm_xy is None:
+        return ndi.rotate(volumen, -angulo, axes=(1, 2), reshape=False, order=orden,
+                          mode="constant", cval=relleno).astype(volumen.dtype)
+    a = np.radians(-angulo)
+    # Convención de ndi.rotate en coordenadas (fila, columna) = (y, x).
+    r = np.array([[np.cos(a), np.sin(a)], [-np.sin(a), np.cos(a)]])
+    d = np.diag([float(mm_xy[1]), float(mm_xy[0])])
+    m = np.eye(3)
+    m[1:, 1:] = np.linalg.inv(d) @ r @ d
+    centro = (np.array(volumen.shape, dtype=float) - 1) / 2
+    return ndi.affine_transform(volumen, m, offset=centro - m @ centro, order=orden,
+                                mode="constant", cval=relleno).astype(volumen.dtype)
+
+
+# ---------------------------------------------------------------------------
+# Paso 2 sobre el caché del modelo (imágenes uint8 ya ventaneadas)
+# ---------------------------------------------------------------------------
+# El caché guarda cada corte como uint8 = 255 · ventana(HU) ** 1.5, con ventana C400/W1800
+# (−500 a 1300 HU). El umbral óseo de 250 HU cae en 255 · (750/1800) ** 1.5 ≈ 68.6.
+VENTANA_MIN_HU, VENTANA_ANCHO_HU, GAMMA_CACHE = -500.0, 1800.0, 1.5
+
+
+def umbral_u8(hu: float = 250.0) -> float:
+    """Valor uint8 del caché que corresponde a ``hu`` HU (después de ventana y gamma)."""
+    v = float(np.clip((hu - VENTANA_MIN_HU) / VENTANA_ANCHO_HU, 0.0, 1.0))
+    return 255.0 * v ** GAMMA_CACHE
+
+
+def silueta_de_cache(imagenes_u8: np.ndarray, mm_xy: tuple[float, float],
+                     umbral_hu: float = 250.0) -> np.ndarray:
+    """MIP axial de hueso a partir del caché, remuestreada a 1 mm por píxel (píxeles cuadrados)."""
+    silueta = (imagenes_u8 > umbral_u8(umbral_hu)).any(axis=0).astype(np.float32)
+    silueta = ndi.zoom(silueta, (float(mm_xy[1]), float(mm_xy[0])), order=0)
+    etiquetas, n = ndi.label(silueta > 0.5)
+    if n > 1:
+        tamanos = ndi.sum(silueta > 0.5, etiquetas, index=range(1, n + 1))
+        silueta = np.isin(etiquetas, np.argsort(tamanos)[-3:] + 1).astype(np.float32)
+    return silueta
+
+
+def enderezar_caso(imagenes_u8: np.ndarray, etiquetas: np.ndarray | None,
+                   mm_xy: tuple[float, float], **kwargs
+                   ) -> tuple[np.ndarray, np.ndarray | None, EstimacionGiro]:
+    """Paso 2 sobre un caso del caché (que ya viene en orientación estándar por el paso 1).
+
+    Estima el giro con la silueta en milímetros y, solo si ``corregir``, gira la imagen
+    (bilineal, esquinas en 0) y la etiqueta (vecino más cercano) en milímetros reales.
+    Usa solo la imagen: la etiqueta no interviene en la estimación.
+    """
+    est = estimar_giro_axial(silueta_de_cache(imagenes_u8, mm_xy), **kwargs)
+    if not est.corregir:
+        return imagenes_u8, etiquetas, est
+    imagenes = corregir_giro_axial(imagenes_u8, est.angulo, relleno=0, mm_xy=mm_xy)
+    if etiquetas is not None:
+        etiquetas = corregir_giro_axial(etiquetas, est.angulo, es_etiqueta=True, mm_xy=mm_xy)
+    return imagenes, etiquetas, est
 
 
 def normalizar(volumen_hu: np.ndarray, spacing_xyz, etiqueta: np.ndarray | None = None,

@@ -18,6 +18,12 @@ Uso:
     python src/evaluate_volumes.py --checkpoint outputs/gamma/w10g_384neg.pth \\
         --cache-dir data/cache/s10/cache_384 --split val --tta \\
         --output outputs/s10/linea_base_val.json
+
+Con ``--normalizar`` cada volumen pasa por el paso 2 de ``normalizacion.py`` (giro axial del
+paciente, estimado con la simetría izquierda-derecha de la pelvis en milímetros) antes de entrar
+al modelo; el paso 1 (orientación con los metadatos) ya lo hace el caché canónico. Se aplica
+después de ``--stress``, así ``--stress rot=60 --normalizar`` mide si el giro se recupera. Imagen y
+etiqueta reciben el mismo giro, de modo que las métricas se comparan en el marco enderezado.
 """
 
 from __future__ import annotations
@@ -36,6 +42,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from aumento_fisico import mm_por_pixel
 from build_case_cache import from_uint8, load_case_cache
 from instance_postprocess import primary_secondary_to_instances, semantic_to_instances
 from pengwin_metrics import detection_metrics, multilabel_f1_auc, refine_boxes_with_semantic
@@ -355,6 +362,8 @@ def main() -> None:
                         help="Deformación de robustez sobre validación, p. ej. rot=60 o aspect=1.6,lowres=2.5.")
     parser.add_argument("--save-predictions", default=None,
                         help="Carpeta donde guardar semántica e instancias predichas por caso.")
+    parser.add_argument("--normalizar", action="store_true",
+                        help="Endereza el giro axial de cada volumen antes del modelo (normalizacion.py).")
     args = parser.parse_args()
 
     if args.split == "test":
@@ -364,7 +373,13 @@ def main() -> None:
     two_pass = two_pass or args.two_pass
     cache_dir = Path(args.cache_dir)
     case_ids = [str(c).zfill(3) for c in args.cases] if args.cases else cases_of_split(cache_dir, args.split)
-    print(f"{len(case_ids)} casos de {args.split} | dispositivo {device} | TTA={args.tta} | segundo pase={two_pass}")
+    print(f"{len(case_ids)} casos de {args.split} | dispositivo {device} | TTA={args.tta} | segundo pase={two_pass}"
+          f" | normalizar={args.normalizar}")
+    if args.normalizar:
+        import normalizacion
+        if not getattr(model, "canonical", False):
+            print("AVISO: el modelo no es canónico; el giro se estima igual, pero el paso 1 no se aplica.")
+    giros: dict[str, dict] = {}
 
     records: list[SliceRecord] = []
     started = time.time()
@@ -374,6 +389,16 @@ def main() -> None:
             if args.split == "test":
                 raise SystemExit("La prueba de estrés es solo para validación.")
             case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress)
+        if args.normalizar:
+            mm_xy = mm_por_pixel(case)
+            case["images"], case["labels"], est = normalizacion.enderezar_caso(
+                case["images"], case["labels"], mm_xy)
+            giros[case_id] = {"angulo": round(est.angulo, 2), "corregido": est.corregir,
+                              "simetria_antes": round(est.simetria_sin_girar, 3),
+                              "simetria_despues": round(est.simetria, 3),
+                              "mm_xy": [round(float(v), 4) for v in mm_xy]}
+            print(f"    giro estimado {est.angulo:+6.1f}° "
+                  f"({'corregido' if est.corregir else 'sin corregir'})", flush=True)
         case_records, predictions = evaluate_case(
             model, case_id, case["images"], case["labels"], device, args.batch_size,
             args.confidence, two_pass, keep_predictions=bool(args.save_predictions))
@@ -387,7 +412,8 @@ def main() -> None:
 
     seconds = time.time() - started
     result = {"checkpoint": args.checkpoint, "cache_dir": str(cache_dir), "split": args.split,
-              "cases": case_ids, "stress": args.stress, "canonical": bool(getattr(model, "canonical", False)), "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
+              "cases": case_ids, "stress": args.stress, "canonical": bool(getattr(model, "canonical", False)),
+              "normalizar": args.normalizar, "giros": giros, "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
               "device": str(device), "seconds": round(seconds, 1),
               "ms_per_slice": round(1000 * seconds / max(len(records), 1), 1),
               "subsets": {name: summarize(records, name) for name in SUBSETS},
