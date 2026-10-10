@@ -293,7 +293,7 @@ def load_model(checkpoints: list[str], device: torch.device, tta: bool) -> tuple
     return model, (False if len(models) > 1 or tta else two_pass)
 
 
-def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str) -> tuple[np.ndarray, np.ndarray]:
+def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=None) -> tuple[np.ndarray, np.ndarray]:
     """Deforma un volumen de validación para medir robustez sin tocar test.
 
     ``spec`` combina claves separadas por coma: ``rot=60`` (grados), ``scale=0.7``,
@@ -308,6 +308,12 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str) -> tuple[
     sx, sy = scale / aspect, scale * aspect
     theta = torch.tensor([[math.cos(angle) / sx, -math.sin(angle) / sy, -2 * shift],
                           [math.sin(angle) / sx, math.cos(angle) / sy, 0.0]], dtype=torch.float32)
+    if "rotmm" in opts:   # giro en milímetros reales (no deforma con píxeles no cuadrados)
+        from aumento_fisico import theta_mm
+        mm = torch.tensor([list(mm_xy) if mm_xy is not None else [1.0, 1.0]], dtype=torch.float32)
+        theta = theta_mm(torch.tensor([math.radians(opts["rotmm"])]), torch.tensor([scale]),
+                         torch.tensor([1.0 / aspect]), torch.tensor([[-2 * shift, 0.0]]), mm,
+                         images_u8.shape[-2], images_u8.shape[-1])[0]
     out_i, out_l = [], []
     for start in range(0, len(images_u8), 64):
         x = torch.from_numpy(images_u8[start:start + 64].astype(np.float32))[:, None]
@@ -388,7 +394,7 @@ def main() -> None:
         if args.stress:
             if args.split == "test":
                 raise SystemExit("La prueba de estrés es solo para validación.")
-            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress)
+            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress, mm_por_pixel(case))
         if args.normalizar:
             mm_xy = mm_por_pixel(case)
             case["images"], case["labels"], est = normalizacion.enderezar_caso(

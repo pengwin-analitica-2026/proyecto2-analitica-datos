@@ -41,5 +41,30 @@ class TestEstresMasEnderezado(unittest.TestCase):
                 self.assertTrue(set(np.unique(lab_e)) <= {0, 11})
 
 
+class TestEstresEnMilimetros(unittest.TestCase):
+    def _pelvis_en_pixeles(self, mm_x, mm_y):
+        recta = _pelvis_sintetica(0, n=240)
+        from scipy import ndimage as ndi
+        s = (ndi.zoom(recta, (1 / mm_y, 1 / mm_x), order=0) > 0.5).astype(np.uint8)
+        return (s * 200)[None].repeat(2, axis=0), (s * 11)[None].repeat(2, axis=0)
+
+    def test_rotmm_igual_a_rot_con_pixeles_cuadrados(self):
+        img, lab = self._pelvis_en_pixeles(1.0, 1.0)
+        a = apply_stress(img, lab, "rot=40")
+        b = apply_stress(img, lab, "rotmm=40", (0.8, 0.8))
+        np.testing.assert_array_equal(a[1], b[1])
+
+    def test_rotmm_se_recupera_con_pixeles_no_cuadrados(self):
+        """Píxeles de 0.84 × 0.42 mm (como el caso 044): el giro físico sí se recupera."""
+        mm_xy = (0.84, 0.42)
+        img, lab = self._pelvis_en_pixeles(*mm_xy)
+        for rot in (30, 60):
+            with self.subTest(rot=rot):
+                img_g, lab_g = apply_stress(img, lab, f"rotmm={rot}", mm_xy)
+                _, lab_e, est = nz.enderezar_caso(img_g, lab_g, mm_xy)
+                self.assertAlmostEqual(est.angulo, rot, delta=2.0)
+                self.assertGreater(_dice(lab_e[0], lab[0]), 0.93)
+
+
 if __name__ == "__main__":
     unittest.main()
