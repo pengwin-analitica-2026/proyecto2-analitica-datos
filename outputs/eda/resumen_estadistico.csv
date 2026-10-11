@@ -1,0 +1,14 @@
+metrica,valor
+n_casos,100.0
+fragmentos_total_min,3.0
+fragmentos_total_max,9.0
+fragmentos_total_media,5.75
+fragmentos_sacro_media,1.53
+fragmentos_coxal_izq_media,2.15
+fragmentos_coxal_der_media,2.07
+casos_sin_fractura_sacro (1 fragmento),55.0
+casos_sin_fractura_coxal_izq (1 fragmento),34.0
+casos_sin_fractura_coxal_der (1 fragmento),36.0
+volumen_hueso_mm3_min,551192.6434580332
+volumen_hueso_mm3_max,1095225.5580101013
+volumen_hueso_mm3_media,781058.3912427056

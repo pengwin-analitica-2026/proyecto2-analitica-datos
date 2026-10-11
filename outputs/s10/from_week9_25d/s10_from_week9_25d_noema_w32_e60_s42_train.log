@@ -1,0 +1,33 @@
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 65s
+Transferencia Semana 9: backbone=51 tensores, detector=8 tensores | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\week9_25d\week9_25d_cbam_w32_e35_s42.pth
+Modelo: 2,737,534 parámetros | CBAM=1 gamma aprendible=False | cuda
+Módulos heredados Semana 9: congelados (epoch 1)
+epoch 001 loss=3.1206 dice=0.7035 map50=0.3549 inst=0.6423 (512s/época, total 9.8 min)
+epoch 002 loss=2.1543 (415s)
+epoch 003 loss=2.0443 (390s)
+epoch 004 loss=1.9507 (389s)
+epoch 005 loss=1.8671 dice=0.8144 map50=0.5619 inst=0.7156 (561s/época, total 39.1 min)
+Módulos heredados Semana 9: ajustables (epoch 6)
+epoch 006 loss=1.5232 (492s)
+epoch 007 loss=1.2454 (422s)
+epoch 008 loss=1.1063 (420s)
+epoch 009 loss=1.1274 (416s)
+epoch 010 loss=0.9973 dice=0.9171 map50=0.7174 inst=0.7705 (540s/época, total 77.2 min)
+epoch 011 loss=1.0112 (414s)
+epoch 012 loss=0.9455 (414s)
+epoch 013 loss=0.9620 (413s)
+epoch 014 loss=0.9050 (413s)
+epoch 015 loss=0.8932 dice=0.9520 map50=0.8605 inst=0.8018 (558s/época, total 114.1 min)
+epoch 016 loss=0.8534 (433s)
+epoch 017 loss=0.8967 (424s)
+epoch 018 loss=0.8142 (424s)
+epoch 019 loss=0.8411 (424s)
+epoch 020 loss=0.8217 dice=0.9444 map50=0.8539 inst=0.8132 (548s/época, total 151.6 min)
+epoch 021 loss=0.7849 (422s)
+epoch 022 loss=0.7888 (422s)
+epoch 023 loss=0.7773 (422s)
+epoch 024 loss=0.7655 (425s)
+epoch 025 loss=0.7359 dice=0.9565 map50=0.8806 inst=0.8307 (549s/época, total 189.0 min)
+Parada temprana en epoch 25: Dice de validacion 0.9565 alcanzo el objetivo 0.8500. Se conserva el mejor checkpoint.
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_from_week9_25d_noema_w32_e60_s42.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_from_week9_25d_noema_w32_e60_s42.json

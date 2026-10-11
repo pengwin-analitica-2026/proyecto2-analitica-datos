@@ -1,0 +1,8 @@
+$ e:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\.venv\Scripts\python.exe src/train_s10.py --cache-root E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10 --size 384 --epochs 2 --base-channels 8 --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 4 --per-epoch 100 --max-minutes 15 --eval-every 1 --ema 0.999 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical --output E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\smoke_semana10_gpu.pth
+
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 83s
+Modelo: 172,462 parámetros | CBAM=1 γ aprendible=False | cuda
+epoch 001 loss=8.6188 dice=0.1595 map50=0.0000 inst=0.0000 (394s/época, total 8.3 min)
+epoch 002 loss=7.8148 dice=0.0903 map50=0.0061 inst=0.0000 (874s/época, total 22.9 min)
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\smoke_semana10_gpu.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\smoke_semana10_gpu.json

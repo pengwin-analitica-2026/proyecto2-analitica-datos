@@ -1,0 +1,9 @@
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 53s
+Modelo: 2,737,534 parámetros | CBAM=1 γ aprendible=False | cuda
+Traceback (most recent call last):
+  File "E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\train_s10.py", line 426, in <module>
+    main()
+  File "E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\train_s10.py", line 383, in main
+    raise FloatingPointError(
+FloatingPointError: Pérdida no finita en epoch=1, batch=0: {'total': nan, 'detection': nan, 'classification': nan, 'semantic': nan, 'instance': nan, 'semantic_dice': nan, 'boundary': nan, 'centers': nan, 'offsets': nan, 'instance_dice': nan, 'deep_supervision': 0.0, 'det_objectness': nan, 'det_box': nan, 'det_classification': nan}

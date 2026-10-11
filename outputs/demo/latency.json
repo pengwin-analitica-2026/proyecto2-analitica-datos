@@ -1,0 +1,26 @@
+[
+ {
+  "Modelo": "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth",
+  "Dispositivo": "CPU",
+  "Hardware": "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz",
+  "TTA": "no",
+  "Hilos CPU": 8,
+  "Cortes por segundo": 2.98,
+  "Mediana (ms)": 336.1,
+  "p90 (ms)": 395.8,
+  "Pasadas": 30,
+  "Tamaño": "384×384"
+ },
+ {
+  "Modelo": "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth",
+  "Dispositivo": "CPU",
+  "Hardware": "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz",
+  "TTA": "sí",
+  "Hilos CPU": 8,
+  "Cortes por segundo": 1.44,
+  "Mediana (ms)": 695.5,
+  "p90 (ms)": 920.1,
+  "Pasadas": 30,
+  "Tamaño": "384×384"
+ }
+]

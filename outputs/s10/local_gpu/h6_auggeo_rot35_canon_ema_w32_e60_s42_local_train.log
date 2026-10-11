@@ -1,0 +1,37 @@
+$ e:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\.venv\Scripts\python.exe src/train_s10.py --cache-root E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10 --size 384 --epochs 60 --base-channels 32 --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 2 --per-epoch 2500 --max-minutes 170 --eval-every 10 --ema 0.999 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical --output E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\h6_auggeo_rot35_canon_ema_w32_e60_s42_local.pth
+
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 81s
+Modelo: 2,736,958 parámetros | CBAM=1 γ aprendible=False | cuda
+epoch 001 loss=nan dice=0.0000 map50=0.0000 inst=0.0000 (637s/época, total 12.2 min)
+epoch 002 loss=nan (317s)
+epoch 003 loss=nan (308s)
+epoch 004 loss=nan (304s)
+epoch 005 loss=nan (301s)
+epoch 006 loss=nan (299s)
+epoch 007 loss=nan (302s)
+epoch 008 loss=nan (319s)
+epoch 009 loss=nan (313s)
+epoch 010 loss=nan dice=0.0000 map50=0.0000 inst=0.0000 (606s/época, total 63.4 min)
+epoch 011 loss=nan (316s)
+epoch 012 loss=nan (315s)
+epoch 013 loss=nan (314s)
+epoch 014 loss=nan (312s)
+epoch 015 loss=nan (310s)
+epoch 016 loss=nan (315s)
+epoch 017 loss=nan (340s)
+epoch 018 loss=nan (355s)
+epoch 019 loss=nan (346s)
+epoch 020 loss=nan dice=0.0000 map50=0.0000 inst=0.0000 (630s/época, total 122.6 min)
+epoch 021 loss=nan (304s)
+epoch 022 loss=nan (302s)
+epoch 023 loss=nan (304s)
+epoch 024 loss=nan (309s)
+epoch 025 loss=nan (319s)
+epoch 026 loss=nan (313s)
+epoch 027 loss=nan (299s)
+epoch 028 loss=nan (299s)
+epoch 029 loss=nan (304s)
+epoch 030 loss=nan dice=0.0000 map50=0.0000 inst=0.0000 (594s/época, total 178.4 min)
+Límite de 170.0 min alcanzado; se guarda el mejor punto.
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\h6_auggeo_rot35_canon_ema_w32_e60_s42_local.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu\h6_auggeo_rot35_canon_ema_w32_e60_s42_local.json

@@ -1,0 +1,5 @@
+$ e:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\.venv\Scripts\python.exe src/train_s10.py --cache-root E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10 --size 384 --epochs 60 --base-channels 32 --cbam 1 --secondary-weight 3 --augment --cosine --batch-size 2 --per-epoch 2500 --max-minutes 170 --eval-every 10 --context 1 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical --output E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu_25d\h6_25d_noema_auggeo_rot35_canon_w32_e60_s42_local.pth
+
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 63s
+Modelo: 2,737,534 parámetros | CBAM=1 γ aprendible=False | cuda

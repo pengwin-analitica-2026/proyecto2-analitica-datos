@@ -1,0 +1,18 @@
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 75s
+Continuacion Semana 10 desde E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_from_week9_25d_noema_w32_e60_s42.pth: todos los pesos cargados.
+Modelo: 2,737,534 parámetros | CBAM=1 gamma aprendible=False | cuda
+Referencia inicial conservada: instance_dice=0.8307
+Módulos heredados Semana 9: ajustables (epoch 1)
+epoch 001 loss=0.7021 dice=0.9657 map50=0.9311 inst=0.8432 (645s/época, total 12.4 min)
+epoch 002 loss=0.6980 dice=0.9644 map50=0.9214 inst=0.8502 (618s/época, total 22.7 min)
+epoch 003 loss=0.6987 (491s)
+epoch 004 loss=0.6921 dice=0.9663 map50=0.9382 inst=0.8410 (579s/época, total 40.5 min)
+epoch 005 loss=0.6783 (447s)
+epoch 006 loss=0.6873 dice=0.9658 map50=0.9415 inst=0.8442 (578s/época, total 57.6 min)
+epoch 007 loss=0.6841 (446s)
+epoch 008 loss=0.6654 dice=0.9656 map50=0.9402 inst=0.8474 (570s/época, total 74.5 min)
+epoch 009 loss=0.6831 (448s)
+epoch 010 loss=0.6654 dice=0.9662 map50=0.9389 inst=0.8476 (586s/época, total 91.8 min)
+Parada temprana en epoch 10: instance_dice sin mejorar al menos 0.0020 durante 4 evaluaciones. Se conserva el mejor checkpoint.
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_finetune_instancias_desde_ep25_w32_e20_s42.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_finetune_instancias_desde_ep25_w32_e20_s42.json

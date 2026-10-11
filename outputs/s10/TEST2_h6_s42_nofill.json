@@ -1,0 +1,973 @@
+{
+  "checkpoint": [
+    "/content/salida/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth"
+  ],
+  "split": "test",
+  "tta": true,
+  "two_pass": false,
+  "min_voxels": 30,
+  "device": "cuda",
+  "resumen": {
+    "n_cases": 15,
+    "dice_principal": 0.9312097502390192,
+    "dice_secundario": 0.7564995696113103,
+    "iou_principal": 0.8753834857929793,
+    "iou_secundario": 0.6589768737601122,
+    "dice_todos": 0.8430937420285861,
+    "iou_todos": 0.7700238879107882,
+    "perdidos_secundario": 0.07777777777777777,
+    "n_fragmentos_secundarios": 41,
+    "n_con_distancia_predicha": 36,
+    "error_distancia_mm_media": 1.2773148123226967,
+    "error_distancia_mm_mediana": 0.0,
+    "error_distancia_mm_p90": 0.5559895833333334,
+    "assd_mm_media": 2.055521592265685,
+    "hd95_mm_media": 11.553066528071763,
+    "correlacion_distancia": 0.8184971263465984
+  },
+  "casos": [
+    {
+      "case_id": "007",
+      "n_slices": 317,
+      "spacing_xyz_mm": [
+        1.1145833333333333,
+        1.1145833333333333,
+        1.0
+      ],
+      "segundos_modelo": 211.9,
+      "segundos_total": 223.9,
+      "volumen": {
+        "n_fragments": 7,
+        "dice_todos": 0.7064013337790843,
+        "iou_todos": 0.6370574172511734,
+        "n_todos": 7,
+        "perdidos_todos": 0.14285714285714285,
+        "dice_principal": 0.9367020213350786,
+        "iou_principal": 0.8822876343832328,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.5336758181120888,
+        "iou_secundario": 0.45313475440212886,
+        "n_secundario": 4,
+        "perdidos_secundario": 0.25
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 12116,
+          "ground_truth_mm": 0.0,
+          "pred_id": 13,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.3737928737928738,
+          "iou": 0.22985563632640524,
+          "assd_mm": 7.111822562952341,
+          "hd95_mm": 34.993214151487535
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 7339,
+          "ground_truth_mm": 0.0,
+          "pred_id": null,
+          "predicted_mm": null,
+          "absolute_error_mm": null,
+          "dice": 0.0,
+          "iou": 0.0
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 3140,
+          "ground_truth_mm": 0.0,
+          "pred_id": 24,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.939016393442623,
+          "iou": 0.8850432632880099,
+          "assd_mm": 0.26272802159223624,
+          "hd95_mm": 1.1145833333333333
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 23,
+          "volume_voxels": 1939,
+          "ground_truth_mm": 9.4078129469311,
+          "pred_id": 25,
+          "predicted_mm": 45.76041548106835,
+          "absolute_error_mm": 36.35260253413725,
+          "dice": 0.8218940052128584,
+          "iou": 0.6976401179941003,
+          "assd_mm": 0.6074987415889594,
+          "hd95_mm": 2.2896060811730137
+        }
+      ]
+    },
+    {
+      "case_id": "012",
+      "n_slices": 265,
+      "spacing_xyz_mm": [
+        1.171875,
+        1.171875,
+        1.0
+      ],
+      "segundos_modelo": 169.1,
+      "segundos_total": 179.3,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.8812712393627449,
+        "iou_todos": 0.7959537389932356,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9341687546093844,
+        "iou_principal": 0.8784355975819441,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8019249664927853,
+        "iou_secundario": 0.6722309511101725,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 13714,
+          "ground_truth_mm": 0.0,
+          "pred_id": 13,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8517005051642588,
+          "iou": 0.7417058955391168,
+          "assd_mm": 2.345077839896864,
+          "hd95_mm": 17.20076902577687
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 59739,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.7521494278213119,
+          "iou": 0.6027560066812283,
+          "assd_mm": 3.3847859867433927,
+          "hd95_mm": 23.637975933865402
+        }
+      ]
+    },
+    {
+      "case_id": "020",
+      "n_slices": 350,
+      "spacing_xyz_mm": [
+        1.0426666736602783,
+        1.0426666736602783,
+        0.7989501953125
+      ],
+      "segundos_modelo": 215.5,
+      "segundos_total": 228.9,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.9492745993014242,
+        "iou_todos": 0.9049455745685944,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9641171504671987,
+        "iou_principal": 0.9308994470266513,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.9270107725527628,
+        "iou_secundario": 0.8660147658815087,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 14167,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8913325138699711,
+          "iou": 0.8039673978185305,
+          "assd_mm": 0.622062074532272,
+          "hd95_mm": 2.8141073746452028
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 22221,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9626890312355544,
+          "iou": 0.9280621339444869,
+          "assd_mm": 0.4157374523037822,
+          "hd95_mm": 1.0426666736602783
+        }
+      ]
+    },
+    {
+      "case_id": "039",
+      "n_slices": 392,
+      "spacing_xyz_mm": [
+        1.0230208573242028,
+        0.48927084480722743,
+        0.800000011920929
+      ],
+      "segundos_modelo": 240.4,
+      "segundos_total": 255.9,
+      "volumen": {
+        "n_fragments": 9,
+        "dice_todos": 0.5274329538323875,
+        "iou_todos": 0.4186521282442957,
+        "n_todos": 9,
+        "perdidos_todos": 0.2222222222222222,
+        "dice_principal": 0.8278591494412003,
+        "iou_principal": 0.7177038182937169,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.3772198560279811,
+        "iou_secundario": 0.26912628321958515,
+        "n_secundario": 6,
+        "perdidos_secundario": 0.3333333333333333
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 140329,
+          "ground_truth_mm": 0.0,
+          "pred_id": 3,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.3840369827693915,
+          "iou": 0.23765208651095446,
+          "assd_mm": 5.034657694319742,
+          "hd95_mm": 21.189921771262924
+        },
+        {
+          "region": "sacro",
+          "gt_id": 3,
+          "volume_voxels": 84755,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.6182846097389055,
+          "iou": 0.4474760968118564,
+          "assd_mm": 2.690312957881385,
+          "hd95_mm": 8.84142564324292
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 241299,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.5551932009091808,
+          "iou": 0.38426812585499315,
+          "assd_mm": 5.714228567855489,
+          "hd95_mm": 35.23809269011692
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 41409,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.7058043427504086,
+          "iou": 0.5453613901397067,
+          "assd_mm": 2.976388109004478,
+          "hd95_mm": 17.699944955547384
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 23,
+          "volume_voxels": 4778,
+          "ground_truth_mm": 33.71311529824639,
+          "pred_id": null,
+          "predicted_mm": null,
+          "absolute_error_mm": null,
+          "dice": 0.0,
+          "iou": 0.0
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 24,
+          "volume_voxels": 9856,
+          "ground_truth_mm": 0.0,
+          "pred_id": null,
+          "predicted_mm": null,
+          "absolute_error_mm": null,
+          "dice": 0.0,
+          "iou": 0.0
+        }
+      ]
+    },
+    {
+      "case_id": "043",
+      "n_slices": 274,
+      "spacing_xyz_mm": [
+        1.1510416666666667,
+        1.1510416666666667,
+        1.0
+      ],
+      "segundos_modelo": 177.3,
+      "segundos_total": 187.7,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.9467742326440822,
+        "iou_todos": 0.9008041767409031,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9609172494488106,
+        "iou_principal": 0.9254434593911541,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.9255597074369895,
+        "iou_secundario": 0.8638452527655267,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 61090,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9642028889477869,
+          "iou": 0.9308800716467559,
+          "assd_mm": 0.37837213304316775,
+          "hd95_mm": 1.1510416666666667
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 13489,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8869165259261921,
+          "iou": 0.7968104338842975,
+          "assd_mm": 1.2437799005417667,
+          "hd95_mm": 9.433762596976411
+        }
+      ]
+    },
+    {
+      "case_id": "047",
+      "n_slices": 193,
+      "spacing_xyz_mm": [
+        0.9973959922790527,
+        0.9973959922790527,
+        1.2500052452087402
+      ],
+      "segundos_modelo": 116.4,
+      "segundos_total": 123.5,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.8596410739829656,
+        "iou_todos": 0.7606594725767496,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.8990858797086885,
+        "iou_principal": 0.8182054023793897,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8004738653943813,
+        "iou_secundario": 0.6743405778727896,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 18348,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8781195417271086,
+          "iou": 0.7827211315178383,
+          "assd_mm": 0.6869654156597503,
+          "hd95_mm": 3.7500157356262207
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 8063,
+          "ground_truth_mm": 0.0,
+          "pred_id": 14,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.7228281890616539,
+          "iou": 0.5659600242277407,
+          "assd_mm": 1.7761985690074824,
+          "hd95_mm": 13.160558130032602
+        }
+      ]
+    },
+    {
+      "case_id": "054",
+      "n_slices": 301,
+      "spacing_xyz_mm": [
+        1.1119791666666667,
+        1.1119791666666667,
+        1.0
+      ],
+      "segundos_modelo": 187.9,
+      "segundos_total": 199.5,
+      "volumen": {
+        "n_fragments": 7,
+        "dice_todos": 0.7460558317456852,
+        "iou_todos": 0.6708089144956578,
+        "n_todos": 7,
+        "perdidos_todos": 0.14285714285714285,
+        "dice_principal": 0.9213071730301792,
+        "iou_principal": 0.8578072893165678,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.6146173257823149,
+        "iou_secundario": 0.5305601333799753,
+        "n_secundario": 4,
+        "perdidos_secundario": 0.25
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 60771,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 6.0,
+          "absolute_error_mm": 6.0,
+          "dice": 0.9604969492273356,
+          "iou": 0.9239962773686874,
+          "assd_mm": 0.33076584668153264,
+          "hd95_mm": 1.1119791666666667
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 11935,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 1.1119791666666667,
+          "absolute_error_mm": 1.1119791666666667,
+          "dice": 0.7287415846711548,
+          "iou": 0.573244256151214,
+          "assd_mm": 3.1475641694877323,
+          "hd95_mm": 21.59141629064561
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 23,
+          "volume_voxels": 5868,
+          "ground_truth_mm": 12.322853378430045,
+          "pred_id": null,
+          "predicted_mm": null,
+          "absolute_error_mm": null,
+          "dice": 0.0,
+          "iou": 0.0
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 24,
+          "volume_voxels": 973,
+          "ground_truth_mm": 40.03125,
+          "pred_id": 25,
+          "predicted_mm": 42.55000154281317,
+          "absolute_error_mm": 2.5187515428131704,
+          "dice": 0.7692307692307693,
+          "iou": 0.625,
+          "assd_mm": 0.7136325740014235,
+          "hd95_mm": 1.5725760185763324
+        }
+      ]
+    },
+    {
+      "case_id": "061",
+      "n_slices": 350,
+      "spacing_xyz_mm": [
+        1.0466667016347249,
+        1.0466667016347249,
+        0.7989501953125
+      ],
+      "segundos_modelo": 219.2,
+      "segundos_total": 232.3,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.831163811872937,
+        "iou_todos": 0.7417016285497959,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9004949340927473,
+        "iou_principal": 0.8280458540676991,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.7271671285432217,
+        "iou_secundario": 0.6121852902729411,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 19970,
+          "ground_truth_mm": 0.0,
+          "pred_id": 23,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9298686494468769,
+          "iou": 0.8689294533481818,
+          "assd_mm": 0.5065936866423828,
+          "hd95_mm": 2.615416585483057
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 23,
+          "volume_voxels": 102395,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.5244656076395665,
+          "iou": 0.35544112719770043,
+          "assd_mm": 10.542296446629397,
+          "hd95_mm": 49.61828675839122
+        }
+      ]
+    },
+    {
+      "case_id": "062",
+      "n_slices": 303,
+      "spacing_xyz_mm": [
+        1.0422312418619792,
+        0.5710856119791666,
+        1.0
+      ],
+      "segundos_modelo": 196.0,
+      "segundos_total": 207.9,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.911599884325452,
+        "iou_todos": 0.8441968342824249,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9522529087846695,
+        "iou_principal": 0.9094185839261475,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8506203476366256,
+        "iou_secundario": 0.7463642098168404,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 29246,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.7816125342677148,
+          "iou": 0.6415139323498733,
+          "assd_mm": 1.2663517698008049,
+          "hd95_mm": 4.932117585816867
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 51460,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9196281610055365,
+          "iou": 0.8512144872838074,
+          "assd_mm": 0.8115576599517502,
+          "hd95_mm": 5.488253941624505
+        }
+      ]
+    },
+    {
+      "case_id": "065",
+      "n_slices": 350,
+      "spacing_xyz_mm": [
+        1.0426666736602783,
+        1.0426666736602783,
+        0.7989501953125
+      ],
+      "segundos_modelo": 220.7,
+      "segundos_total": 234.3,
+      "volumen": {
+        "n_fragments": 4,
+        "dice_todos": 0.8941361713124845,
+        "iou_todos": 0.8119823191923927,
+        "n_todos": 4,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9222364169131012,
+        "iou_principal": 0.8558297988142983,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8098354345106342,
+        "iou_secundario": 0.6804398803266758,
+        "n_secundario": 1,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 57536,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8098354345106342,
+          "iou": 0.6804398803266758,
+          "assd_mm": 3.13232619779763,
+          "hd95_mm": 26.33821722939282
+        }
+      ]
+    },
+    {
+      "case_id": "083",
+      "n_slices": 350,
+      "spacing_xyz_mm": [
+        0.9973958333333334,
+        0.9973958333333334,
+        0.79998779296875
+      ],
+      "segundos_modelo": 221.6,
+      "segundos_total": 235.0,
+      "volumen": {
+        "n_fragments": 6,
+        "dice_todos": 0.925529781888185,
+        "iou_todos": 0.8651550412687313,
+        "n_todos": 6,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9553160499009529,
+        "iou_principal": 0.9152958017647707,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8957435138754173,
+        "iou_secundario": 0.815014280772692,
+        "n_secundario": 3,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 35486,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9490920602031713,
+          "iou": 0.903116271427789,
+          "assd_mm": 0.34183068386735244,
+          "hd95_mm": 1.5999755859375
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 14887,
+          "ground_truth_mm": 0.0,
+          "pred_id": 13,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8265062975150346,
+          "iou": 0.704312512086637,
+          "assd_mm": 1.9471703005632834,
+          "hd95_mm": 11.372062182629422
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 31528,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.911632183908046,
+          "iou": 0.8376140588036499,
+          "assd_mm": 0.7157186264914287,
+          "hd95_mm": 2.7447976459749306
+        }
+      ]
+    },
+    {
+      "case_id": "086",
+      "n_slices": 265,
+      "spacing_xyz_mm": [
+        0.8776041666666666,
+        0.4850819905598958,
+        1.0
+      ],
+      "segundos_modelo": 71.4,
+      "segundos_total": 81.9,
+      "volumen": {
+        "n_fragments": 7,
+        "dice_todos": 0.9378118428972327,
+        "iou_todos": 0.8861053746899306,
+        "n_todos": 7,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9561219790683876,
+        "iou_principal": 0.9175947251101787,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.9240792407688668,
+        "iou_secundario": 0.8624883618747444,
+        "n_secundario": 4,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 130926,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8452615416112191,
+          "iou": 0.7319939294224441,
+          "assd_mm": 2.8018106645214167,
+          "hd95_mm": 19.394692863393082
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 45456,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9545434848550505,
+          "iou": 0.9130398739948603,
+          "assd_mm": 0.5755657255063521,
+          "hd95_mm": 2.4734067271862017
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 4859,
+          "ground_truth_mm": 0.0,
+          "pred_id": 13,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9259406729046387,
+          "iou": 0.8620945319740501,
+          "assd_mm": 0.2726478362372238,
+          "hd95_mm": 1.0
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 57222,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.9705712637045586,
+          "iou": 0.9428251121076233,
+          "assd_mm": 0.184902764528155,
+          "hd95_mm": 0.8776041666666666
+        }
+      ]
+    },
+    {
+      "case_id": "089",
+      "n_slices": 291,
+      "spacing_xyz_mm": [
+        1.0338541666666667,
+        1.0338541666666667,
+        1.0
+      ],
+      "segundos_modelo": 37.6,
+      "segundos_total": 49.0,
+      "volumen": {
+        "n_fragments": 6,
+        "dice_todos": 0.7717024798457263,
+        "iou_todos": 0.7209767550179892,
+        "n_todos": 6,
+        "perdidos_todos": 0.16666666666666666,
+        "dice_principal": 0.9569665068509411,
+        "iou_principal": 0.9184696199073333,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.5864384528405118,
+        "iou_secundario": 0.5234838901286452,
+        "n_secundario": 3,
+        "perdidos_secundario": 0.3333333333333333
+      },
+      "distancias": [
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 16540,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8733174329029252,
+          "iou": 0.775122877025646,
+          "assd_mm": 1.7144152286067553,
+          "hd95_mm": 12.835533980250371
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 13,
+          "volume_voxels": 2305,
+          "ground_truth_mm": 0.0,
+          "pred_id": null,
+          "predicted_mm": null,
+          "absolute_error_mm": null,
+          "dice": 0.0,
+          "iou": 0.0
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 35787,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8859979256186101,
+          "iou": 0.7953287933602894,
+          "assd_mm": 1.282862973197543,
+          "hd95_mm": 5.8838499251260865
+        }
+      ]
+    },
+    {
+      "case_id": "094",
+      "n_slices": 313,
+      "spacing_xyz_mm": [
+        1.3013333479563396,
+        1.3013333479563396,
+        0.7989501953125
+      ],
+      "segundos_modelo": 39.9,
+      "segundos_total": 51.5,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.9127527534991751,
+        "iou_todos": 0.8426624003185396,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9453745091592753,
+        "iou_principal": 0.8968945147681701,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.8638201200090248,
+        "iou_secundario": 0.7613142286440935,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 23045,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8363501061524656,
+          "iou": 0.7187300154233909,
+          "assd_mm": 1.0830271524546609,
+          "hd95_mm": 4.581059819936675
+        },
+        {
+          "region": "coxal_derecho",
+          "gt_id": 22,
+          "volume_voxels": 13746,
+          "ground_truth_mm": 0.0,
+          "pred_id": 22,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.8912901338655839,
+          "iou": 0.8038984418647961,
+          "assd_mm": 1.0903898595683468,
+          "hd95_mm": 8.97907724270051
+        }
+      ]
+    },
+    {
+      "case_id": "098",
+      "n_slices": 350,
+      "spacing_xyz_mm": [
+        1.0426666736602783,
+        1.0426666736602783,
+        0.801025390625
+      ],
+      "segundos_modelo": 52.2,
+      "segundos_total": 65.4,
+      "volumen": {
+        "n_fragments": 5,
+        "dice_todos": 0.8448581401392234,
+        "iou_todos": 0.7486965424714076,
+        "n_todos": 5,
+        "perdidos_todos": 0.0,
+        "dice_principal": 0.9352255707746733,
+        "iou_principal": 0.8784207401634374,
+        "n_principal": 3,
+        "perdidos_principal": 0.0,
+        "dice_secundario": 0.7093069941860484,
+        "iou_secundario": 0.5541102459333631,
+        "n_secundario": 2,
+        "perdidos_secundario": 0.0
+      },
+      "distancias": [
+        {
+          "region": "sacro",
+          "gt_id": 2,
+          "volume_voxels": 35126,
+          "ground_truth_mm": 0.0,
+          "pred_id": 2,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.7791834059891158,
+          "iou": 0.6382477186267417,
+          "assd_mm": 1.321182047418723,
+          "hd95_mm": 6.111913616968175
+        },
+        {
+          "region": "coxal_izquierdo",
+          "gt_id": 12,
+          "volume_voxels": 12604,
+          "ground_truth_mm": 0.0,
+          "pred_id": 12,
+          "predicted_mm": 0.0,
+          "absolute_error_mm": 0.0,
+          "dice": 0.639430582382981,
+          "iou": 0.46997277323998443,
+          "assd_mm": 4.965549080687665,
+          "hd95_mm": 31.230471913803104
+        }
+      ]
+    }
+  ]
+}

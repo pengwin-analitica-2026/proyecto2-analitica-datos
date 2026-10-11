@@ -1,0 +1,90 @@
+$ e:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\.venv\Scripts\python.exe src/evaluate_volumes.py --checkpoint E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu_25d\smoke_semana10_gpu_25d_noema.pth --cache-dir E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384 --split val --batch-size 4 --tta --output E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu_25d\smoke_semana10_gpu_25d_noema_val.json --cases 014
+
+1 casos de val | dispositivo cuda | TTA=True | segundo pase=False
+  1/1 caso 014: 298 cortes (299 s)
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 298 cortes
+  classification_f1_macro            0.554  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.593  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.101  NO cumple (objetivo 0.65)
+  detection_map50                    0.004  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.001  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.019  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.010  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.006  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.004  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.237
+  detection_raw_map50                0.005
+  detection_raw_map50_95             0.001
+  detection_raw_one_iou_mean         0.122
+  detection_raw_one_map50            0.009
+  detection_raw_one_map50_95         0.001
+  instance_dice_primary              0.007
+  instance_dice_secondary            0.005
+  instance_missed_secondary          0.916
+
+[con_hueso] 221 cortes
+  classification_f1_macro            0.653  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.477  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.101  NO cumple (objetivo 0.65)
+  detection_map50                    0.006  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.002  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.021  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.011  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.006  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.004  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.237
+  detection_raw_map50                0.006
+  detection_raw_map50_95             0.001
+  detection_raw_one_iou_mean         0.122
+  detection_raw_one_map50            0.011
+  detection_raw_one_map50_95         0.002
+  instance_dice_primary              0.007
+  instance_dice_secondary            0.005
+  instance_missed_secondary          0.916
+
+[centro_15_85] 155 cortes
+  classification_f1_macro            0.667  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.388  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.094  NO cumple (objetivo 0.65)
+  detection_map50                    0.005  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.001  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.024  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.012  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.008  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.004  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.258
+  detection_raw_map50                0.015
+  detection_raw_map50_95             0.003
+  detection_raw_one_iou_mean         0.138
+  detection_raw_one_map50            0.019
+  detection_raw_one_map50_95         0.003
+  instance_dice_primary              0.009
+  instance_dice_secondary            0.005
+  instance_missed_secondary          0.907
+
+[extremos] 66 cortes
+  classification_f1_macro            0.617  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.461  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.129  NO cumple (objetivo 0.65)
+  detection_map50                    0.008  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.004  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.002  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.001  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.001  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.001  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.157
+  detection_raw_map50                0.000
+  detection_raw_map50_95             0.000
+  detection_raw_one_iou_mean         0.061
+  detection_raw_one_map50            0.000
+  detection_raw_one_map50_95         0.000
+  instance_dice_primary              0.000
+  instance_dice_secondary            0.004
+  instance_missed_secondary          0.974
+
+Guardado: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\local_gpu_25d\smoke_semana10_gpu_25d_noema_val.json

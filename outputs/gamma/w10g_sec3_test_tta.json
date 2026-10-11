@@ -1,0 +1,38 @@
+{
+  "checkpoint": [
+    "outputs/w10g_sec3.pth"
+  ],
+  "tta": true,
+  "split": "test",
+  "cases": [
+    "007",
+    "012",
+    "020",
+    "039",
+    "043",
+    "047",
+    "054",
+    "061",
+    "062",
+    "065",
+    "083",
+    "086",
+    "089",
+    "094",
+    "098"
+  ],
+  "n_slices": 180,
+  "classification_f1_macro": 0.9889704847922118,
+  "classification_auc_macro": 0.5933998532450402,
+  "detection_iou_mean": 0.8869008818641305,
+  "detection_map50": 0.9319230253615617,
+  "detection_map50_95": 0.8499786668651362,
+  "segmentation_dice_macro": 0.9412538306200893,
+  "segmentation_iou_macro": 0.8893512678900398,
+  "instance_dice_matched": 0.8140841546022032,
+  "instance_iou_matched": 0.7494554756522362,
+  "instance_semantic_cc_dice_matched": 0.7898169631112704,
+  "instance_semantic_cc_iou_matched": 0.7381265424326343,
+  "instance_direct_dice_matched": 0.8140841546022032,
+  "instance_direct_iou_matched": 0.7494554756522362
+}

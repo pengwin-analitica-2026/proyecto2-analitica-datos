@@ -1,0 +1,118 @@
+AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.
+15 casos de test | dispositivo cuda | TTA=True | segundo pase=False | normalizar=True
+    normalización 007: ángulo=-9.0° aceptada=True (clear_symmetry_improvement)
+  1/15 caso 007: 317 cortes (89 s)
+    normalización 012: ángulo=-17.0° aceptada=True (clear_symmetry_improvement)
+  2/15 caso 012: 265 cortes (165 s)
+    normalización 020: ángulo=+4.0° aceptada=False (angle_below_5deg)
+  3/15 caso 020: 350 cortes (258 s)
+    normalización 039: ángulo=-4.0° aceptada=False (angle_below_5deg)
+  4/15 caso 039: 392 cortes (367 s)
+    normalización 043: ángulo=-7.0° aceptada=True (clear_symmetry_improvement)
+  5/15 caso 043: 274 cortes (446 s)
+    normalización 047: ángulo=+0.0° aceptada=False (angle_below_5deg)
+  6/15 caso 047: 193 cortes (498 s)
+    normalización 054: ángulo=-11.0° aceptada=False (low_absolute_symmetry)
+  7/15 caso 054: 301 cortes (585 s)
+    normalización 061: ángulo=+11.0° aceptada=True (clear_symmetry_improvement)
+  8/15 caso 061: 350 cortes (682 s)
+    normalización 062: ángulo=+6.0° aceptada=True (clear_symmetry_improvement)
+  9/15 caso 062: 303 cortes (768 s)
+    normalización 065: ángulo=-9.0° aceptada=True (clear_symmetry_improvement)
+  10/15 caso 065: 350 cortes (869 s)
+    normalización 083: ángulo=-6.0° aceptada=False (low_absolute_symmetry)
+  11/15 caso 083: 350 cortes (966 s)
+    normalización 086: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  12/15 caso 086: 265 cortes (1041 s)
+    normalización 089: ángulo=+7.0° aceptada=False (low_absolute_symmetry)
+  13/15 caso 089: 291 cortes (1117 s)
+    normalización 094: ángulo=-2.0° aceptada=False (angle_below_5deg)
+  14/15 caso 094: 313 cortes (1202 s)
+    normalización 098: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  15/15 caso 098: 350 cortes (1296 s)
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 4664 cortes
+  classification_f1_macro            0.974  cumple
+  classification_auc_macro           0.995  cumple
+  detection_iou_mean                 0.935  cumple
+  detection_map50                    0.956  cumple
+  detection_map50_95                 0.892  cumple
+  segmentation_dice_macro            0.966  cumple
+  segmentation_iou_macro             0.934  cumple
+  instance_dice_matched              0.857  cumple
+  instance_iou_matched               0.788  cumple
+  detection_raw_iou_mean             0.736
+  detection_raw_map50                0.835
+  detection_raw_map50_95             0.450
+  detection_raw_one_iou_mean         0.724
+  detection_raw_one_map50            0.845
+  detection_raw_one_map50_95         0.466
+  instance_dice_primary              0.904
+  instance_dice_secondary            0.709
+  instance_missed_secondary          0.071
+
+[con_hueso] 3531 cortes
+  classification_f1_macro            0.974  cumple
+  classification_auc_macro           0.979  cumple
+  detection_iou_mean                 0.935  cumple
+  detection_map50                    0.958  cumple
+  detection_map50_95                 0.895  cumple
+  segmentation_dice_macro            0.967  cumple
+  segmentation_iou_macro             0.936  cumple
+  instance_dice_matched              0.857  cumple
+  instance_iou_matched               0.788  cumple
+  detection_raw_iou_mean             0.736
+  detection_raw_map50                0.837
+  detection_raw_map50_95             0.452
+  detection_raw_one_iou_mean         0.724
+  detection_raw_one_map50            0.848
+  detection_raw_one_map50_95         0.468
+  instance_dice_primary              0.904
+  instance_dice_secondary            0.709
+  instance_missed_secondary          0.071
+
+[centro_15_85] 2461 cortes
+  classification_f1_macro            0.994  cumple
+  classification_auc_macro           0.964  cumple
+  detection_iou_mean                 0.947  cumple
+  detection_map50                    0.973  cumple
+  detection_map50_95                 0.916  cumple
+  segmentation_dice_macro            0.969  cumple
+  segmentation_iou_macro             0.941  cumple
+  instance_dice_matched              0.864  cumple
+  instance_iou_matched               0.798  cumple
+  detection_raw_iou_mean             0.755
+  detection_raw_map50                0.875
+  detection_raw_map50_95             0.491
+  detection_raw_one_iou_mean         0.744
+  detection_raw_one_map50            0.885
+  detection_raw_one_map50_95         0.505
+  instance_dice_primary              0.914
+  instance_dice_secondary            0.685
+  instance_missed_secondary          0.074
+
+[extremos] 1070 cortes
+  classification_f1_macro            0.895  cumple
+  classification_auc_macro           0.930  cumple
+  detection_iou_mean                 0.892  cumple
+  detection_map50                    0.834  cumple
+  detection_map50_95                 0.748  cumple
+  segmentation_dice_macro            0.930  cumple
+  segmentation_iou_macro             0.873  cumple
+  instance_dice_matched              0.834  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.753  cumple
+  detection_raw_iou_mean             0.673
+  detection_raw_map50                0.684
+  detection_raw_map50_95             0.325
+  detection_raw_one_iou_mean         0.656
+  detection_raw_one_map50            0.695
+  detection_raw_one_map50_95         0.343
+  instance_dice_primary              0.864
+  instance_dice_secondary            0.766
+  instance_missed_secondary          0.064
+
+Guardado: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_rotacion_fisica_desde_final_w32_e12_s42_test.json

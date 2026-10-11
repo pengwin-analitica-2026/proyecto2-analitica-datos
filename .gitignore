@@ -1,0 +1,44 @@
+venv/
+__pycache__/
+.ipynb_checkpoints/
+*.pth
+.DS_Store
+.Rhistory
+data/raw/
+data/cache/
+
+.venv/
+
+.env
+# Herramientas de asistente de IA y credenciales (no se suben)
+.claude/
+CLAUDE.md
+.claude-cuenta2/
+.agents/
+kaggle.json
+.kaggle/
+*.token
+
+# Semana 11: casos exportados para el dashboard (se regeneran con src/demo_export.py)
+outputs/demo/*
+# Casos que lee el dashboard desplegado en Streamlit Community Cloud (CI/CD al hacer push a main)
+!outputs/demo/latency.json
+!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/
+outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/*
+!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/
+!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/044/
+!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/099/
+!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/039/
+# predictions.npz solo sirve para --reuse en local
+outputs/demo/**/predictions.npz
+
+# Carpeta generada por deploy/build_streamlit_cloud.py
+build/
+
+# Pesos versionados: H6 (modelo final, tres semillas; la imagen de la API copia la s42) y D5
+# (primera evaluación en test). Los demás .pth de la Semana 10 quedan fuera del repo.
+!outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth
+!outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s43.pth
+!outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s44.pth
+!outputs/s10/d5_ema_w32_e60_s42.pth
+

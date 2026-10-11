@@ -1,0 +1,1069 @@
+{
+ "resumen": {
+  "n": 100,
+  "sentido_correcto (desvio < 90)": 77,
+  "desvio_mediana": 5.3,
+  "desvio_p90": 162.46,
+  "desvio_max": 176.0,
+  "casos_con_desvio_mayor_a_15": [
+   [
+    "001",
+    "train",
+    167.7,
+    167.7
+   ],
+   [
+    "012",
+    "test",
+    36.6,
+    36.6
+   ],
+   [
+    "013",
+    "train",
+    168.7,
+    168.7
+   ],
+   [
+    "016",
+    "train",
+    164.5,
+    164.5
+   ],
+   [
+    "018",
+    "train",
+    150.4,
+    150.4
+   ],
+   [
+    "025",
+    "train",
+    158.4,
+    21.6
+   ],
+   [
+    "029",
+    "train",
+    153.9,
+    153.9
+   ],
+   [
+    "030",
+    "train",
+    160.8,
+    160.8
+   ],
+   [
+    "031",
+    "train",
+    167.2,
+    167.2
+   ],
+   [
+    "034",
+    "train",
+    163.0,
+    163.0
+   ],
+   [
+    "036",
+    "train",
+    9.6,
+    170.4
+   ],
+   [
+    "046",
+    "train",
+    153.3,
+    153.3
+   ],
+   [
+    "048",
+    "train",
+    162.4,
+    162.4
+   ],
+   [
+    "049",
+    "train",
+    166.1,
+    166.1
+   ],
+   [
+    "052",
+    "train",
+    155.5,
+    155.5
+   ],
+   [
+    "053",
+    "train",
+    161.7,
+    161.7
+   ],
+   [
+    "055",
+    "train",
+    151.5,
+    151.5
+   ],
+   [
+    "059",
+    "train",
+    161.0,
+    161.0
+   ],
+   [
+    "061",
+    "test",
+    -163.7,
+    163.7
+   ],
+   [
+    "064",
+    "train",
+    -159.3,
+    159.3
+   ],
+   [
+    "065",
+    "test",
+    176.0,
+    176.0
+   ],
+   [
+    "066",
+    "train",
+    18.6,
+    18.6
+   ],
+   [
+    "083",
+    "test",
+    159.4,
+    159.4
+   ],
+   [
+    "089",
+    "test",
+    174.4,
+    174.4
+   ],
+   [
+    "093",
+    "train",
+    154.9,
+    154.9
+   ],
+   [
+    "095",
+    "val",
+    143.5,
+    143.5
+   ]
+  ]
+ },
+ "casos": [
+  {
+   "caso": "001",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 167.7,
+   "desvio_respecto_a_cabecera": 167.7,
+   "separacion_mm": 24.6,
+   "alargamiento": 1.25
+  },
+  {
+   "caso": "002",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -177.2,
+   "desvio_respecto_a_cabecera": 2.8,
+   "separacion_mm": 48.9,
+   "alargamiento": 2.47
+  },
+  {
+   "caso": "003",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -168.3,
+   "desvio_respecto_a_cabecera": 11.7,
+   "separacion_mm": 18.1,
+   "alargamiento": 2.75
+  },
+  {
+   "caso": "004",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -173.0,
+   "desvio_respecto_a_cabecera": 7.0,
+   "separacion_mm": 32.8,
+   "alargamiento": 2.45
+  },
+  {
+   "caso": "005",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 0.0,
+   "desvio_respecto_a_cabecera": 0.0,
+   "separacion_mm": 36.1,
+   "alargamiento": 2.04
+  },
+  {
+   "caso": "006",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 174.9,
+   "desvio_respecto_a_cabecera": 5.1,
+   "separacion_mm": 29.6,
+   "alargamiento": 3.06
+  },
+  {
+   "caso": "007",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 10.1,
+   "desvio_respecto_a_cabecera": 10.1,
+   "separacion_mm": 72.2,
+   "alargamiento": 1.88
+  },
+  {
+   "caso": "008",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 2.6,
+   "desvio_respecto_a_cabecera": 2.6,
+   "separacion_mm": 30.6,
+   "alargamiento": 2.39
+  },
+  {
+   "caso": "009",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 175.7,
+   "desvio_respecto_a_cabecera": 4.3,
+   "separacion_mm": 17.8,
+   "alargamiento": 2.86
+  },
+  {
+   "caso": "010",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -10.7,
+   "desvio_respecto_a_cabecera": 10.7,
+   "separacion_mm": 61.4,
+   "alargamiento": 1.22
+  },
+  {
+   "caso": "011",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 3.7,
+   "desvio_respecto_a_cabecera": 3.7,
+   "separacion_mm": 10.3,
+   "alargamiento": 3.32
+  },
+  {
+   "caso": "012",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 36.6,
+   "desvio_respecto_a_cabecera": 36.6,
+   "separacion_mm": 21.7,
+   "alargamiento": 1.29
+  },
+  {
+   "caso": "013",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 168.7,
+   "desvio_respecto_a_cabecera": 168.7,
+   "separacion_mm": 8.8,
+   "alargamiento": 1.52
+  },
+  {
+   "caso": "014",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -179.8,
+   "desvio_respecto_a_cabecera": 0.2,
+   "separacion_mm": 9.0,
+   "alargamiento": 2.14
+  },
+  {
+   "caso": "015",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 1.4,
+   "desvio_respecto_a_cabecera": 1.4,
+   "separacion_mm": 19.6,
+   "alargamiento": 3.37
+  },
+  {
+   "caso": "016",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 164.5,
+   "desvio_respecto_a_cabecera": 164.5,
+   "separacion_mm": 5.7,
+   "alargamiento": 2.61
+  },
+  {
+   "caso": "017",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -4.6,
+   "desvio_respecto_a_cabecera": 4.6,
+   "separacion_mm": 7.1,
+   "alargamiento": 1.68
+  },
+  {
+   "caso": "018",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 150.4,
+   "desvio_respecto_a_cabecera": 150.4,
+   "separacion_mm": 15.0,
+   "alargamiento": 2.05
+  },
+  {
+   "caso": "019",
+   "split": "val",
+   "cabecera": "RAI",
+   "angulo": 0.4,
+   "desvio_respecto_a_cabecera": 0.4,
+   "separacion_mm": 22.8,
+   "alargamiento": 3.12
+  },
+  {
+   "caso": "020",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": -2.4,
+   "desvio_respecto_a_cabecera": 2.4,
+   "separacion_mm": 36.0,
+   "alargamiento": 2.14
+  },
+  {
+   "caso": "021",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -0.8,
+   "desvio_respecto_a_cabecera": 0.8,
+   "separacion_mm": 67.3,
+   "alargamiento": 1.46
+  },
+  {
+   "caso": "022",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -6.2,
+   "desvio_respecto_a_cabecera": 6.2,
+   "separacion_mm": 7.0,
+   "alargamiento": 1.39
+  },
+  {
+   "caso": "023",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 176.4,
+   "desvio_respecto_a_cabecera": 3.6,
+   "separacion_mm": 20.7,
+   "alargamiento": 2.62
+  },
+  {
+   "caso": "024",
+   "split": "val",
+   "cabecera": "RAI",
+   "angulo": -1.5,
+   "desvio_respecto_a_cabecera": 1.5,
+   "separacion_mm": 22.7,
+   "alargamiento": 3.1
+  },
+  {
+   "caso": "025",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 158.4,
+   "desvio_respecto_a_cabecera": 21.6,
+   "separacion_mm": 21.7,
+   "alargamiento": 2.02
+  },
+  {
+   "caso": "026",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 2.9,
+   "desvio_respecto_a_cabecera": 2.9,
+   "separacion_mm": 21.2,
+   "alargamiento": 2.09
+  },
+  {
+   "caso": "027",
+   "split": "val",
+   "cabecera": "RAI",
+   "angulo": 9.6,
+   "desvio_respecto_a_cabecera": 9.6,
+   "separacion_mm": 22.9,
+   "alargamiento": 1.33
+  },
+  {
+   "caso": "028",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 175.3,
+   "desvio_respecto_a_cabecera": 4.7,
+   "separacion_mm": 11.4,
+   "alargamiento": 3.15
+  },
+  {
+   "caso": "029",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 153.9,
+   "desvio_respecto_a_cabecera": 153.9,
+   "separacion_mm": 22.6,
+   "alargamiento": 1.69
+  },
+  {
+   "caso": "030",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 160.8,
+   "desvio_respecto_a_cabecera": 160.8,
+   "separacion_mm": 14.0,
+   "alargamiento": 2.52
+  },
+  {
+   "caso": "031",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 167.2,
+   "desvio_respecto_a_cabecera": 167.2,
+   "separacion_mm": 0.4,
+   "alargamiento": 1.5
+  },
+  {
+   "caso": "032",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 3.1,
+   "desvio_respecto_a_cabecera": 3.1,
+   "separacion_mm": 38.0,
+   "alargamiento": 1.91
+  },
+  {
+   "caso": "033",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -178.5,
+   "desvio_respecto_a_cabecera": 1.5,
+   "separacion_mm": 16.3,
+   "alargamiento": 2.72
+  },
+  {
+   "caso": "034",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 163.0,
+   "desvio_respecto_a_cabecera": 163.0,
+   "separacion_mm": 25.5,
+   "alargamiento": 1.43
+  },
+  {
+   "caso": "035",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -173.1,
+   "desvio_respecto_a_cabecera": 6.9,
+   "separacion_mm": 26.1,
+   "alargamiento": 2.58
+  },
+  {
+   "caso": "036",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 9.6,
+   "desvio_respecto_a_cabecera": 170.4,
+   "separacion_mm": 1.0,
+   "alargamiento": 2.1
+  },
+  {
+   "caso": "037",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -12.0,
+   "desvio_respecto_a_cabecera": 12.0,
+   "separacion_mm": 30.3,
+   "alargamiento": 1.59
+  },
+  {
+   "caso": "038",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 8.2,
+   "desvio_respecto_a_cabecera": 8.2,
+   "separacion_mm": 11.4,
+   "alargamiento": 1.9
+  },
+  {
+   "caso": "039",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 4.2,
+   "desvio_respecto_a_cabecera": 4.2,
+   "separacion_mm": 20.8,
+   "alargamiento": 3.57
+  },
+  {
+   "caso": "040",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -6.7,
+   "desvio_respecto_a_cabecera": 6.7,
+   "separacion_mm": 76.7,
+   "alargamiento": 1.27
+  },
+  {
+   "caso": "041",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 176.7,
+   "desvio_respecto_a_cabecera": 3.3,
+   "separacion_mm": 26.0,
+   "alargamiento": 3.27
+  },
+  {
+   "caso": "042",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 5.3,
+   "desvio_respecto_a_cabecera": 5.3,
+   "separacion_mm": 27.5,
+   "alargamiento": 2.07
+  },
+  {
+   "caso": "043",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 5.8,
+   "desvio_respecto_a_cabecera": 5.8,
+   "separacion_mm": 77.7,
+   "alargamiento": 1.21
+  },
+  {
+   "caso": "044",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -179.4,
+   "desvio_respecto_a_cabecera": 0.6,
+   "separacion_mm": 14.4,
+   "alargamiento": 2.65
+  },
+  {
+   "caso": "045",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -167.3,
+   "desvio_respecto_a_cabecera": 12.7,
+   "separacion_mm": 16.0,
+   "alargamiento": 2.8
+  },
+  {
+   "caso": "046",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 153.3,
+   "desvio_respecto_a_cabecera": 153.3,
+   "separacion_mm": 17.0,
+   "alargamiento": 1.7
+  },
+  {
+   "caso": "047",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 3.8,
+   "desvio_respecto_a_cabecera": 3.8,
+   "separacion_mm": 15.8,
+   "alargamiento": 1.82
+  },
+  {
+   "caso": "048",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 162.4,
+   "desvio_respecto_a_cabecera": 162.4,
+   "separacion_mm": 4.6,
+   "alargamiento": 1.48
+  },
+  {
+   "caso": "049",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 166.1,
+   "desvio_respecto_a_cabecera": 166.1,
+   "separacion_mm": 3.2,
+   "alargamiento": 1.65
+  },
+  {
+   "caso": "050",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": 177.1,
+   "desvio_respecto_a_cabecera": 2.9,
+   "separacion_mm": 28.0,
+   "alargamiento": 2.57
+  },
+  {
+   "caso": "051",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 4.8,
+   "desvio_respecto_a_cabecera": 4.8,
+   "separacion_mm": 16.6,
+   "alargamiento": 2.47
+  },
+  {
+   "caso": "052",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 155.5,
+   "desvio_respecto_a_cabecera": 155.5,
+   "separacion_mm": 37.3,
+   "alargamiento": 1.59
+  },
+  {
+   "caso": "053",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 161.7,
+   "desvio_respecto_a_cabecera": 161.7,
+   "separacion_mm": 16.0,
+   "alargamiento": 1.79
+  },
+  {
+   "caso": "054",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 9.2,
+   "desvio_respecto_a_cabecera": 9.2,
+   "separacion_mm": 82.5,
+   "alargamiento": 1.57
+  },
+  {
+   "caso": "055",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 151.5,
+   "desvio_respecto_a_cabecera": 151.5,
+   "separacion_mm": 26.3,
+   "alargamiento": 1.71
+  },
+  {
+   "caso": "056",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -174.5,
+   "desvio_respecto_a_cabecera": 5.5,
+   "separacion_mm": 32.5,
+   "alargamiento": 2.8
+  },
+  {
+   "caso": "057",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -176.4,
+   "desvio_respecto_a_cabecera": 3.6,
+   "separacion_mm": 23.9,
+   "alargamiento": 2.82
+  },
+  {
+   "caso": "058",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 177.4,
+   "desvio_respecto_a_cabecera": 2.6,
+   "separacion_mm": 27.5,
+   "alargamiento": 3.49
+  },
+  {
+   "caso": "059",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 161.0,
+   "desvio_respecto_a_cabecera": 161.0,
+   "separacion_mm": 4.3,
+   "alargamiento": 1.63
+  },
+  {
+   "caso": "060",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -179.1,
+   "desvio_respecto_a_cabecera": 0.9,
+   "separacion_mm": 19.7,
+   "alargamiento": 2.88
+  },
+  {
+   "caso": "061",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": -163.7,
+   "desvio_respecto_a_cabecera": 163.7,
+   "separacion_mm": 26.5,
+   "alargamiento": 1.3
+  },
+  {
+   "caso": "062",
+   "split": "test",
+   "cabecera": "LPI",
+   "angulo": 173.9,
+   "desvio_respecto_a_cabecera": 6.1,
+   "separacion_mm": 8.7,
+   "alargamiento": 2.87
+  },
+  {
+   "caso": "063",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 178.6,
+   "desvio_respecto_a_cabecera": 1.4,
+   "separacion_mm": 19.9,
+   "alargamiento": 3.14
+  },
+  {
+   "caso": "064",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -159.3,
+   "desvio_respecto_a_cabecera": 159.3,
+   "separacion_mm": 10.5,
+   "alargamiento": 1.59
+  },
+  {
+   "caso": "065",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 176.0,
+   "desvio_respecto_a_cabecera": 176.0,
+   "separacion_mm": 2.5,
+   "alargamiento": 1.62
+  },
+  {
+   "caso": "066",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 18.6,
+   "desvio_respecto_a_cabecera": 18.6,
+   "separacion_mm": 59.6,
+   "alargamiento": 1.47
+  },
+  {
+   "caso": "067",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -179.6,
+   "desvio_respecto_a_cabecera": 0.4,
+   "separacion_mm": 18.9,
+   "alargamiento": 2.7
+  },
+  {
+   "caso": "068",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -9.0,
+   "desvio_respecto_a_cabecera": 9.0,
+   "separacion_mm": 15.2,
+   "alargamiento": 2.03
+  },
+  {
+   "caso": "069",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 7.8,
+   "desvio_respecto_a_cabecera": 7.8,
+   "separacion_mm": 5.6,
+   "alargamiento": 3.07
+  },
+  {
+   "caso": "070",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 9.0,
+   "desvio_respecto_a_cabecera": 9.0,
+   "separacion_mm": 48.4,
+   "alargamiento": 1.37
+  },
+  {
+   "caso": "071",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -174.4,
+   "desvio_respecto_a_cabecera": 5.6,
+   "separacion_mm": 18.4,
+   "alargamiento": 2.89
+  },
+  {
+   "caso": "072",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 179.6,
+   "desvio_respecto_a_cabecera": 0.4,
+   "separacion_mm": 22.6,
+   "alargamiento": 2.85
+  },
+  {
+   "caso": "073",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -3.0,
+   "desvio_respecto_a_cabecera": 3.0,
+   "separacion_mm": 5.8,
+   "alargamiento": 2.18
+  },
+  {
+   "caso": "074",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 0.3,
+   "desvio_respecto_a_cabecera": 0.3,
+   "separacion_mm": 7.3,
+   "alargamiento": 2.76
+  },
+  {
+   "caso": "075",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 4.8,
+   "desvio_respecto_a_cabecera": 4.8,
+   "separacion_mm": 80.4,
+   "alargamiento": 1.62
+  },
+  {
+   "caso": "076",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 5.3,
+   "desvio_respecto_a_cabecera": 5.3,
+   "separacion_mm": 39.9,
+   "alargamiento": 1.64
+  },
+  {
+   "caso": "077",
+   "split": "val",
+   "cabecera": "RAI",
+   "angulo": 14.4,
+   "desvio_respecto_a_cabecera": 14.4,
+   "separacion_mm": 10.3,
+   "alargamiento": 1.57
+  },
+  {
+   "caso": "078",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": -177.4,
+   "desvio_respecto_a_cabecera": 2.6,
+   "separacion_mm": 22.1,
+   "alargamiento": 3.04
+  },
+  {
+   "caso": "079",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -172.9,
+   "desvio_respecto_a_cabecera": 7.1,
+   "separacion_mm": 32.9,
+   "alargamiento": 2.62
+  },
+  {
+   "caso": "080",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -1.9,
+   "desvio_respecto_a_cabecera": 1.9,
+   "separacion_mm": 22.2,
+   "alargamiento": 1.64
+  },
+  {
+   "caso": "081",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 179.4,
+   "desvio_respecto_a_cabecera": 0.6,
+   "separacion_mm": 18.0,
+   "alargamiento": 3.04
+  },
+  {
+   "caso": "082",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -177.4,
+   "desvio_respecto_a_cabecera": 2.6,
+   "separacion_mm": 21.3,
+   "alargamiento": 2.76
+  },
+  {
+   "caso": "083",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 159.4,
+   "desvio_respecto_a_cabecera": 159.4,
+   "separacion_mm": 22.8,
+   "alargamiento": 1.4
+  },
+  {
+   "caso": "084",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 3.3,
+   "desvio_respecto_a_cabecera": 3.3,
+   "separacion_mm": 58.2,
+   "alargamiento": 1.78
+  },
+  {
+   "caso": "085",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": -175.4,
+   "desvio_respecto_a_cabecera": 4.6,
+   "separacion_mm": 21.8,
+   "alargamiento": 3.58
+  },
+  {
+   "caso": "086",
+   "split": "test",
+   "cabecera": "LPI",
+   "angulo": -176.9,
+   "desvio_respecto_a_cabecera": 3.1,
+   "separacion_mm": 21.5,
+   "alargamiento": 2.94
+  },
+  {
+   "caso": "087",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": 176.1,
+   "desvio_respecto_a_cabecera": 3.9,
+   "separacion_mm": 21.4,
+   "alargamiento": 2.79
+  },
+  {
+   "caso": "088",
+   "split": "train",
+   "cabecera": "LPI",
+   "angulo": 179.6,
+   "desvio_respecto_a_cabecera": 0.4,
+   "separacion_mm": 23.4,
+   "alargamiento": 3.22
+  },
+  {
+   "caso": "089",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 174.4,
+   "desvio_respecto_a_cabecera": 174.4,
+   "separacion_mm": 9.6,
+   "alargamiento": 2.11
+  },
+  {
+   "caso": "090",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -1.4,
+   "desvio_respecto_a_cabecera": 1.4,
+   "separacion_mm": 52.7,
+   "alargamiento": 1.44
+  },
+  {
+   "caso": "091",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -5.0,
+   "desvio_respecto_a_cabecera": 5.0,
+   "separacion_mm": 54.3,
+   "alargamiento": 1.82
+  },
+  {
+   "caso": "092",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -5.1,
+   "desvio_respecto_a_cabecera": 5.1,
+   "separacion_mm": 23.7,
+   "alargamiento": 2.47
+  },
+  {
+   "caso": "093",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 154.9,
+   "desvio_respecto_a_cabecera": 154.9,
+   "separacion_mm": 33.4,
+   "alargamiento": 1.5
+  },
+  {
+   "caso": "094",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 2.6,
+   "desvio_respecto_a_cabecera": 2.6,
+   "separacion_mm": 27.8,
+   "alargamiento": 2.59
+  },
+  {
+   "caso": "095",
+   "split": "val",
+   "cabecera": "RAI",
+   "angulo": 143.5,
+   "desvio_respecto_a_cabecera": 143.5,
+   "separacion_mm": 57.5,
+   "alargamiento": 1.65
+  },
+  {
+   "caso": "096",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": 8.9,
+   "desvio_respecto_a_cabecera": 8.9,
+   "separacion_mm": 58.6,
+   "alargamiento": 1.59
+  },
+  {
+   "caso": "097",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -5.2,
+   "desvio_respecto_a_cabecera": 5.2,
+   "separacion_mm": 8.4,
+   "alargamiento": 1.94
+  },
+  {
+   "caso": "098",
+   "split": "test",
+   "cabecera": "RAI",
+   "angulo": 6.7,
+   "desvio_respecto_a_cabecera": 6.7,
+   "separacion_mm": 12.7,
+   "alargamiento": 1.95
+  },
+  {
+   "caso": "099",
+   "split": "val",
+   "cabecera": "LPI",
+   "angulo": 178.8,
+   "desvio_respecto_a_cabecera": 1.2,
+   "separacion_mm": 18.8,
+   "alargamiento": 3.35
+  },
+  {
+   "caso": "100",
+   "split": "train",
+   "cabecera": "RAI",
+   "angulo": -3.1,
+   "desvio_respecto_a_cabecera": 3.1,
+   "separacion_mm": 21.5,
+   "alargamiento": 1.33
+  }
+ ]
+}

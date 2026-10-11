@@ -1,0 +1,22 @@
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+  normalización: 10/70 casos, 3 correcciones aceptadas
+  normalización: 20/70 casos, 3 correcciones aceptadas
+  normalización: 30/70 casos, 4 correcciones aceptadas
+  normalización: 40/70 casos, 6 correcciones aceptadas
+  normalización: 50/70 casos, 7 correcciones aceptadas
+  normalización: 60/70 casos, 9 correcciones aceptadas
+  normalización: 70/70 casos, 11 correcciones aceptadas
+  normalización: 10/15 casos, 0 correcciones aceptadas
+  normalización: 15/15 casos, 0 correcciones aceptadas
+Cortes train=18266 (con hueso 16876) | val=709 | carga 136s
+Enderezado pélvico aceptado: train=11/70 | val=0/15
+Continuacion Semana 10 desde E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_finetune_instancias_desde_ep25_w32_e20_s42.pth: todos los pesos cargados.
+Modelo: 2,737,534 parámetros | CBAM=1 gamma aprendible=False | cuda
+Referencia inicial conservada: instance_dice=0.8502
+Módulos heredados Semana 9: ajustables (epoch 1)
+epoch 001 loss=0.6761 dice=0.9670 map50=0.9410 inst=0.8471 (595s/época, total 12.4 min)
+epoch 002 loss=0.6825 dice=0.9668 map50=0.9399 inst=0.8491 (638s/época, total 23.0 min)
+epoch 003 loss=0.7039 (480s)
+epoch 004 loss=0.6949 dice=0.9671 map50=0.9458 inst=0.8469 (600s/época, total 41.0 min)
+Parada temprana en epoch 4: instance_dice sin mejorar al menos 0.0010 durante 3 evaluaciones. Se conserva el mejor checkpoint.
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_rotacion_fisica_desde_final_w32_e12_s42.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_rotacion_fisica_desde_final_w32_e12_s42.json

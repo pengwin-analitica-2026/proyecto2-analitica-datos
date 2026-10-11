@@ -1,0 +1,29 @@
+Codificacion del target: 0 regiones reubicadas por colision de celda, 0 descartadas
+Modelo: 32 canales base, CBAM si, 1 etapas
+Entrada: context=1, canales=3, canonical=True, tamaño=(384, 384)
+Dispositivo: cuda | precisión mixta=True | cuDNN=False
+
+epoch 001 train_loss=0.7925 F1=0.000 P=0.000 R=0.000 FP=34 iou=0.006  <- mejor
+epoch 002 train_loss=0.4016 F1=0.068 P=0.057 R=0.084 FP=609 iou=0.153  <- mejor
+epoch 003 train_loss=0.3676 F1=0.111 P=0.080 R=0.177 FP=893 iou=0.200  <- mejor
+epoch 005 train_loss=0.2320 F1=0.187 P=0.186 R=0.189 FP=364 iou=0.198  <- mejor
+epoch 008 train_loss=0.1095 F1=0.243 P=0.171 R=0.418 FP=893 iou=0.393  <- mejor
+epoch 010 train_loss=0.1061 F1=0.203 P=0.128 R=0.486 FP=1456 iou=0.446
+epoch 012 train_loss=0.1295 F1=0.367 P=0.290 R=0.500 FP=538 iou=0.434  <- mejor
+epoch 015 train_loss=0.0929 F1=0.372 P=0.273 R=0.584 FP=684 iou=0.481  <- mejor
+epoch 016 train_loss=0.1030 F1=0.413 P=0.310 R=0.620 FP=609 iou=0.501  <- mejor
+epoch 017 train_loss=0.0684 F1=0.445 P=0.322 R=0.723 FP=671 iou=0.551  <- mejor
+epoch 020 train_loss=0.1191 F1=0.377 P=0.274 R=0.602 FP=701 iou=0.491
+epoch 024 train_loss=0.0658 F1=0.526 P=0.426 R=0.689 FP=409 iou=0.535  <- mejor
+epoch 025 train_loss=0.0534 F1=0.514 P=0.404 R=0.705 FP=457 iou=0.542
+epoch 028 train_loss=0.0487 F1=0.549 P=0.429 R=0.761 FP=446 iou=0.587  <- mejor
+epoch 029 train_loss=0.0427 F1=0.576 P=0.463 R=0.761 FP=389 iou=0.580  <- mejor
+epoch 030 train_loss=0.0387 F1=0.562 P=0.451 R=0.748 FP=401 iou=0.581
+epoch 035 train_loss=0.0548 F1=0.511 P=0.395 R=0.725 FP=489 iou=0.558
+
+Mejor epoca: 29 (seleccion por F1)
+  F1=0.5756  precision=0.4627  recall=0.7614
+  falsos positivos=389  cajas reales=440  predichas=724
+  IoU medio=0.5801
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\week9_25d\week9_25d_cbam_w32_e35_s42.pth
+Historial : E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\week9_25d\week9_25d_cbam_w32_e35_s42.json

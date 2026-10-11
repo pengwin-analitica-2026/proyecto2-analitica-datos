@@ -1,0 +1,26 @@
+Precomputando mapas de distancia a la fractura...
+epoch 001 loss=4.9390 dice=0.4312 map50=0.0381 iou_bbox=0.2303
+epoch 010 loss=1.0176 dice=0.9139 map50=0.7619 iou_bbox=0.7539
+epoch 020 loss=0.8337 dice=0.9301 map50=0.9045 iou_bbox=0.8692
+epoch 030 loss=0.7578 dice=0.9446 map50=0.9039 iou_bbox=0.8880
+epoch 040 loss=0.6620 dice=0.9429 map50=0.8852 iou_bbox=0.8719
+epoch 050 loss=0.6067 dice=0.9480 map50=0.9411 iou_bbox=0.9066
+epoch 060 loss=0.5634 dice=0.9488 map50=0.9137 iou_bbox=0.8851
+epoch 070 loss=0.5476 dice=0.9516 map50=0.9151 iou_bbox=0.8899
+epoch 080 loss=0.5394 dice=0.9508 map50=0.9023 iou_bbox=0.8762
+Mejores métricas de validación: {
+  "classification_f1_macro": 0.9944994499449945,
+  "classification_auc_macro": 0.9750665698378117,
+  "detection_iou_mean": 0.9066056947044113,
+  "detection_map50": 0.9410581981246512,
+  "detection_map50_95": 0.8424928855127314,
+  "segmentation_dice_macro": 0.9479622829181286,
+  "segmentation_iou_macro": 0.9020346687355579,
+  "instance_dice_matched": 0.7989587521921044,
+  "instance_iou_matched": 0.732631271381411,
+  "instance_semantic_cc_dice_matched": 0.7625928167380713,
+  "instance_semantic_cc_iou_matched": 0.7051203246761193,
+  "instance_direct_dice_matched": 0.7989587521921044,
+  "instance_direct_iou_matched": 0.732631271381411
+}
+Checkpoint: outputs/w10g_base.pth
