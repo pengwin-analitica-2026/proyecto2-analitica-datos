@@ -1,0 +1,117 @@
+15 casos de val | dispositivo cuda | TTA=True | segundo pase=False | normalizar=True
+    normalización 014: ángulo=-6.0° aceptada=False (field_of_view_crop_risk)
+  1/15 caso 014: 298 cortes (78 s)
+    normalización 019: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  2/15 caso 019: 350 cortes (169 s)
+    normalización 024: ángulo=+3.0° aceptada=False (angle_below_5deg)
+  3/15 caso 024: 350 cortes (260 s)
+    normalización 027: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  4/15 caso 027: 313 cortes (341 s)
+    normalización 033: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  5/15 caso 033: 365 cortes (438 s)
+    normalización 044: ángulo=+0.0° aceptada=False (angle_below_5deg)
+  6/15 caso 044: 409 cortes (550 s)
+    normalización 050: ángulo=+2.0° aceptada=False (angle_below_5deg)
+  7/15 caso 050: 326 cortes (638 s)
+    normalización 057: ángulo=-2.0° aceptada=False (angle_below_5deg)
+  8/15 caso 057: 341 cortes (728 s)
+    normalización 060: ángulo=-1.0° aceptada=False (angle_below_5deg)
+  9/15 caso 060: 333 cortes (816 s)
+    normalización 067: ángulo=+1.0° aceptada=False (angle_below_5deg)
+  10/15 caso 067: 369 cortes (912 s)
+    normalización 077: ángulo=-2.0° aceptada=False (angle_below_5deg)
+  11/15 caso 077: 350 cortes (1001 s)
+    normalización 078: ángulo=-3.0° aceptada=False (angle_below_5deg)
+  12/15 caso 078: 388 cortes (1103 s)
+    normalización 087: ángulo=+5.0° aceptada=False (angle_below_5deg)
+  13/15 caso 087: 312 cortes (1186 s)
+    normalización 095: ángulo=-19.0° aceptada=False (low_absolute_symmetry)
+  14/15 caso 095: 257 cortes (1254 s)
+    normalización 099: ángulo=+1.0° aceptada=False (angle_below_5deg)
+  15/15 caso 099: 286 cortes (1329 s)
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 5047 cortes
+  classification_f1_macro            0.971  cumple
+  classification_auc_macro           0.995  cumple
+  detection_iou_mean                 0.912  cumple
+  detection_map50                    0.919  cumple
+  detection_map50_95                 0.838  cumple
+  segmentation_dice_macro            0.964  cumple
+  segmentation_iou_macro             0.930  cumple
+  instance_dice_matched              0.856  cumple
+  instance_iou_matched               0.790  cumple
+  detection_raw_iou_mean             0.677
+  detection_raw_map50                0.754
+  detection_raw_map50_95             0.334
+  detection_raw_one_iou_mean         0.660
+  detection_raw_one_map50            0.778
+  detection_raw_one_map50_95         0.356
+  instance_dice_primary              0.898
+  instance_dice_secondary            0.730
+  instance_missed_secondary          0.089
+
+[con_hueso] 3907 cortes
+  classification_f1_macro            0.971  cumple
+  classification_auc_macro           0.984  cumple
+  detection_iou_mean                 0.912  cumple
+  detection_map50                    0.922  cumple
+  detection_map50_95                 0.842  cumple
+  segmentation_dice_macro            0.964  cumple
+  segmentation_iou_macro             0.932  cumple
+  instance_dice_matched              0.856  cumple
+  instance_iou_matched               0.790  cumple
+  detection_raw_iou_mean             0.677
+  detection_raw_map50                0.757
+  detection_raw_map50_95             0.336
+  detection_raw_one_iou_mean         0.660
+  detection_raw_one_map50            0.782
+  detection_raw_one_map50_95         0.360
+  instance_dice_primary              0.898
+  instance_dice_secondary            0.730
+  instance_missed_secondary          0.089
+
+[centro_15_85] 2729 cortes
+  classification_f1_macro            0.989  cumple
+  classification_auc_macro           0.980  cumple
+  detection_iou_mean                 0.928  cumple
+  detection_map50                    0.950  cumple
+  detection_map50_95                 0.876  cumple
+  segmentation_dice_macro            0.970  cumple
+  segmentation_iou_macro             0.941  cumple
+  instance_dice_matched              0.859  cumple
+  instance_iou_matched               0.795  cumple
+  detection_raw_iou_mean             0.687
+  detection_raw_map50                0.795
+  detection_raw_map50_95             0.353
+  detection_raw_one_iou_mean         0.670
+  detection_raw_one_map50            0.823
+  detection_raw_one_map50_95         0.377
+  instance_dice_primary              0.906
+  instance_dice_secondary            0.711
+  instance_missed_secondary          0.094
+
+[extremos] 1178 cortes
+  classification_f1_macro            0.880  cumple
+  classification_auc_macro           0.947  cumple
+  detection_iou_mean                 0.857  cumple
+  detection_map50                    0.711  cumple
+  detection_map50_95                 0.634  cumple
+  segmentation_dice_macro            0.862  cumple
+  segmentation_iou_macro             0.784  cumple
+  instance_dice_matched              0.844  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.774  cumple
+  detection_raw_iou_mean             0.643
+  detection_raw_map50                0.588
+  detection_raw_map50_95             0.271
+  detection_raw_one_iou_mean         0.625
+  detection_raw_one_map50            0.610
+  detection_raw_one_map50_95         0.290
+  instance_dice_primary              0.869
+  instance_dice_secondary            0.783
+  instance_missed_secondary          0.073
+
+Guardado: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\auditoria_rotacion_fisica\limpio_normalizado.json

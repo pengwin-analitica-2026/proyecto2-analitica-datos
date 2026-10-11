@@ -34,8 +34,8 @@ def main() -> None:
     parser.add_argument("--cache", default="data/cache/week9_detection_slices.npz")
     parser.add_argument("--checkpoint", default="outputs/week9_detection_initial.pth")
     parser.add_argument("--case-id", default=None, help="caso de validación; omitir para el primero")
-    parser.add_argument("--confidence", type=float, default=0.20,
-                        help="umbral de confianza (0.20 por defecto, el de siempre); el "
+    parser.add_argument("--confidence", type=float, default=0.40,
+                        help="umbral de confianza (0.40, calibrado exclusivamente en validación); el "
                              "calibrado sobre validacion se pasa explicito, ver "
                              "notebooks/03_semana9_deteccion_jacobo.ipynb")
     parser.add_argument("--all-predictions", action="store_true",

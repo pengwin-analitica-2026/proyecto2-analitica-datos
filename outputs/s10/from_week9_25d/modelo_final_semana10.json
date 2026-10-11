@@ -1,0 +1,24 @@
+{
+  "modelo_final": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\from_week9_25d\\modelo_final_semana10.pth",
+  "checkpoint_origen": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\from_week9_25d\\s10_desde_week9_rotacion_fisica_w32_e60_s42.pth",
+  "sha256": "ed71a7c626eb7e0d6348a1e0535ca852c60c4b9371ce8aa8cf3b608a08dccfb2",
+  "bytes": 11011471,
+  "historial": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\from_week9_25d\\s10_desde_week9_rotacion_fisica_w32_e60_s42.json",
+  "evaluacion_validacion": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\from_week9_25d\\s10_desde_week9_rotacion_fisica_w32_e60_s42_val.json",
+  "evaluacion_prueba": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\from_week9_25d\\s10_desde_week9_rotacion_fisica_w32_e60_s42_test.json",
+  "mejor_validacion_entrenamiento": {
+    "classification_f1_macro": 0.97216430896715,
+    "classification_auc_macro": 0.9921109508001198,
+    "detection_iou_mean": 0.8828231626642453,
+    "detection_map50": 0.8863213315233188,
+    "detection_map50_95": 0.7949376530914066,
+    "segmentation_dice_macro": 0.9600781625908916,
+    "segmentation_iou_macro": 0.9237070967988559,
+    "instance_dice_matched": 0.8522886771283726,
+    "instance_iou_matched": 0.7797518729902813,
+    "instance_semantic_cc_dice_matched": 0.7927028160018014,
+    "instance_semantic_cc_iou_matched": 0.7419064976042521,
+    "instance_direct_dice_matched": 0.8522886771283726,
+    "instance_direct_iou_matched": 0.7797518729902813
+  }
+}

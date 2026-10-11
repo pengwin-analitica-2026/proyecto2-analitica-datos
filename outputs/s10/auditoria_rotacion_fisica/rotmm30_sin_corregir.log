@@ -1,0 +1,102 @@
+15 casos de val | dispositivo cuda | TTA=True | segundo pase=False | normalizar=False
+  1/15 caso 014: 298 cortes (84 s)
+  2/15 caso 019: 350 cortes (181 s)
+  3/15 caso 024: 350 cortes (279 s)
+  4/15 caso 027: 313 cortes (366 s)
+  5/15 caso 033: 365 cortes (471 s)
+  6/15 caso 044: 409 cortes (589 s)
+  7/15 caso 050: 326 cortes (681 s)
+  8/15 caso 057: 341 cortes (774 s)
+  9/15 caso 060: 333 cortes (869 s)
+  10/15 caso 067: 369 cortes (972 s)
+  11/15 caso 077: 350 cortes (1068 s)
+  12/15 caso 078: 388 cortes (1174 s)
+  13/15 caso 087: 312 cortes (1263 s)
+  14/15 caso 095: 257 cortes (1335 s)
+  15/15 caso 099: 286 cortes (1414 s)
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\src\pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 5047 cortes
+  classification_f1_macro            0.970  cumple
+  classification_auc_macro           0.994  cumple
+  detection_iou_mean                 0.855  cumple
+  detection_map50                    0.840  cumple
+  detection_map50_95                 0.760  cumple
+  segmentation_dice_macro            0.949  cumple
+  segmentation_iou_macro             0.903  cumple
+  instance_dice_matched              0.839  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.763  cumple
+  detection_raw_iou_mean             0.654
+  detection_raw_map50                0.710
+  detection_raw_map50_95             0.277
+  detection_raw_one_iou_mean         0.628
+  detection_raw_one_map50            0.740
+  detection_raw_one_map50_95         0.300
+  instance_dice_primary              0.881
+  instance_dice_secondary            0.712
+  instance_missed_secondary          0.085
+
+[con_hueso] 3907 cortes
+  classification_f1_macro            0.972  cumple
+  classification_auc_macro           0.978  cumple
+  detection_iou_mean                 0.855  cumple
+  detection_map50                    0.846  cumple
+  detection_map50_95                 0.767  cumple
+  segmentation_dice_macro            0.950  cumple
+  segmentation_iou_macro             0.906  cumple
+  instance_dice_matched              0.839  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.763  cumple
+  detection_raw_iou_mean             0.654
+  detection_raw_map50                0.714
+  detection_raw_map50_95             0.280
+  detection_raw_one_iou_mean         0.628
+  detection_raw_one_map50            0.746
+  detection_raw_one_map50_95         0.304
+  instance_dice_primary              0.881
+  instance_dice_secondary            0.712
+  instance_missed_secondary          0.085
+
+[centro_15_85] 2729 cortes
+  classification_f1_macro            0.991  cumple
+  classification_auc_macro           0.969  cumple
+  detection_iou_mean                 0.888  cumple
+  detection_map50                    0.898  cumple
+  detection_map50_95                 0.820  cumple
+  segmentation_dice_macro            0.958  cumple
+  segmentation_iou_macro             0.919  cumple
+  instance_dice_matched              0.841  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.767  cumple
+  detection_raw_iou_mean             0.670
+  detection_raw_map50                0.763
+  detection_raw_map50_95             0.309
+  detection_raw_one_iou_mean         0.649
+  detection_raw_one_map50            0.794
+  detection_raw_one_map50_95         0.333
+  instance_dice_primary              0.889
+  instance_dice_secondary            0.689
+  instance_missed_secondary          0.090
+
+[extremos] 1178 cortes
+  classification_f1_macro            0.870  cumple
+  classification_auc_macro           0.934  cumple
+  detection_iou_mean                 0.743  cumple
+  detection_map50                    0.608  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.545  cumple
+  segmentation_dice_macro            0.819  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.729  cumple
+  instance_dice_matched              0.830  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.749  cumple
+  detection_raw_iou_mean             0.596
+  detection_raw_map50                0.554
+  detection_raw_map50_95             0.195
+  detection_raw_one_iou_mean         0.558
+  detection_raw_one_map50            0.583
+  detection_raw_one_map50_95         0.216
+  instance_dice_primary              0.850
+  instance_dice_secondary            0.780
+  instance_missed_secondary          0.067
+
+Guardado: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\auditoria_rotacion_fisica\rotmm30_sin_corregir.json

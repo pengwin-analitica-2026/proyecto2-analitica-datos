@@ -1,0 +1,57 @@
+{
+  "metodo": "ablacion_inferencia_mismo_checkpoint",
+  "checkpoint": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\week9_25d\\week9_25d_rotacion_fisica_desde_cero_w32_e35_s42.pth",
+  "cache": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\data\\cache\\week9_detection_25d_fisico_384.npz",
+  "confidence": 0.4,
+  "muestras_validacion": 210,
+  "cabeza": "deteccion_grid",
+  "componentes": [
+    "objectness",
+    "box",
+    "classification"
+  ],
+  "con_cbam": {
+    "f1": 0.5613660618996799,
+    "precision": 0.5291750503018109,
+    "recall": 0.5977272727272728,
+    "iou_medio": 0.46918180750045313,
+    "falsos_positivos": 234.0,
+    "n_gt": 440.0,
+    "n_pred": 497.0,
+    "loss_total": 0.08375764668342613,
+    "loss_objectness": 0.007108987738112253,
+    "loss_box": 0.014079887858991112,
+    "loss_classification": 0.006249219476277782
+  },
+  "sin_cbam": {
+    "f1": 0.0870265914585012,
+    "precision": 0.06741573033707865,
+    "recall": 0.12272727272727273,
+    "iou_medio": 0.13972245085456259,
+    "falsos_positivos": 747.0,
+    "n_gt": 440.0,
+    "n_pred": 801.0,
+    "loss_total": 4.389105136900962,
+    "loss_objectness": 0.017679533349084002,
+    "loss_box": 0.027094399788793886,
+    "loss_classification": 4.235953667050317
+  },
+  "aportacion": {
+    "f1": 0.47433947044117863,
+    "precision": 0.46175931996473224,
+    "recall": 0.47500000000000003,
+    "iou_medio": 0.32945935664589054,
+    "loss_total": 4.305347490217536,
+    "loss_objectness": 0.01057054561097175,
+    "loss_box": 0.013014511929802774,
+    "loss_classification": 4.229704447574039
+  },
+  "aportacion_general_cabeza_deteccion": {
+    "metrica_principal": "f1",
+    "delta_f1": 0.47433947044117863,
+    "puntos_porcentuales_f1": 47.433947044117865,
+    "caida_relativa_al_puentear_cbam_pct": 84.49735433524418,
+    "factor_f1_con_vs_sin_cbam": 6.4505118779398405
+  },
+  "advertencia": "No sustituye un entrenamiento controlado desde cero sin CBAM."
+}

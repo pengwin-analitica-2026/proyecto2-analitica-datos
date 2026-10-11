@@ -77,7 +77,8 @@ def main() -> None:
     ap.add_argument("--casos", nargs="*", default=None, help="casos fijos en vez del split")
     ap.add_argument("--min-dist", type=float, default=2.0, help="mm minimos al principal")
     ap.add_argument("--top", type=int, default=2, help="fragmentos mas lejanos por caso")
-    ap.add_argument("--confidence", type=float, default=0.20)
+    ap.add_argument("--confidence", type=float, default=0.40,
+                    help="Umbral calibrado en validación para el detector de Semana 9.")
     ap.add_argument("--cobertura", type=float, default=0.5,
                     help="fraccion del fragmento que debe quedar dentro de la caja")
     ap.add_argument("--size", type=int, default=256)

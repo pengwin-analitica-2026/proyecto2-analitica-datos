@@ -43,7 +43,7 @@ def seed_everything(seed: int = 42) -> None:
 
 
 def evaluar_deteccion(model: DetectionModel, images: torch.Tensor, labels: torch.Tensor,
-                      device: torch.device, confidence: float = 0.20,
+                      device: torch.device, confidence: float = 0.40,
                       iou_threshold: float = 0.5,
                       max_por_clase: int | None = None) -> dict[str, float]:
     """Metricas de deteccion sobre validacion, tras NMS y por clase.
@@ -110,6 +110,8 @@ def main() -> None:
                         help="Rotación aleatoria máxima en grados.")
     parser.add_argument("--aug-mm", action="store_true",
                         help="Aplica la rotación en milímetros usando spacing_yx del caché.")
+    parser.add_argument("--confidence", type=float, default=0.40,
+                        help="Umbral de confianza usado para seleccionar el checkpoint en validación.")
     parser.add_argument("--output", default="outputs/week9_detection_initial.pth")
     args = parser.parse_args()
     if args.aug_mm and args.aug_geo <= 0:
@@ -191,7 +193,8 @@ def main() -> None:
             scaler.step(optimizer)
             scaler.update()
             losses.append(float(loss.detach()))
-        metrics = evaluar_deteccion(model, val_x, val_y, device)
+        metrics = evaluar_deteccion(model, val_x, val_y, device,
+                                    confidence=args.confidence)
         gammas = {f"gamma_{k}": v for k, v in model.backbone.valores_gamma().items()}
         historial.append({"epoch": epoch, "train_loss": float(np.mean(losses)), **metrics, **gammas})
 
@@ -216,6 +219,7 @@ def main() -> None:
     torch.save({"model": model.state_dict(), "base_channels": args.base_channels,
                 "in_channels": in_channels, "context": context, "canonical": canonical,
                 "aug_geo": args.aug_geo, "aug_rot_deg": args.aug_rot_deg, "aug_mm": args.aug_mm,
+                "confidence": args.confidence,
                 "input_size": int(data["size"]), "cache": str(args.cache),
                 "use_cbam": args.use_cbam, "cbam_stages": args.cbam_stages,
                 "learnable_gamma": args.learnable_gamma, "best_epoch": best_epoch,
@@ -230,9 +234,10 @@ def main() -> None:
                    "disable_cudnn": args.disable_cudnn, "mixed_precision": amp,
                    "epochs": args.epochs, "lr": args.lr, "batch_size": args.batch_size,
                    "aug_geo": args.aug_geo, "aug_rot_deg": args.aug_rot_deg, "aug_mm": args.aug_mm,
+                   "confidence": args.confidence,
                    "seed": args.seed, "cache": str(args.cache),
                    "gamma_cache": float(data["gamma"]) if "gamma" in data.files else None,
-                   "criterio_seleccion": "f1@iou0.5"},
+                   "criterio_seleccion": f"f1@iou0.5,confidence={args.confidence:.2f}"},
         "mejor_epoca": best_epoch,
         "historial": historial,
     }, indent=2))

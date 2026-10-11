@@ -1,0 +1,78 @@
+{
+  "metodo": "ablacion_inferencia_mismo_checkpoint",
+  "checkpoint": "E:\\Proyecto_2_Analytics\\proyecto2-analitica-datos-main\\outputs\\s10\\local_gpu_25d\\smoke_semana10_gpu_25d_noema.pth",
+  "split": "val",
+  "cases": [
+    "014"
+  ],
+  "confidence": 0.1,
+  "tta": true,
+  "two_pass": false,
+  "normalizar": false,
+  "seconds_without_cbam": 338.6,
+  "definicion_score": {
+    "clasificacion": "classification_f1_macro",
+    "deteccion": "detection_raw_one_map50",
+    "segmentacion": "promedio(segmentation_dice_macro, instance_dice_matched)",
+    "general": "promedio(clasificacion, deteccion, segmentacion)"
+  },
+  "con_cbam": {
+    "clasificacion": 0.5541734755999871,
+    "deteccion": 0.00861512055275997,
+    "segmentacion": 0.0127329157593008,
+    "dice_semantico": 0.018968441943172296,
+    "dice_instancias": 0.006497389575429306,
+    "general": 0.1918405039706826
+  },
+  "sin_cbam": {
+    "clasificacion": 0.5541734755999871,
+    "deteccion": 0.011172175915773318,
+    "segmentacion": 0.06046837763799113,
+    "dice_semantico": 0.11384213340137504,
+    "dice_instancias": 0.0070946218746072145,
+    "general": 0.20860467638458388
+  },
+  "aportacion": {
+    "clasificacion": 0.0,
+    "deteccion": -0.0025570553630133476,
+    "segmentacion": -0.04773546187869033,
+    "dice_semantico": -0.09487369145820275,
+    "dice_instancias": -0.0005972322991779086,
+    "general": -0.016764172413901268
+  },
+  "caida_al_retirar_cbam_pct": -8.738599027274864,
+  "metricas_completas_sin_cbam": {
+    "n_slices": 298,
+    "n_cases": 1,
+    "classification_f1_macro": 0.5541734755999871,
+    "classification_auc_macro": 0.6153953291745357,
+    "detection_iou_mean": 0.12613905429897257,
+    "detection_map50": 0.020240098632986005,
+    "detection_map50_95": 0.005070678285326404,
+    "detection_raw_iou_mean": 0.3702462102607023,
+    "detection_raw_map50": 0.009702661569599884,
+    "detection_raw_map50_95": 0.0018991082799743894,
+    "detection_raw_one_iou_mean": 0.10935074733400056,
+    "detection_raw_one_map50": 0.011172175915773318,
+    "detection_raw_one_map50_95": 0.001951029184065835,
+    "n_gt_boxes": 561,
+    "n_raw_boxes": 14473,
+    "segmentation_dice_macro": 0.11384213340137504,
+    "segmentation_iou_macro": 0.060866352813320146,
+    "segmentation_dice_sacro": 0.05730855962741254,
+    "segmentation_dice_coxal_izquierdo": 0.1281957124586884,
+    "segmentation_dice_coxal_derecho": 0.15602212811802416,
+    "n_fragments": 816,
+    "instance_dice_matched": 0.0070946218746072145,
+    "instance_iou_matched": 0.0039403244026423815,
+    "n_fragments_primary": 530,
+    "instance_dice_primary": 0.008288641970526686,
+    "instance_iou_primary": 0.004662345005241888,
+    "instance_missed_primary": 0.8603773584905661,
+    "n_fragments_secondary": 286,
+    "instance_dice_secondary": 0.004881927291259946,
+    "instance_iou_secondary": 0.0026023141950279097,
+    "instance_missed_secondary": 0.916083916083916
+  },
+  "advertencia": "Mide dependencia en inferencia, no ganancia causal de entrenamiento."
+}

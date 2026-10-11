@@ -1,0 +1,33 @@
+Casos: train=70 val=15 | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\data\cache\s10\cache_384
+Cortes train=18266 (con hueso 16876) | val=709 | carga 53s
+Transferencia Semana 9: backbone=51 tensores, detector=8 tensores | E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\week9_25d\week9_25d_rotacion_fisica_desde_cero_w32_e35_s42.pth
+Modelo: 2,737,534 parámetros | CBAM=1 gamma aprendible=False | cuda
+Módulos heredados Semana 9: congelados (epoch 1)
+epoch 001 loss=2.3774 dice=0.7784 map50=0.4770 inst=0.6857 (497s/época, total 9.4 min)
+epoch 002 loss=1.4503 (352s)
+epoch 003 loss=1.3409 (352s)
+epoch 004 loss=1.2479 (354s)
+epoch 005 loss=1.2002 dice=0.8611 map50=0.6939 inst=0.7484 (487s/época, total 35.2 min)
+Módulos heredados Semana 9: ajustables (epoch 6)
+epoch 006 loss=1.2713 (427s)
+epoch 007 loss=1.1255 (423s)
+epoch 008 loss=1.0275 (423s)
+epoch 009 loss=1.0222 (422s)
+epoch 010 loss=0.9731 dice=0.9225 map50=0.7405 inst=0.7857 (551s/época, total 72.6 min)
+epoch 011 loss=0.9486 (421s)
+epoch 012 loss=0.8956 (422s)
+epoch 013 loss=0.9098 (422s)
+epoch 014 loss=0.8909 (422s)
+epoch 015 loss=0.8399 dice=0.9296 map50=0.7916 inst=0.7973 (548s/época, total 109.8 min)
+epoch 016 loss=0.8583 (420s)
+epoch 017 loss=0.8268 (423s)
+epoch 018 loss=0.8050 (420s)
+epoch 019 loss=0.8113 (419s)
+epoch 020 loss=0.7920 dice=0.9557 map50=0.9093 inst=0.8348 (543s/época, total 146.9 min)
+epoch 021 loss=0.7729 (436s)
+epoch 022 loss=0.7766 (437s)
+epoch 023 loss=0.7580 (437s)
+epoch 024 loss=0.7633 (437s)
+epoch 025 loss=0.7314 dice=0.9601 map50=0.8863 inst=0.8523 (559s/época, total 185.4 min)
+Parada temprana en epoch 25: objetivos Dice alcanzados: semantico=0.9601, instancias=0.8523. Se conserva el mejor checkpoint.
+Checkpoint: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_desde_week9_rotacion_fisica_w32_e60_s42.pth | métricas: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_desde_week9_rotacion_fisica_w32_e60_s42.json
