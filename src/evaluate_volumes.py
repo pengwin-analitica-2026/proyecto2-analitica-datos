@@ -298,7 +298,8 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=Non
 
     ``spec`` combina claves separadas por coma: ``rot=60`` (grados), ``scale=0.7``,
     ``aspect=1.6`` (estira el eje vertical y encoge el horizontal), ``shift=0.15`` (fracción del
-    lado, hacia la derecha) y ``lowres=2.5`` (reduce filas por ese factor y vuelve a ampliar).
+    lado, hacia la derecha) y ``lowres=2.5`` (reduce filas por ese factor y vuelve a ampliar), ``noise=10`` (ruido gaussiano,
+    niveles de gris 0-255) y ``blur=1.5`` (desenfoque gaussiano en píxeles).
     Imagen bilineal, etiqueta con vecino más cercano.
     """
     import math
@@ -326,6 +327,16 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=Non
             x = F.interpolate(F.interpolate(x, size=(int(h / opts["lowres"]), int(w / (1 + (opts["lowres"] - 1) / 3))),
                                             mode="bilinear", align_corners=False),
                               size=(h, w), mode="bilinear", align_corners=False)
+        if opts.get("blur", 0.0) > 0:      # desenfoque gaussiano separable, solo imagen
+            sigma = opts["blur"]
+            radio = max(1, int(round(3 * sigma)))
+            t = torch.arange(-radio, radio + 1, dtype=torch.float32)
+            k = torch.exp(-0.5 * (t / sigma) ** 2); k = k / k.sum()
+            x = F.conv2d(F.pad(x, (radio, radio, 0, 0), mode="reflect"), k.view(1, 1, 1, -1))
+            x = F.conv2d(F.pad(x, (0, 0, radio, radio), mode="reflect"), k.view(1, 1, -1, 1))
+        if opts.get("noise", 0.0) > 0:     # ruido gaussiano reproducible, solo imagen
+            g = torch.Generator().manual_seed(1234 + start)
+            x = x + torch.randn(x.shape, generator=g) * opts["noise"]
         out_i.append(x[:, 0].round().clamp(0, 255).numpy().astype(np.uint8))
         out_l.append(y[:, 0].numpy().astype(np.uint8))
     return np.concatenate(out_i), np.concatenate(out_l)
