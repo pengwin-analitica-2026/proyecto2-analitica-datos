@@ -1,0 +1,13 @@
+caso,inclinación aplicada,detectado oblicuo,inclinación leída (°),Dice sin corregir,Dice corregido
+014,10° (cabeceo),True,10.0,0.514,0.981
+014,20° (lateral),True,20.0,0.243,0.981
+014,20° + 10° (combinado),True,22.3,0.236,0.972
+014,15° (en el plano),True,15.0,0.282,0.969
+044,10° (cabeceo),True,10.0,0.545,0.968
+044,20° (lateral),True,20.0,0.238,0.985
+044,20° + 10° (combinado),True,22.3,0.305,0.925
+044,15° (en el plano),True,15.0,0.356,0.976
+099,10° (cabeceo),True,10.0,0.554,0.982
+099,20° (lateral),True,20.0,0.264,0.983
+099,20° + 10° (combinado),True,22.3,0.294,0.978
+099,15° (en el plano),True,15.0,0.405,0.988

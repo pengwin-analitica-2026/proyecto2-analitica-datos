@@ -293,7 +293,31 @@ def load_model(checkpoints: list[str], device: torch.device, tta: bool) -> tuple
     return model, (False if len(models) > 1 or tta else two_pass)
 
 
-def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=None) -> tuple[np.ndarray, np.ndarray]:
+def inclinar_3d(images_u8: np.ndarray, labels: np.ndarray, pitch: float, roll: float,
+                mm_xy=None, mm_z=None) -> tuple[np.ndarray, np.ndarray]:
+    """Inclina el volumen (z, y, x) fuera del plano axial, en milímetros reales.
+
+    ``pitch`` gira en el plano (z, y): cabeceo. ``roll`` gira en el plano (z, x): inclinación
+    lateral. El centro del volumen queda fijo; lo que sale del recuadro se rellena con 0.
+    """
+    import math
+    from scipy import ndimage as ndi
+    mx, my = mm_xy if mm_xy is not None else (1.0, 1.0)
+    mz = float(mm_z) if mm_z else 1.0
+    d = np.diag([mz, my, mx])
+    a, b = math.radians(pitch), math.radians(roll)
+    rot_zy = np.array([[math.cos(a), -math.sin(a), 0.0], [math.sin(a), math.cos(a), 0.0], [0.0, 0.0, 1.0]])
+    rot_zx = np.array([[math.cos(b), 0.0, -math.sin(b)], [0.0, 1.0, 0.0], [math.sin(b), 0.0, math.cos(b)]])
+    giro = rot_zx @ rot_zy
+    m = np.linalg.inv(d) @ giro.T @ d          # salida(o) = entrada(m @ o + offset)
+    centro = (np.array(images_u8.shape, dtype=np.float64) - 1) / 2
+    offset = centro - m @ centro
+    img = ndi.affine_transform(images_u8.astype(np.float32), m, offset=offset, order=1, cval=0.0)
+    lab = ndi.affine_transform(labels, m, offset=offset, order=0, cval=0)
+    return np.clip(np.round(img), 0, 255).astype(np.uint8), lab.astype(labels.dtype)
+
+
+def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=None, mm_z=None) -> tuple[np.ndarray, np.ndarray]:
     """Deforma un volumen de validación para medir robustez sin tocar test.
 
     ``spec`` combina claves separadas por coma: ``rot=60`` (grados), ``scale=0.7``,
@@ -304,6 +328,9 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=Non
     """
     import math
     opts = {k: float(v) for k, v in (item.split("=") for item in spec.split(",") if item)}
+    if opts.get("pitch", 0.0) or opts.get("roll", 0.0):
+        images_u8, labels = inclinar_3d(images_u8, labels, opts.get("pitch", 0.0), opts.get("roll", 0.0),
+                                        mm_xy, mm_z)
     angle = math.radians(opts.get("rot", 0.0))
     scale, aspect, shift = opts.get("scale", 1.0), opts.get("aspect", 1.0), opts.get("shift", 0.0)
     sx, sy = scale / aspect, scale * aspect
@@ -425,7 +452,8 @@ def main() -> None:
         if args.stress:
             if args.split == "test":
                 raise SystemExit("La prueba de estrés es solo para validación.")
-            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress, mm_por_pixel(case))
+            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress, mm_por_pixel(case),
+                                                     mm_z=float(case["spacing_xyz"][2]))
         if args.normalizar:
             mm_xy = mm_por_pixel(case)
             case["images"], case["labels"], est = normalizacion.enderezar_caso(
