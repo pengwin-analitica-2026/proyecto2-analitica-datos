@@ -337,6 +337,13 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=Non
         if opts.get("noise", 0.0) > 0:     # ruido gaussiano reproducible, solo imagen
             g = torch.Generator().manual_seed(1234 + start)
             x = x + torch.randn(x.shape, generator=g) * opts["noise"]
+        if opts.get("suav", 0.0) > 0:   # filtro del pipeline: después del ruido, sobre 0-255
+            x = x.round().clamp(0, 255)
+            sigma = opts["suav"]; radio = max(1, int(round(3 * sigma)))
+            t = torch.arange(-radio, radio + 1, dtype=torch.float32)
+            k = torch.exp(-0.5 * (t / sigma) ** 2); k = k / k.sum()
+            x = F.conv2d(F.pad(x, (radio, radio, 0, 0), mode="reflect"), k.view(1, 1, 1, -1))
+            x = F.conv2d(F.pad(x, (0, 0, radio, radio), mode="reflect"), k.view(1, 1, -1, 1))
         out_i.append(x[:, 0].round().clamp(0, 255).numpy().astype(np.uint8))
         out_l.append(y[:, 0].numpy().astype(np.uint8))
     return np.concatenate(out_i), np.concatenate(out_l)
