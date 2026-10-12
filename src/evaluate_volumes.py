@@ -381,12 +381,25 @@ def main() -> None:
                         help="Carpeta donde guardar semántica e instancias predichas por caso.")
     parser.add_argument("--normalizar", action="store_true",
                         help="Endereza el giro axial de cada volumen antes del modelo (normalizacion.py).")
+    parser.add_argument("--sin-cbam", action="store_true",
+                        help="Ablación en inferencia: reemplaza CBAM del backbone por la identidad.")
     args = parser.parse_args()
 
     if args.split == "test":
         print("AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, two_pass = load_model(args.checkpoint, device, args.tta)
+    if args.sin_cbam:
+        apagados = 0
+        for modulo in model.modules():
+            if type(modulo).__name__ == "FundidoraBackbone":
+                modulo.cbam = torch.nn.Identity()
+                modulo.cbam_intermedios = torch.nn.ModuleDict()
+                modulo.use_cbam, modulo.learnable_gamma = False, False
+                apagados += 1
+        print(f"CBAM apagado en {apagados} backbone(s) (ablación en inferencia)")
+        if apagados == 0:
+            raise SystemExit("No encontré FundidoraBackbone en el modelo")
     two_pass = two_pass or args.two_pass
     cache_dir = Path(args.cache_dir)
     case_ids = [str(c).zfill(3) for c in args.cases] if args.cases else cases_of_split(cache_dir, args.split)
@@ -429,7 +442,7 @@ def main() -> None:
 
     seconds = time.time() - started
     result = {"checkpoint": args.checkpoint, "cache_dir": str(cache_dir), "split": args.split,
-              "cases": case_ids, "stress": args.stress, "canonical": bool(getattr(model, "canonical", False)),
+              "cases": case_ids, "stress": args.stress, "sin_cbam": bool(getattr(args, "sin_cbam", False)), "canonical": bool(getattr(model, "canonical", False)),
               "normalizar": args.normalizar, "giros": giros, "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
               "device": str(device), "seconds": round(seconds, 1),
               "ms_per_slice": round(1000 * seconds / max(len(records), 1), 1),
