@@ -291,6 +291,12 @@ def main() -> None:
                         help="Épocas iniciales con backbone y detector heredados congelados.")
     parser.add_argument("--confidence", type=float, default=0.10)
     parser.add_argument("--output", default="outputs/s10/modelo.pth")
+    parser.add_argument(
+        "--last-output",
+        default=None,
+        help=("Guarda además los pesos de la última época ejecutada. El archivo de "
+              "--output sigue siendo el mejor checkpoint de validación."),
+    )
     parser.add_argument("--metrics-output", default=None)
     parser.add_argument("--fracture-weight", type=float, default=0.0)
     parser.add_argument("--secondary-weight", type=float, default=1.0)
@@ -468,6 +474,7 @@ def main() -> None:
             model.load_state_dict(backup)
 
     best_score, best_state, best_metrics, history = -float("inf"), None, None, []
+    last_metrics = None
     best_selection_value = -float("inf")
     early_best_value = -float("inf")
     early_bad_evaluations = 0
@@ -576,6 +583,7 @@ def main() -> None:
                 metrics = evaluate(model, val_x, val_y, device, args.batch_size * 2, args.confidence,
                                    two_pass=False)
                 eval_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            last_metrics = metrics
             score = (metrics["segmentation_dice_macro"] + metrics["detection_map50"]
                      + metrics["instance_dice_matched"])
             semantic_dice = float(metrics["segmentation_dice_macro"])
@@ -649,10 +657,27 @@ def main() -> None:
             stop_reason = f"limite de tiempo de {args.max_minutes} minutos"
             break
 
+    last_path = None
+    if args.last_output:
+        last_path = Path(args.last_output)
+        if last_path.resolve() == out_path.resolve():
+            raise ValueError("--last-output debe ser distinto de --output.")
+        last_path.parent.mkdir(parents=True, exist_ok=True)
+        with averaged_weights():
+            last_state = {key: value.detach().cpu().clone()
+                          for key, value in model.state_dict().items()}
+        last_checkpoint = checkpoint_dict(last_state, last_metrics)
+        last_checkpoint["checkpoint_kind"] = "ultima_epoca"
+        last_checkpoint["epoch_completed"] = epoch
+        torch.save(last_checkpoint, last_path)
+        print(f"Checkpoint de última época: {last_path}", flush=True)
+
     metrics_path = Path(args.metrics_output) if args.metrics_output else out_path.with_suffix(".json")
     metrics_path.write_text(json.dumps({"best": best_metrics, "history": history,
                                         "stopped_early": stopped_early, "stop_reason": stop_reason,
                                         "epochs_completed": epoch, "args": vars(args),
+                                        "best_checkpoint": str(out_path),
+                                        "last_checkpoint": str(last_path) if last_path else None,
                                         "minutes": (time.time() - started) / 60}, indent=2))
     print(f"Checkpoint: {out_path} | métricas: {metrics_path}", flush=True)
 

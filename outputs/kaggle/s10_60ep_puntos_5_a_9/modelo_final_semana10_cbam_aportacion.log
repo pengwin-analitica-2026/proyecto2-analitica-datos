@@ -1,0 +1,44 @@
+  sin CBAM 1/15: caso 014
+  sin CBAM 2/15: caso 019
+  sin CBAM 3/15: caso 024
+  sin CBAM 4/15: caso 027
+  sin CBAM 5/15: caso 033
+  sin CBAM 6/15: caso 044
+  sin CBAM 7/15: caso 050
+  sin CBAM 8/15: caso 057
+  sin CBAM 9/15: caso 060
+  sin CBAM 10/15: caso 067
+  sin CBAM 11/15: caso 077
+  sin CBAM 12/15: caso 078
+  sin CBAM 13/15: caso 087
+  sin CBAM 14/15: caso 095
+  sin CBAM 15/15: caso 099
+
+=== Aportación general de CBAM — Semana 10 ===
+
+Cabeza de clasificación:
+  con CBAM = 0.9721
+  sin CBAM = 0.8842
+  aportación = +0.0880
+
+Cabeza de detección:
+  con CBAM = 0.8490
+  sin CBAM = 0.2366
+  aportación = +0.6124
+
+Cabeza de segmentación:
+  con CBAM = 0.9202
+  sin CBAM = 0.6954
+  aportación = +0.2248
+
+Score general con CBAM: 0.9138
+Score general sin CBAM: 0.6054
+Aportación general:      +0.3084
+Caída al retirar CBAM:   33.8 %
+
+Detalle de segmentación:
+  Dice semántico:  0.9697 -> 0.7619 (+0.2077)
+  Dice instancias: 0.8707 -> 0.6288 (+0.2419)
+
+Nota: es una ablación de inferencia del mismo checkpoint; no sustituye entrenar un control desde cero sin CBAM.
+JSON: /kaggle/working/modelo_final_semana10_cbam_aportacion.json

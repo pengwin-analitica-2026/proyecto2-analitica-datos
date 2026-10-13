@@ -109,16 +109,21 @@ class EndToEndTests(unittest.TestCase):
             root = Path(d)
             make_cache(root)
             out = root / "m.pth"
+            last = root / "m_last.pth"
             subprocess.run(
                 [sys.executable, str(SRC / "train_s10.py"), "--cache-root", str(root), "--size", "64",
                  "--epochs", "2", "--batch-size", "4", "--base-channels", "4", "--margin", "1",
                  "--val-stride", "2", "--eval-every", "1", "--context", "1", "--focal-gamma", "2",
                  "--tversky-beta", "0.7", "--deep-supervision-weight", "0.3", "--ema", "0.9",
                  "--secondary-oversample", "3", "--per-epoch", "10", "--augment", "--cosine",
-                 "--output", str(out)], check=True, capture_output=True)
+                 "--output", str(out), "--last-output", str(last)],
+                check=True, capture_output=True)
             checkpoint = torch.load(out, map_location="cpu", weights_only=False)
+            last_checkpoint = torch.load(last, map_location="cpu", weights_only=False)
             self.assertEqual(checkpoint["in_channels"], 3)
             self.assertTrue(checkpoint["deep_supervision"])
+            self.assertEqual(last_checkpoint["checkpoint_kind"], "ultima_epoca")
+            self.assertEqual(last_checkpoint["epoch_completed"], 2)
             result = root / "val.json"
             subprocess.run(
                 [sys.executable, str(SRC / "evaluate_volumes.py"), "--checkpoint", str(out),

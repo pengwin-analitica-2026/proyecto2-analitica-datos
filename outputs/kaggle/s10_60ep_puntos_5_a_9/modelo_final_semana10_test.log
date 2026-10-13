@@ -1,0 +1,103 @@
+AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.
+15 casos de test | dispositivo cuda | TTA=True | segundo pase=False | normalizar=False
+  1/15 caso 007: 317 cortes (45 s)
+  2/15 caso 012: 265 cortes (82 s)
+  3/15 caso 020: 350 cortes (131 s)
+  4/15 caso 039: 392 cortes (188 s)
+  5/15 caso 043: 274 cortes (226 s)
+  6/15 caso 047: 193 cortes (254 s)
+  7/15 caso 054: 301 cortes (297 s)
+  8/15 caso 061: 350 cortes (345 s)
+  9/15 caso 062: 303 cortes (388 s)
+  10/15 caso 065: 350 cortes (437 s)
+  11/15 caso 083: 350 cortes (486 s)
+  12/15 caso 086: 265 cortes (524 s)
+  13/15 caso 089: 291 cortes (564 s)
+  14/15 caso 094: 313 cortes (607 s)
+  15/15 caso 098: 350 cortes (656 s)
+/kaggle/temp/codigo/src/pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+/kaggle/temp/codigo/src/pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 4664 cortes
+  classification_f1_macro            0.974  cumple
+  classification_auc_macro           0.996  cumple
+  detection_iou_mean                 0.947  cumple
+  detection_map50                    0.969  cumple
+  detection_map50_95                 0.913  cumple
+  segmentation_dice_macro            0.971  cumple
+  segmentation_iou_macro             0.943  cumple
+  instance_dice_matched              0.880  cumple
+  instance_iou_matched               0.821  cumple
+  detection_raw_iou_mean             0.766
+  detection_raw_map50                0.883
+  detection_raw_map50_95             0.513
+  detection_raw_one_iou_mean         0.758
+  detection_raw_one_map50            0.888
+  detection_raw_one_map50_95         0.526
+  instance_dice_primary              0.919
+  instance_dice_secondary            0.757
+  instance_missed_secondary          0.072
+
+[con_hueso] 3531 cortes
+  classification_f1_macro            0.974  cumple
+  classification_auc_macro           0.989  cumple
+  detection_iou_mean                 0.947  cumple
+  detection_map50                    0.970  cumple
+  detection_map50_95                 0.915  cumple
+  segmentation_dice_macro            0.971  cumple
+  segmentation_iou_macro             0.944  cumple
+  instance_dice_matched              0.880  cumple
+  instance_iou_matched               0.821  cumple
+  detection_raw_iou_mean             0.766
+  detection_raw_map50                0.885
+  detection_raw_map50_95             0.515
+  detection_raw_one_iou_mean         0.758
+  detection_raw_one_map50            0.890
+  detection_raw_one_map50_95         0.528
+  instance_dice_primary              0.919
+  instance_dice_secondary            0.757
+  instance_missed_secondary          0.072
+
+[centro_15_85] 2461 cortes
+  classification_f1_macro            0.990  cumple
+  classification_auc_macro           0.986  cumple
+  detection_iou_mean                 0.955  cumple
+  detection_map50                    0.978  cumple
+  detection_map50_95                 0.928  cumple
+  segmentation_dice_macro            0.974  cumple
+  segmentation_iou_macro             0.949  cumple
+  instance_dice_matched              0.889  cumple
+  instance_iou_matched               0.833  cumple
+  detection_raw_iou_mean             0.779
+  detection_raw_map50                0.919
+  detection_raw_map50_95             0.548
+  detection_raw_one_iou_mean         0.773
+  detection_raw_one_map50            0.921
+  detection_raw_one_map50_95         0.558
+  instance_dice_primary              0.929
+  instance_dice_secondary            0.746
+  instance_missed_secondary          0.073
+
+[extremos] 1070 cortes
+  classification_f1_macro            0.863  cumple
+  classification_auc_macro           0.965  cumple
+  detection_iou_mean                 0.920  cumple
+  detection_map50                    0.873  cumple
+  detection_map50_95                 0.794  cumple
+  segmentation_dice_macro            0.923  cumple
+  segmentation_iou_macro             0.865  cumple
+  instance_dice_matched              0.849  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.780  cumple
+  detection_raw_iou_mean             0.721
+  detection_raw_map50                0.684
+  detection_raw_map50_95             0.378
+  detection_raw_one_iou_mean         0.708
+  detection_raw_one_map50            0.699
+  detection_raw_one_map50_95         0.395
+  instance_dice_primary              0.880
+  instance_dice_secondary            0.782
+  instance_missed_secondary          0.068
+
+Guardado: /kaggle/working/modelo_final_semana10_test.json

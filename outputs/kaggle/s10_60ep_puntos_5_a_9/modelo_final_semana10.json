@@ -1,0 +1,14 @@
+{
+  "modelo_final": "/kaggle/working/modelo_final_semana10.pth",
+  "checkpoint_seleccionado": "s10_kaggle_60ep_sin_early_stopping_epoch60.pth",
+  "criterio_seleccion": "instance_dice_matched de validación volumétrica (subconjunto todo)",
+  "candidatos_validacion": {
+    "s10_kaggle_60ep_sin_early_stopping_best.pth": 0.8696240789707724,
+    "s10_kaggle_60ep_sin_early_stopping_epoch60.pth": 0.8707241494623937
+  },
+  "sha256": "04499d26562696fe70c76b1d81748dc57e8236687998dead6c0a807a14b2279f",
+  "bytes": 11011469,
+  "historial_entrenamiento": "s10_kaggle_60ep_sin_early_stopping_historial.json",
+  "evaluacion_validacion": "modelo_final_semana10_val.json",
+  "evaluacion_prueba": "modelo_final_semana10_test.json"
+}

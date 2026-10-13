@@ -1,0 +1,12 @@
+{
+  "estado": "puntos_1_a_9_completos",
+  "entrenamiento_epocas": 60,
+  "stopped_early": false,
+  "modelo_final": "modelo_final_semana10.pth",
+  "manifiesto": "modelo_final_semana10.json",
+  "validacion": "modelo_final_semana10_val.json",
+  "test": "modelo_final_semana10_test.json",
+  "cbam": "modelo_final_semana10_cbam_aportacion.json",
+  "hd95_assd_val": "modelo_final_semana10_hd95_assd_val.json",
+  "hd95_assd_test": "modelo_final_semana10_hd95_assd_test.json"
+}

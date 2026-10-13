@@ -337,6 +337,10 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str,
 
 def cache_spacing_yx(case: dict) -> tuple[float, float]:
     """Milímetros por píxel (y,x) después del resize del caché."""
+    # Los cachés reales guardan spacing_xyz. El valor unitario conserva
+    # compatibilidad con cachés sintéticos antiguos usados por las pruebas.
+    if "spacing_xyz" not in case:
+        return 1.0, 1.0
     sx, sy = (float(v) for v in case["spacing_xyz"][:2])
     height, width = case["images"].shape[-2:]
     orig = case.get("orig_shape", case["images"].shape)

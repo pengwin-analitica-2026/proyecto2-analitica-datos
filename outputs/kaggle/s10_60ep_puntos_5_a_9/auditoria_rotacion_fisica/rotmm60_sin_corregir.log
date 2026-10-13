@@ -1,0 +1,102 @@
+15 casos de val | dispositivo cuda | TTA=True | segundo pase=False | normalizar=False
+  1/15 caso 014: 298 cortes (48 s)
+  2/15 caso 019: 350 cortes (104 s)
+  3/15 caso 024: 350 cortes (160 s)
+  4/15 caso 027: 313 cortes (210 s)
+  5/15 caso 033: 365 cortes (272 s)
+  6/15 caso 044: 409 cortes (339 s)
+  7/15 caso 050: 326 cortes (394 s)
+  8/15 caso 057: 341 cortes (448 s)
+  9/15 caso 060: 333 cortes (504 s)
+  10/15 caso 067: 369 cortes (563 s)
+  11/15 caso 077: 350 cortes (617 s)
+  12/15 caso 078: 388 cortes (679 s)
+  13/15 caso 087: 312 cortes (730 s)
+  14/15 caso 095: 257 cortes (772 s)
+  15/15 caso 099: 286 cortes (818 s)
+/kaggle/temp/codigo/src/pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+/kaggle/temp/codigo/src/pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 5047 cortes
+  classification_f1_macro            0.873  cumple
+  classification_auc_macro           0.961  cumple
+  detection_iou_mean                 0.462  NO cumple (objetivo 0.65)
+  detection_map50                    0.388  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.272  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.716  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.561  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.602  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.514  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.496
+  detection_raw_map50                0.404
+  detection_raw_map50_95             0.136
+  detection_raw_one_iou_mean         0.433
+  detection_raw_one_map50            0.459
+  detection_raw_one_map50_95         0.168
+  instance_dice_primary              0.656
+  instance_dice_secondary            0.443
+  instance_missed_secondary          0.282
+
+[con_hueso] 3906 cortes
+  classification_f1_macro            0.874  cumple
+  classification_auc_macro           0.837  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.462  NO cumple (objetivo 0.65)
+  detection_map50                    0.404  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.283  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.717  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.561  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.602  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.514  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.496
+  detection_raw_map50                0.412
+  detection_raw_map50_95             0.139
+  detection_raw_one_iou_mean         0.433
+  detection_raw_one_map50            0.475
+  detection_raw_one_map50_95         0.175
+  instance_dice_primary              0.656
+  instance_dice_secondary            0.443
+  instance_missed_secondary          0.282
+
+[centro_15_85] 2728 cortes
+  classification_f1_macro            0.906  cumple
+  classification_auc_macro           0.760  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.492  NO cumple (objetivo 0.65)
+  detection_map50                    0.443  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.313  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.729  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.576  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.614  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.525  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.521
+  detection_raw_map50                0.466
+  detection_raw_map50_95             0.163
+  detection_raw_one_iou_mean         0.462
+  detection_raw_one_map50            0.532
+  detection_raw_one_map50_95         0.204
+  instance_dice_primary              0.671
+  instance_dice_secondary            0.433
+  instance_missed_secondary          0.259
+
+[extremos] 1178 cortes
+  classification_f1_macro            0.640  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.764  NO cumple (objetivo 0.85)
+  detection_iou_mean                 0.360  NO cumple (objetivo 0.65)
+  detection_map50                    0.244  NO cumple (objetivo 0.65)
+  detection_map50_95                 0.168  NO cumple (objetivo 0.4)
+  segmentation_dice_macro            0.573  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.416  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.561  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.476  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.409
+  detection_raw_map50                0.250
+  detection_raw_map50_95             0.077
+  detection_raw_one_iou_mean         0.333
+  detection_raw_one_map50            0.297
+  detection_raw_one_map50_95         0.096
+  instance_dice_primary              0.596
+  instance_dice_secondary            0.474
+  instance_missed_secondary          0.351
+
+Guardado: /kaggle/working/auditoria_rotacion_fisica/rotmm60_sin_corregir.json

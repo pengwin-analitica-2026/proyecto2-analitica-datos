@@ -1,0 +1,9 @@
+{
+  "estado": "entrenamiento_60_epocas_completo",
+  "epochs_completed": 60,
+  "stopped_early": false,
+  "mejor_checkpoint": "s10_kaggle_60ep_sin_early_stopping_best.pth",
+  "checkpoint_epoca_60": "s10_kaggle_60ep_sin_early_stopping_epoch60.pth",
+  "historial": "s10_kaggle_60ep_sin_early_stopping_historial.json",
+  "siguiente_etapa": "evaluacion_puntos_5_a_9"
+}

@@ -1,0 +1,117 @@
+15 casos de val | dispositivo cuda | TTA=True | segundo pase=False | normalizar=True
+    normalización 014: ángulo=-66.0° aceptada=False (field_of_view_crop_risk)
+  1/15 caso 014: 298 cortes (49 s)
+    normalización 019: ángulo=-61.0° aceptada=True (clear_symmetry_improvement)
+  2/15 caso 019: 350 cortes (110 s)
+    normalización 024: ángulo=-57.0° aceptada=True (clear_symmetry_improvement)
+  3/15 caso 024: 350 cortes (174 s)
+    normalización 027: ángulo=-61.0° aceptada=True (clear_symmetry_improvement)
+  4/15 caso 027: 313 cortes (230 s)
+    normalización 033: ángulo=-61.0° aceptada=True (clear_symmetry_improvement)
+  5/15 caso 033: 365 cortes (297 s)
+    normalización 044: ángulo=+38.0° aceptada=False (field_of_view_crop_risk)
+  6/15 caso 044: 409 cortes (367 s)
+    normalización 050: ángulo=-56.0° aceptada=True (clear_symmetry_improvement)
+  7/15 caso 050: 326 cortes (426 s)
+    normalización 057: ángulo=-64.0° aceptada=True (clear_symmetry_improvement)
+  8/15 caso 057: 341 cortes (486 s)
+    normalización 060: ángulo=-61.0° aceptada=True (clear_symmetry_improvement)
+  9/15 caso 060: 333 cortes (545 s)
+    normalización 067: ángulo=-60.0° aceptada=True (clear_symmetry_improvement)
+  10/15 caso 067: 369 cortes (608 s)
+    normalización 077: ángulo=-62.0° aceptada=True (clear_symmetry_improvement)
+  11/15 caso 077: 350 cortes (669 s)
+    normalización 078: ángulo=-62.0° aceptada=True (clear_symmetry_improvement)
+  12/15 caso 078: 388 cortes (735 s)
+    normalización 087: ángulo=-55.0° aceptada=True (clear_symmetry_improvement)
+  13/15 caso 087: 312 cortes (791 s)
+    normalización 095: ángulo=+53.0° aceptada=False (low_absolute_symmetry)
+  14/15 caso 095: 257 cortes (833 s)
+    normalización 099: ángulo=+33.0° aceptada=False (field_of_view_crop_risk)
+  15/15 caso 099: 286 cortes (879 s)
+/kaggle/temp/codigo/src/pengwin_metrics.py:114: RuntimeWarning: Mean of empty slice
+  "detection_map50": float(np.nanmean(ap50)),
+/kaggle/temp/codigo/src/pengwin_metrics.py:115: RuntimeWarning: Mean of empty slice
+  "detection_map50_95": float(np.nanmean(aps))}
+
+[todo] 5047 cortes
+  classification_f1_macro            0.946  cumple
+  classification_auc_macro           0.991  cumple
+  detection_iou_mean                 0.805  cumple
+  detection_map50                    0.857  cumple
+  detection_map50_95                 0.773  cumple
+  segmentation_dice_macro            0.877  cumple
+  segmentation_iou_macro             0.782  cumple
+  instance_dice_matched              0.781  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.703  cumple
+  detection_raw_iou_mean             0.671
+  detection_raw_map50                0.776
+  detection_raw_map50_95             0.395
+  detection_raw_one_iou_mean         0.648
+  detection_raw_one_map50            0.795
+  detection_raw_one_map50_95         0.418
+  instance_dice_primary              0.817
+  instance_dice_secondary            0.672
+  instance_missed_secondary          0.131
+
+[con_hueso] 3906 cortes
+  classification_f1_macro            0.947  cumple
+  classification_auc_macro           0.963  cumple
+  detection_iou_mean                 0.805  cumple
+  detection_map50                    0.863  cumple
+  detection_map50_95                 0.780  cumple
+  segmentation_dice_macro            0.877  cumple
+  segmentation_iou_macro             0.782  cumple
+  instance_dice_matched              0.781  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.703  cumple
+  detection_raw_iou_mean             0.671
+  detection_raw_map50                0.781
+  detection_raw_map50_95             0.398
+  detection_raw_one_iou_mean         0.648
+  detection_raw_one_map50            0.801
+  detection_raw_one_map50_95         0.423
+  instance_dice_primary              0.817
+  instance_dice_secondary            0.672
+  instance_missed_secondary          0.131
+
+[centro_15_85] 2728 cortes
+  classification_f1_macro            0.961  cumple
+  classification_auc_macro           0.946  cumple
+  detection_iou_mean                 0.814  cumple
+  detection_map50                    0.877  cumple
+  detection_map50_95                 0.803  cumple
+  segmentation_dice_macro            0.883  cumple
+  segmentation_iou_macro             0.790  cumple
+  instance_dice_matched              0.784  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.710  cumple
+  detection_raw_iou_mean             0.682
+  detection_raw_map50                0.822
+  detection_raw_map50_95             0.420
+  detection_raw_one_iou_mean         0.660
+  detection_raw_one_map50            0.839
+  detection_raw_one_map50_95         0.443
+  instance_dice_primary              0.827
+  instance_dice_secondary            0.647
+  instance_missed_secondary          0.143
+
+[extremos] 1178 cortes
+  classification_f1_macro            0.841  NO cumple (objetivo 0.85)
+  classification_auc_macro           0.936  cumple
+  detection_iou_mean                 0.772  cumple
+  detection_map50                    0.710  cumple
+  detection_map50_95                 0.613  cumple
+  segmentation_dice_macro            0.818  NO cumple (objetivo 0.85)
+  segmentation_iou_macro             0.696  NO cumple (objetivo 0.7)
+  instance_dice_matched              0.768  NO cumple (objetivo 0.85)
+  instance_iou_matched               0.680  NO cumple (objetivo 0.7)
+  detection_raw_iou_mean             0.633
+  detection_raw_map50                0.589
+  detection_raw_map50_95             0.308
+  detection_raw_one_iou_mean         0.605
+  detection_raw_one_map50            0.611
+  detection_raw_one_map50_95         0.331
+  instance_dice_primary              0.778
+  instance_dice_secondary            0.744
+  instance_missed_secondary          0.095
+
+Guardado: /kaggle/working/auditoria_rotacion_fisica/rotmm60_corregido.json

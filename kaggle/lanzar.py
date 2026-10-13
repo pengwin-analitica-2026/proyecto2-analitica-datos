@@ -21,7 +21,9 @@ import argparse
 import base64
 import io
 import json
+import os
 import subprocess
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -58,7 +60,12 @@ def current_commit() -> str:
 
 
 def build_bundle(script: Path) -> str:
-    return BOOTSTRAP.format(payload=pack_code(), commit=current_commit()) + "\n" + script.read_text()
+    source = script.read_text(encoding="utf-8")
+    # El arranque generado debe aparecer antes del script; una importación
+    # __future__ dejaría entonces de estar al principio del módulo. Python 3.11+
+    # ya soporta las anotaciones usadas por estos kernels sin ese future.
+    source = source.replace("from __future__ import annotations\n", "", 1)
+    return BOOTSTRAP.format(payload=pack_code(), commit=current_commit()) + "\n" + source
 
 
 def main() -> None:
@@ -66,7 +73,7 @@ def main() -> None:
     parser.add_argument("script")
     parser.add_argument("--slug", required=True)
     parser.add_argument("--usuario", default="gustaveloper")
-    parser.add_argument("--gpu", action="store_true", help="Corre con T4 x2; gasta cupo semanal.")
+    parser.add_argument("--gpu", action="store_true", help="Solicita cualquier GPU disponible; gasta cupo semanal.")
     parser.add_argument("--sin-internet", action="store_true")
     parser.add_argument("--fuentes", nargs="*", default=[], help="Kernels cuya salida se monta en /kaggle/input.")
     parser.add_argument("--datasets", nargs="*", default=[])
@@ -75,7 +82,7 @@ def main() -> None:
     args = parser.parse_args()
 
     folder = Path(tempfile.mkdtemp(prefix="kaggle_"))
-    (folder / "script.py").write_text(build_bundle(Path(args.script)))
+    (folder / "script.py").write_text(build_bundle(Path(args.script)), encoding="utf-8")
     metadata = {
         "id": f"{args.usuario}/{args.slug}", "title": args.slug, "code_file": "script.py",
         "language": "python", "kernel_type": "script", "is_private": "true",
@@ -83,17 +90,25 @@ def main() -> None:
         "enable_internet": "false" if args.sin_internet else "true",
         "dataset_sources": args.datasets, "competition_sources": [], "kernel_sources": args.fuentes,
     }
-    (folder / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2))
+    (folder / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     size_kb = (folder / "script.py").stat().st_size / 1024
     print(f"paquete: {folder} | script {size_kb:.0f} KB | gpu={args.gpu}")
     if args.solo_armar:
         return
-    command = ["kaggle", "kernels", "push", "-p", str(folder)]
+    kaggle_local = Path(sys.executable).with_name("kaggle.exe" if os.name == "nt" else "kaggle")
+    kaggle_command = str(kaggle_local) if kaggle_local.exists() else "kaggle"
+    command = [kaggle_command, "kernels", "push", "-p", str(folder)]
     if args.timeout:
         command += ["-t", str(args.timeout)]
     if args.gpu:
-        command += ["--accelerator", "NvidiaTeslaT4"]
-    print(subprocess.run(command, capture_output=True, text=True).stdout.strip())
+        command += ["--accelerator", "gpu"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    if result.stderr.strip():
+        print(result.stderr.strip(), file=sys.stderr)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
 
 
 if __name__ == "__main__":

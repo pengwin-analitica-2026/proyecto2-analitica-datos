@@ -1,0 +1,10 @@
+{
+  "title": "PENGWIN S10 cache 384 privado",
+  "id": "federicog19/pengwin-s10-cache-privado",
+  "licenses": [
+    {
+      "name": "other"
+    }
+  ],
+  "description": "Dataset privado para experimentos reproducibles del proyecto. Contiene solamente el cache procesado de 100 casos a 384x384, su indice de splits y el checkpoint 2.5D fisico de Semana 9. No contiene los archivos MHA crudos."
+}

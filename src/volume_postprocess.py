@@ -101,6 +101,48 @@ def surface_distances(a: np.ndarray, b: np.ndarray, spacing_xyz: tuple[float, fl
     return float((to_b.mean() + to_a.mean()) / 2), float(np.percentile(both, 95))
 
 
+def fragment_surface_table(prediction: np.ndarray, truth: np.ndarray,
+                           spacing_xyz: tuple[float, float, float]) -> list[dict]:
+    """ASSD y HD95 3D en mm para cada fragmento real.
+
+    Los fragmentos se emparejan uno a uno, por máximo IoU y dentro de la misma
+    macro-región anatómica. La numeración de los secundarios predichos depende
+    de su volumen, por lo que comparar IDs directamente entre predicción y GT no
+    sería correcto. Un fragmento real sin solapamiento queda explícitamente como
+    no detectado y sus distancias de superficie son ``None``; el resumen debe
+    acompañar las medias con la cobertura para no ocultar esas omisiones.
+    """
+    matches = match_fragments(prediction, truth)
+    region_by_id = {
+        fragment_id: region
+        for region, (low, high, _) in REGIONS.items()
+        for fragment_id in range(low, high + 1)
+    }
+    rows: list[dict] = []
+    for match in matches:
+        gt_id = int(match["gt_id"])
+        pred_id = match["pred_id"]
+        row = {
+            "region": region_by_id[gt_id],
+            "tipo": "principal" if bool(match["primary"]) else "secundario",
+            "gt_id": gt_id,
+            "pred_id": None if pred_id is None else int(pred_id),
+            "volume_voxels": int(match["volume_voxels"]),
+            "dice": float(match["dice"]),
+            "iou": float(match["iou"]),
+            "detectado": pred_id is not None,
+            "assd_mm": None,
+            "hd95_mm": None,
+        }
+        if pred_id is not None:
+            assd, hd95 = surface_distances(
+                prediction == int(pred_id), truth == gt_id, spacing_xyz)
+            row["assd_mm"] = assd
+            row["hd95_mm"] = hd95
+        rows.append(row)
+    return rows
+
+
 def match_fragments(prediction: np.ndarray, truth: np.ndarray) -> list[dict]:
     """Empareja en 3D cada fragmento real con el predicho de mayor IoU de su misma región.
 

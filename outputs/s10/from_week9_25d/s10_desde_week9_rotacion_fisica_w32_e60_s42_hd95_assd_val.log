@@ -1,0 +1,28 @@
+15 casos de val | cuda | TTA=True | checkpoint=s10_desde_week9_rotacion_fisica_w32_e60_s42.pth
+  1/15 caso 014: fragmentos=7 cobertura=100.0% ASSD=6.73 mm HD95=31.69 mm
+  2/15 caso 019: fragmentos=4 cobertura=100.0% ASSD=1.36 mm HD95=8.02 mm
+  3/15 caso 024: fragmentos=9 cobertura=88.9% ASSD=3.08 mm HD95=16.45 mm
+  4/15 caso 027: fragmentos=5 cobertura=100.0% ASSD=2.15 mm HD95=14.84 mm
+  5/15 caso 033: fragmentos=5 cobertura=100.0% ASSD=1.67 mm HD95=7.07 mm
+  6/15 caso 044: fragmentos=4 cobertura=100.0% ASSD=0.84 mm HD95=1.87 mm
+  7/15 caso 050: fragmentos=5 cobertura=100.0% ASSD=1.37 mm HD95=10.50 mm
+  8/15 caso 057: fragmentos=7 cobertura=85.7% ASSD=2.47 mm HD95=13.64 mm
+  9/15 caso 060: fragmentos=6 cobertura=83.3% ASSD=1.83 mm HD95=12.03 mm
+  10/15 caso 067: fragmentos=5 cobertura=100.0% ASSD=1.12 mm HD95=4.82 mm
+  11/15 caso 077: fragmentos=6 cobertura=100.0% ASSD=3.23 mm HD95=17.21 mm
+  12/15 caso 078: fragmentos=4 cobertura=100.0% ASSD=3.87 mm HD95=19.40 mm
+  13/15 caso 087: fragmentos=8 cobertura=87.5% ASSD=9.06 mm HD95=42.18 mm
+  14/15 caso 095: fragmentos=5 cobertura=100.0% ASSD=1.92 mm HD95=13.39 mm
+  15/15 caso 099: fragmentos=6 cobertura=100.0% ASSD=1.65 mm HD95=7.95 mm
+
+=== Métricas opcionales de superficie por fragmento ===
+Fragmentos GT:          86
+Fragmentos detectados:  82
+Cobertura:              95.35%
+ASSD media:             3.096 mm
+ASSD mediana:           1.447 mm
+HD95 media:             16.000 mm
+HD95 mediana:           7.077 mm
+Menor es mejor. Las medias incluyen solo parejas detectadas; la cobertura declara las omisiones.
+JSON: E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_desde_week9_rotacion_fisica_w32_e60_s42_hd95_assd_val.json
+CSV:  E:\Proyecto_2_Analytics\proyecto2-analitica-datos-main\outputs\s10\from_week9_25d\s10_desde_week9_rotacion_fisica_w32_e60_s42_hd95_assd_val.csv
