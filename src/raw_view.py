@@ -25,13 +25,23 @@ from skimage import measure
 from skimage.transform import resize
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pengwin_io import BONE_HU_THRESHOLD, clean_bone_mask
+from pengwin_io import BONE_HU_THRESHOLD, BONE_LOW_HU_THRESHOLD, clean_bone_mask
 
 MIP_HU_MAX = 1500.0   # HU que se muestra como blanco; por encima se satura (cortical densa, metal)
 
 
-def bone_mask_for(image_hu: np.ndarray, spacing_xyz: tuple[float, float, float]) -> np.ndarray:
+def bone_mask_for(image_hu: np.ndarray, spacing_xyz: tuple[float, float, float],
+                  pulido: bool = False) -> np.ndarray:
+    """Máscara ósea del visualizador 1.
+
+    ``pulido=True`` agrega la recuperación de hueso tenue de ``clean_bone_mask`` (histéresis 150/250
+    HU, cierre y relleno de cavidades), que completa el hueso esponjoso. Es solo para la malla 3D:
+    las MIP usan la máscara cruda y ningún modelo, métrica o distancia la usa.
+    """
     sx, sy, sz = (float(v) for v in spacing_xyz)
+    if pulido:
+        return clean_bone_mask(image_hu, spacing_zyx=(sz, sy, sx),
+                               low_threshold=BONE_LOW_HU_THRESHOLD, fill_cavities=True)
     return clean_bone_mask(image_hu, spacing_zyx=(sz, sy, sx))
 
 

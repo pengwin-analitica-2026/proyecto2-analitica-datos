@@ -278,7 +278,16 @@ with tab1:
             col.image(raw[key], caption=f"MIP {name}", use_container_width=True)
         if st.toggle("Mostrar isosuperficie 3D del hueso", value=False,
                      help="Malla rotable de la misma máscara ósea; pesa más que la MIP."):
-            st.plotly_chart(bone_figure(raw["bone_verts_zyx"], raw["bone_faces"]), use_container_width=True)
+            verts, faces = raw["bone_verts_zyx"], raw["bone_faces"]
+            if "bone_verts_zyx_pulido" in raw and "bone_faces_pulido" in raw:
+                version = st.radio("Hueso", ["Pulido", "Crudo"], horizontal=True,
+                                   help="Pulido: además del umbral de 250 HU recupera el hueso tenue "
+                                        "(150-250 HU conectado al esqueleto) y rellena las cavidades. "
+                                        "Crudo: solo el umbral y la limpieza, como la MIP.")
+                if version == "Pulido":
+                    verts, faces = raw["bone_verts_zyx_pulido"], raw["bone_faces_pulido"]
+            st.plotly_chart(bone_figure(verts, faces), use_container_width=True)
+    st.caption("El pulido 3D es solo visual; el modelo, las métricas y las distancias usan los datos sin modificar.")
 
 # ----------------------------------------------------------------------------- visualizador 2
 with tab2:
@@ -357,6 +366,7 @@ with tab3:
     fig = mesh_figure(data["meshes"], fragments, spacing, show_main=show_main, main_opacity=main_opacity,
                       show_gt=show_gt3, gt_fragments=meta["fragments_gt"], label_contacts=label_contacts)
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("El pulido 3D es solo visual; el modelo, las métricas y las distancias usan los datos sin modificar.")
 
 # ----------------------------------------------------------------------------- métricas
 with tab4:

@@ -5,7 +5,7 @@ solo lee lo que este script dejó en ``outputs/demo/<modelo>/<caso>/``:
 
     volume.npz   images [z,S,S] uint8, semantic, ids (volumen de IDs PENGWIN predicho), gt_ids opcional
     meshes.npz   mallas por fragmento (predicho ``p_<id>_v/_f`` y real ``g_<id>_v/_f``)
-    raw_view.npz MIP axial/coronal/sagital e isosuperficie del hueso crudo (visualizador 1)
+    raw_view.npz MIP axial/coronal/sagital e isosuperficie del hueso, cruda y pulida (visualizador 1)
     meta.json    spacing, cajas por corte, tabla de fragmentos con distancia en mm, comparación con GT
 
 Uso (desde la raíz del repo, con los datos en data/raw):
@@ -121,6 +121,9 @@ def fragment_meshes(volume: np.ndarray, spacing_xyz: tuple[float, float, float],
         lo = np.maximum(coords.min(axis=0) - 2, 0)
         hi = coords.max(axis=0) + 3
         crop = mask[tuple(slice(int(a), int(b)) for a, b in zip(lo, hi))]
+        # Solo para la malla: rellena las cavidades cerradas dentro de este fragmento. Va fragmento por
+        # fragmento, así que no une fragmentos, y las distancias y tablas ya se midieron sobre ``volume``.
+        crop = ndi.binary_fill_holes(np.pad(crop, 1))[1:-1, 1:-1, 1:-1]
         raw_field = np.pad(crop.astype(np.float32), 1)
         result = None
         # Del más suave al más crudo: un fragmento muy fino puede no cruzar 0.5 tras suavizar
@@ -233,12 +236,17 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     if raw_view:
         from raw_view import bone_mask_for, bone_mesh, compute_mips
         mask = bone_mask_for(case.image, case.spacing_xyz)
-        mips = compute_mips(case.image, mask, case.spacing_xyz)
+        mips = compute_mips(case.image, mask, case.spacing_xyz)          # las MIP usan la máscara cruda
         mesh = bone_mesh(mask, case.spacing_xyz)
+        # Malla pulida: misma limpieza más la recuperación de hueso tenue. Solo visual.
+        mesh_p = bone_mesh(bone_mask_for(case.image, case.spacing_xyz, pulido=True), case.spacing_xyz)
         np.savez_compressed(out_dir / "raw_view.npz", mip_axial=mips["axial"], mip_coronal=mips["coronal"],
                             mip_sagital=mips["sagital"], bone_verts_zyx=mesh["verts_zyx"],
-                            bone_faces=mesh["faces"], bone_factor=mesh["factor"])
-        log(f"[{case_id}] visualizador 1: MIP y malla de {len(mesh['faces']):,} triángulos")
+                            bone_faces=mesh["faces"], bone_factor=mesh["factor"],
+                            bone_verts_zyx_pulido=mesh_p["verts_zyx"], bone_faces_pulido=mesh_p["faces"],
+                            bone_factor_pulido=mesh_p["factor"])
+        log(f"[{case_id}] visualizador 1: MIP y mallas de {len(mesh['faces']):,} (cruda) y "
+            f"{len(mesh_p['faces']):,} (pulida) triángulos")
 
     bone_z = np.flatnonzero((pred["semantic"] > 0).any(axis=(1, 2)))
     meta = {"case_id": case_id, "model": info, "size": size, "n_slices": int(len(images)),

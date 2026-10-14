@@ -296,6 +296,12 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
 9. **Tamaño de la muestra.** Test tiene 15 pacientes de un solo dataset.
 10. **Evaluaciones repetidas en test.** La cifra de H8 no es una estimación limpia (sección 4.1).
 11. **SAM medido con H6** (sección 4.6).
+12. **El pulido 3D es solo visual.** En el visualizador 1 la malla "pulida" agrega la recuperación de
+    hueso tenue (histéresis 150/250 HU, cierre y relleno de cavidades), y en el visualizador 3 cada
+    fragmento se dibuja con sus cavidades cerradas rellenas. Nada de eso entra al modelo, a las
+    métricas ni a las distancias, que usan los datos sin modificar. Aun pulidos, los casos 025, 026 y
+    066, con hueso de muy baja densidad, siguen incompletos: la recuperación solo llega al 51 %, 48 % y
+    54 % del hueso etiquetado (`docs/resumen_semana8.md`, sección 8.5).
 
 ## 7. Consideraciones éticas
 
