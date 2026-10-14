@@ -25,7 +25,8 @@ class TrainS10Tests(unittest.TestCase):
     def test_load_slices_margin(self):
         with tempfile.TemporaryDirectory() as d:
             labels = np.zeros((20, 8, 8), np.uint8); labels[8:12, 2:4, 2:4] = 1
-            np.savez(Path(d) / "001.npz", images=np.zeros((20, 8, 8), np.uint8), labels=labels)
+            np.savez(Path(d) / "001.npz", images=np.zeros((20, 8, 8), np.uint8), labels=labels,
+                     spacing_xyz=np.ones(3), orig_shape=np.array([20, 8, 8]), size=np.array(8))
             out = load_slices(Path(d), ["001"], margin=2)
             self.assertEqual(len(out["images"]), 8)   # 4 con hueso + 2 de margen por lado
             self.assertEqual(int(out["has_bone"].sum()), 4)

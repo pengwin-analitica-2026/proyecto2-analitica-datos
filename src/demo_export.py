@@ -10,9 +10,9 @@ solo lee lo que este script dejó en ``outputs/demo/<modelo>/<caso>/``:
 
 Uso (desde la raíz del repo, con los datos en data/raw):
 
-    python src/demo_export.py --case 024 044 099 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+    python src/demo_export.py --case 024 044 099 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta
 
-ORIENTACIÓN. H6 se entrenó con los volúmenes en orientación canónica (``orientacion.py``): los .mha
+ORIENTACIÓN. H8 (como H6 y H7) se entrenó con los volúmenes en orientación canónica (``orientacion.py``): los .mha
 guardados en LPI (girados 180 grados en el plano) se enderezan antes de predecir. Si el checkpoint lo
 pide (``model.canonical``), el caso se endereza UNA vez al cargarlo (imagen, ground truth y vista
 cruda), así los tres visualizadores muestran la misma orientación y la inferencia en vivo recibe

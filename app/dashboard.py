@@ -4,7 +4,7 @@ Lee las carpetas que deja ``src/demo_export.py`` en ``outputs/demo/<modelo>/<cas
 desde la raíz del repo:
 
     pip install -r requirements.txt
-    python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+    python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta
     streamlit run app/dashboard.py
 
 Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferencia en vivo del
@@ -29,7 +29,7 @@ from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, RE
 
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
 CHECKPOINT_DIR = ROOT / "outputs" / "s10"
-RESULTS_DIR = ROOT / "outputs" / "s10"          # JSON de la evaluación en test (Semana 10)
+RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en test
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
 
@@ -115,7 +115,7 @@ def fragments_dataframe(rows: list[dict]):
 
 def read_json(name: str) -> dict | None:
     path = RESULTS_DIR / name
-    return json.loads(path.read_text()) if path.exists() else None
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
 TEST_ROWS = (("F1 de clasificación", "classification_f1_macro", 0.85),
@@ -129,40 +129,59 @@ TEST_ROWS = (("F1 de clasificación", "classification_f1_macro", 0.85),
              ("IoU por fragmento", "instance_iou_matched", 0.70))
 
 
+TEST_EVALUATIONS = (("1.ª · D5", "s10/TEST_d5_s42_tta.json"),
+                    ("2.ª · H6", "s10/TEST2_h6_s42_tta.json"),
+                    ("3.ª · H7", "h7/test_tercera_h7_auggeo_rot35_canon_aumm_noema_w32_e60_s42_sin_enderezar.json"),
+                    ("4.ª · H8", "h8/test/test_h8.json"))
+
+
 def test_metrics_section() -> None:
-    """Las dos evaluaciones en test de la Semana 10, leídas de outputs/s10 (no se recalcula nada)."""
+    """Las evaluaciones en test del proyecto, leídas de outputs/ (no se recalcula nada)."""
     import pandas as pd
-    first, second = read_json("TEST_d5_s42_tta.json"), read_json("TEST2_h6_s42_tta.json")
-    if not first or not second:
+    found = [(label, read_json(name)) for label, name in TEST_EVALUATIONS]
+    found = [(label, data["subsets"]["todo"]) for label, data in found if data]
+    final = dict(found).get("4.ª · H8")
+    if not final:
         return
-    a, b = first["subsets"]["todo"], second["subsets"]["todo"]
-    slices = f"{b['n_slices']:,}".replace(",", " ")
-    st.subheader(f"Resultados en test ({b['n_cases']} casos, {slices} cortes)")
-    st.dataframe(pd.DataFrame([{"Métrica": name, "Objetivo": f"{goal:.2f}",
-                                "1.ª evaluación (D5)": f"{a[key]:.3f}", "2.ª evaluación (H6)": f"{b[key]:.3f}",
-                                "Cumple (H6)": "sí" if b[key] >= goal else "no"} for name, key, goal in TEST_ROWS]),
-                 use_container_width=True, hide_index=True)
-    st.caption("**Cómo leer las dos columnas.** La primera evaluación (D5) se hizo con la configuración congelada "
-               "antes de ver test: es la cifra limpia, y no cumplía el Dice por fragmento (0.845). La segunda (H6, "
-               "el modelo de esta demo) se hizo después de analizar los fallos de la primera, y ese análisis miró "
-               "dos casos de test (012 y 039). H6 se eligió solo con validación y pruebas de estrés; sus tres "
-               "semillas dan 0.875, 0.875 y 0.876 en Dice por fragmento.")
-    c1, c2 = st.columns(2)
-    distances = read_json("TEST2_h6_s42_nofill.json")
+    slices = f"{final['n_slices']:,}".replace(",", " ")
+    st.subheader(f"Resultados en test ({final['n_cases']} casos, {slices} cortes)")
+    rows = []
+    for name, key, goal in TEST_ROWS:
+        row = {"Métrica": name, "Objetivo": f"{goal:.2f}"}
+        row.update({label: f"{values[key]:.3f}" for label, values in found})
+        row["Cumple (H8)"] = "sí" if final[key] >= goal else "no"
+        rows.append(row)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption("**Cómo leer las columnas.** H8 es el modelo de esta demo: sin EMA, con el giro del aumento en "
+               "milímetros y con aumento de ruido gaussiano; se eligió solo con validación y se evaluó en test una "
+               "vez, con la configuración escrita de antemano. La primera evaluación (D5) se hizo con la "
+               "configuración congelada antes de ver test y es la única cifra limpia: no cumplía el Dice por "
+               "fragmento (0.845). Las siguientes se hicieron después de analizar los fallos de esa primera "
+               "evaluación, que miró dos casos de test (012 y 039).")
+    c1, c2, c3 = st.columns(3)
+    surface = read_json("h8/test/superficie_test_h8.json")
+    if surface:
+        r = surface["resumen"]["todos"]
+        c1.metric("HD95 / ASSD por fragmento en test (H8)",
+                  f"{r['hd95_mm_mediana']:.1f} / {r['assd_mm_mediana']:.2f} mm",
+                  help=f"Medianas sobre {r['n_detectados']} de {r['n_fragmentos']} fragmentos reales detectados "
+                       f"(cobertura {r['cobertura']:.1%}) · medias {r['hd95_mm_media']:.1f} / "
+                       f"{r['assd_mm_media']:.2f} mm")
+    distances, who = read_json("h8/test/distancias_test_h8.json"), "H8"
+    if not distances:
+        distances, who = read_json("s10/TEST2_h6_s42_nofill.json"), "H6"
     if distances:
         r = distances["resumen"]
-        c1.metric("Error de distancia en test (H6)", f"{r['error_distancia_mm_media']:.2f} mm",
+        c2.metric(f"Error de distancia en test ({who})", f"{r['error_distancia_mm_media']:.2f} mm",
                   help=f"{r['n_con_distancia_predicha']} de {r['n_fragmentos_secundarios']} fragmentos secundarios "
                        f"con distancia predicha · mediana {r['error_distancia_mm_mediana']:.1f} mm · "
                        f"correlación {r['correlacion_distancia']:.2f}")
-        c1.caption(f"Correlación predicción–real {r['correlacion_distancia']:.2f}; un solo fragmento concentra "
-                   "la mayor parte del error medio.")
-    sam = read_json("sam_baseline_test_h6.json")
+    sam = read_json("s10/sam_baseline_test_h6.json")
     if sam:
-        c2.metric("Dice por región en test: propio vs SAM zero-shot",
+        c3.metric("Dice por región en test: propio vs SAM (H6)",
                   f"{sam['global_nuestro']['dice']:.3f} vs {sam['global_sam']['dice']:.3f}",
                   help=f"{sam['global_sam']['n']} regiones en {sam['cortes']} cortes (uno de cada {sam['stride']}). "
-                       "SAM recibe como indicación la caja del ground truth.")
+                       "SAM zero-shot recibe como indicación la caja que predice el detector. Medido con H6.")
 
 
 def latency_section() -> None:
@@ -171,16 +190,16 @@ def latency_section() -> None:
     st.subheader("Latencia por imagen (384×384, lote 1)")
     rows = []
     measured = DEMO_ROOT / "latency.json"
-    for name in ("latencia_gpu_L4.json", "latencia_cpu_colab.json"):
+    for name in ("s10/latencia_gpu_L4.json", "s10/latencia_cpu_colab.json"):
         data = read_json(name)
         if not data:
             continue
         for config, values in data["config"].items():
             rows.append({"Dispositivo": data["device"], "Configuración": config,
                          "Mediana (ms)": values["mediana_ms"], "Percentil alto (ms)": f"p95 · {values['p95_ms']}",
-                         "Fuente": "Semana 10, Colab"})
+                         "Fuente": "Semana 10, Colab (H6, misma arquitectura)"})
     if measured.exists():
-        for row in json.loads(measured.read_text()):       # filas de src/measure_latency.py
+        for row in json.loads(measured.read_text(encoding="utf-8")):       # filas de src/measure_latency.py
             hilos = f", {row['Hilos CPU']} hilos" if row.get("Hilos CPU") not in (None, "—") else ""
             rows.append({"Dispositivo": f"{row['Dispositivo'].lower()} ({row['Hardware']}{hilos})",
                          "Configuración": "1 modelo" + (" + TTA" if row["TTA"] == "sí" else ""),
@@ -203,7 +222,7 @@ st.error(NON_CLINICAL, icon="⚠️")
 cases = discover_cases()
 if not cases:
     st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
-            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta`")
+            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
     st.stop()
 
 with st.sidebar:

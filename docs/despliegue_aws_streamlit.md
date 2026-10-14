@@ -1,12 +1,14 @@
 # Despliegue: Streamlit Community Cloud y API en AWS Lambda
 
-Estado al 6 de octubre de 2026. Modelo desplegado: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
+Estado al 13 de octubre de 2026. Modelo de la imagen de la API: **H8** (`h8_aumm_noise01_noema_w32_e60_s42.pth`).
+La Lambda publicada se actualiza sola cuando esta versión llegue a `main`; hasta entonces sigue con
+H6, y el dashboard avisa si el modelo del servicio no es el del caso exportado.
 
 ```
 Celular / computador ──► Streamlit Community Cloud (app/dashboard.py, sin torch)
                                  │  solo al pulsar «Inferir el corte seleccionado»
                                  ▼
-                       AWS Lambda pelvis-api (contenedor con H6, api/server.py)
+                       AWS Lambda pelvis-api (contenedor con H8, api/server.py)
 ```
 
 Las tres pestañas leen los casos ya exportados (`outputs/demo/<modelo>/<caso>/`), que viajan en el
@@ -72,7 +74,7 @@ responde 403. El AWS CLI 2.27 no tiene la opción del segundo; se agregó con bo
 
 ### Orientación
 
-H6 espera cortes en orientación canónica. La API no gira nada: el dashboard le manda cortes del
+H8 espera cortes en orientación canónica. La API no gira nada: el dashboard le manda cortes del
 caso exportado, y `demo_export.py` ya enderezó el volumen. `/health?deep=1` devuelve
 `"canonical": true` para que se pueda comprobar.
 

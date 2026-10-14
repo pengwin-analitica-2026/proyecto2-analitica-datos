@@ -21,7 +21,9 @@ ellas el comportamiento es el de B1):
 - ``--secondary-oversample``: muestrea más los cortes con fragmentos secundarios;
 - ``--backbone-init``: pesos del backbone preentrenados con ``pretrain_backbone.py``;
 - ``--aug-mm``: el aumento geométrico gira en milímetros reales (``aumento_fisico.py``), no en
-  la grilla de píxeles estirada; sin la opción se conserva el comportamiento anterior.
+  la grilla de píxeles estirada; sin la opción se conserva el comportamiento anterior;
+- ``--aug-noise``: ruido gaussiano en el 30 % de las muestras, con sigma al azar hasta ese valor
+  (escala 0-1); 0 = apagado.
 
 La evaluación durante el entrenamiento usa un subconjunto fijo de validación (un corte
 de cada ``--val-stride``). La cifra definitiva sale de ``evaluate_volumes.py`` sobre el
@@ -256,6 +258,8 @@ def main() -> None:
                         help="Probabilidad de simular baja resolución por muestra; 0 = apagado.")
     parser.add_argument("--aug-gamma", type=float, default=0.0,
                         help="Amplitud log del aumento de gamma por muestra; 0 = apagado.")
+    parser.add_argument("--aug-noise", type=float, default=0.0,
+                        help="Sigma máxima del ruido gaussiano (escala 0-1) en el 30 %% de las muestras; 0 = apagado.")
     parser.add_argument("--aug-mm", action="store_true",
                         help="Aumento geométrico en milímetros reales (aumento_fisico.py), no en píxeles.")
     parser.add_argument("--backbone-init", default=None)
@@ -351,7 +355,7 @@ def main() -> None:
                 "in_channels": in_channels, "context": args.context,
                 "deep_supervision": args.deep_supervision_weight > 0, "ema": args.ema,
                 "use_cbam": use_cbam, "cbam_stages": cbam_stages, "canonical": args.canonical,
-                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "aug_mm": args.aug_mm, "cosine": args.cosine,
+                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "aug_mm": args.aug_mm, "aug_noise": args.aug_noise, "cosine": args.cosine,
                 "input_size": args.size, "mode": args.mode, "seed": args.seed,
                 "fracture_weight": args.fracture_weight, "secondary_weight": args.secondary_weight,
                 "best_validation": metrics, "args": vars(args)}
@@ -386,6 +390,10 @@ def main() -> None:
             if args.aug_gamma > 0:
                 gamma = torch.exp((torch.rand(x.shape[0], 1, 1, 1) * 2 - 1) * args.aug_gamma)
                 x = x.clamp(0.0, 1.0) ** gamma
+            if args.aug_noise > 0:
+                on = torch.rand(x.shape[0]) < 0.3
+                sigma = torch.rand(x.shape[0], 1, 1, 1) * args.aug_noise
+                x[on] = (x[on] + torch.randn_like(x[on]) * sigma[on]).clamp(0.0, 1.0)
             if args.fracture_weight > 0:
                 w = fracture_distance_weight(y, args.fracture_weight)
             target = labels_to_grid(y)

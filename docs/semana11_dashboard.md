@@ -1,6 +1,8 @@
 # Semana 11 — dashboard con tres visualizadores
 
-Estado al 6 de octubre de 2026. Modelo de la demo: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
+Estado al 13 de octubre de 2026. Modelo de la demo: **H8** (`h8_aumm_noise01_noema_w32_e60_s42.pth`), que reemplazó a
+H6 tras la asesoría (ver `docs/modelo_h8.md`). La demo, la API y el dashboard funcionan igual con
+los dos, porque la arquitectura y la orientación canónica son las mismas.
 Es el documento de la Semana 11 para los visualizadores. El despliegue está en
 `docs/despliegue_aws_streamlit.md` y las pruebas y el despliegue automáticos en
 `docs/cicd_github_actions.md`.
@@ -13,7 +15,7 @@ En local, desde la raíz del repo, con el `.venv` activo:
 
 ```bash
 pip install -r requirements.txt
-python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta
 streamlit run app/dashboard.py
 ```
 
@@ -28,7 +30,7 @@ streamlit run app/dashboard.py
   `INFERENCE_URL` e `INFERENCE_KEY` (variables de entorno o secretos de Streamlit); si no, carga el
   modelo local, que necesita `torch` y el checkpoint en `outputs/s10/`.
 
-Casos versionados en `outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/`, todos con H6 y TTA:
+Casos versionados en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`, todos con H8 y TTA:
 
 | Caso | Split | Guardado girado 180° | Para qué |
 |---|---|---|---|
@@ -39,13 +41,13 @@ Casos versionados en `outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/`, todo
 
 ## Orientación
 
-H6 se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están
+H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están
 guardados girados 180° en el plano (`TransformMatrix = -1 0 0 0 -1 0 0 0 1`, orientación LPI) y
 `SimpleITK.GetArrayFromImage` no aplica esa dirección.
 
 `demo_export.py` lo resuelve al cargar el caso:
 
-1. Lee la marca `canonical` del checkpoint (`True` en H6, `False` en D5). Con D5 no se endereza nada.
+1. Lee la marca `canonical` del checkpoint (`True` en H6 y H8, `False` en D5). Con D5 no se endereza nada.
 2. Si el modelo la pide, lee la `TransformMatrix` de la cabecera del `.mha`
    (`orientacion.header_is_rotated`). Si la cabecera no la trae, usa la lista
    `orientacion.LPI_CASES`.
@@ -83,10 +85,10 @@ No se devuelve el resultado a la orientación original: en la canónica todos lo
    rótulo `ID · mm` con flecha en cada fragmento. Interruptores para el fragmento principal, su
    opacidad y el ground truth superpuesto.
 
-Pestaña **Métricas y latencia**: distancia predicha contra la real en el caso elegido; las dos
-evaluaciones en test (D5 con la configuración congelada antes de ver test, 0.845 de Dice por
-fragmento, y H6 después del análisis de fallos, 0.875), el error de distancia y SAM sobre test,
-leídos de `outputs/s10/`; y la latencia por imagen.
+Pestaña **Métricas y latencia**: distancia predicha contra la real en el caso elegido; las cuatro
+evaluaciones en test del proyecto (D5 con la configuración congelada antes de ver test, 0.845 de
+Dice por fragmento; H6, 0.875; H7, 0.879; y H8, 0.874, el modelo de la demo), HD95 y ASSD por
+fragmento, el error de distancia y SAM sobre test, leídos de `outputs/`; y la latencia por imagen.
 
 ## Distancia en mm
 
@@ -96,24 +98,25 @@ el spacing del header (ajustado al estiramiento a 384 px). El volumen de IDs sal
 etiqueta, así no se rellena el hueco entre fragmentos. Es una medida del fragmento entero en 3D: en
 el visualizador 2 se repite en todos los cortes donde aparece.
 
-## Resultado por caso (H6, TTA)
+## Resultado por caso (H8, TTA)
 
-Generado en la CPU del Mac. Dice por macro-hueso de la semántica 3D contra el ground truth y
-fragmentos secundarios reales con su distancia (real → predicha). «Cruce» es el Dice entre el coxal
-izquierdo predicho y el derecho real: si la orientación estuviera mal, sería alto.
+Generado en CPU. Dice por macro-hueso de la semántica 3D contra el ground truth y fragmentos
+secundarios reales con su distancia (real → predicha). «Cruce» es el Dice entre el coxal izquierdo
+predicho y el derecho real: si la orientación estuviera mal, sería alto.
 
 | Caso | Enderezado | Dice sacro / coxal izq. / coxal der. | Cruce | Secundarios separados del principal (real → predicho) |
 |---|---|---|---|---|
-| 024 | no | 0.965 / 0.981 / 0.980 | 0.000 | F3 coxal izq.: 19.0 → 19.0 mm; F4 coxal izq.: 3.2 → 4.5 mm |
-| 044 | sí | 0.958 / 0.970 / 0.966 | 0.000 | ninguno (su único secundario está en contacto: 0.0 → 0.0 mm) |
-| 099 | sí | 0.971 / 0.976 / 0.978 | 0.000 | F2 coxal izq.: 12.8 → 13.3 mm |
-| 039 (test) | no | 0.953 / 0.958 / 0.965 | 0.004 | F3 coxal der.: 33.7 mm, **no detectado** |
+| 024 | no | 0.966 / 0.979 / 0.979 | 0.000 | F3 coxal izq.: 19.0 → 19.0 mm; F4 coxal izq.: 3.2 → 3.9 mm |
+| 044 | sí | 0.958 / 0.973 / 0.968 | 0.000 | ninguno (su único secundario está en contacto: 0.0 → 0.0 mm) |
+| 099 | sí | 0.972 / 0.977 / 0.979 | 0.000 | F2 coxal izq.: 12.8 → 18.6 mm |
+| 039 (test) | no | 0.954 / 0.955 / 0.966 | 0.002 | F3 coxal der.: 33.7 mm, **no detectado** |
 
 En 044 y 099 el sacro queda abajo y las regiones izquierda y derecha coinciden con el ground truth
 después de enderezar. Son cuatro casos: sirven para comprobar que la orientación y la distancia
 funcionan, no para estimar el error (eso está en la pestaña de métricas, con los 15 casos de test).
-En 039 el modelo pierde el fragmento más separado del coxal derecho, uno de los fallos que siguen
-abiertos en test.
+Frente a H6, el fragmento de 3.2 mm del caso 024 se mide mejor (3.9 contra 4.5 mm) y el de 12.8 mm
+del 099 peor (18.6 contra 13.3 mm). En 039 el modelo sigue sin detectar el fragmento más separado
+del coxal derecho.
 
 ## Decisiones
 
@@ -122,7 +125,7 @@ abiertos en test.
 | Framework | Streamlit. El dashboard solo lee los archivos que deja `demo_export.py`, así que abre al instante y no necesita `torch` |
 | Dónde se endereza | Al exportar el caso, no en la API: así las tres vistas, el ground truth y la inferencia en vivo comparten orientación |
 | Orientación | Sale de la cabecera del `.mha`, no de la lista de casos, para que sirva con volúmenes que no sean de PENGWIN |
-| Modelos en la demo | Solo el entregado (H6). El selector de modelos se descartó y los casos exportados con D5 se borraron |
+| Modelos en la demo | Solo el entregado (H8). El selector de modelos se descartó y los casos exportados con D5 y H6 se borraron |
 | Casos | Tres de validación y uno de test (039), este último porque el modelo ya estaba congelado |
 | Videos de respaldo | `docs/video/demo_computador.mp4` (recorrido completo, 110 s) y `docs/video/demo_celular.mp4` (prueba en celular, 70 s) |
 | Publicación | Streamlit Community Cloud y una API en AWS Lambda, probados desde computador y celular (6 de octubre). El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado |

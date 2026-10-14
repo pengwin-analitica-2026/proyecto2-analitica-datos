@@ -217,6 +217,8 @@ class TestCasosReales(unittest.TestCase):
     def test_igual_que_to_canonical_en_los_100(self):
         import orientacion
         import pengwin_io
+        from build_case_cache import set_raw_root
+        set_raw_root(str(DATOS))     # otra prueba puede haber apuntado pengwin_io a una carpeta temporal
         for n in range(1, 101):
             caso = f"{n:03d}"
             img = sitk.ReadImage(str(pengwin_io.find_image_path(caso)))

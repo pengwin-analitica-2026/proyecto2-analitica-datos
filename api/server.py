@@ -3,11 +3,11 @@
 Un solo modelo cargado al arrancar. El dashboard (Streamlit Cloud) manda un corte uint8 [S,S] ya
 preprocesado y recibe la semántica, las cajas y la latencia del modelo.
 
-Orientación: H6 espera cortes en orientación canónica (``src/orientacion.py``). El servidor no gira
+Orientación: H8 espera cortes en orientación canónica (``src/orientacion.py``). El servidor no gira
 nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderezó el volumen.
 ``/health?deep=1`` informa ``canonical`` para que el cliente lo compruebe.
 
-    MODEL_PATH=outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080
+    MODEL_PATH=outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-MODEL_PATH = os.environ.get("MODEL_PATH", str(ROOT / "outputs" / "s10" / "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth"))
+MODEL_PATH = os.environ.get("MODEL_PATH", str(ROOT / "outputs" / "s10" / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 API_KEY = os.environ.get("API_KEY", "")
 TTA = os.environ.get("TTA", "0") == "1"
 MAX_BYTES = 2_000_000          # un corte 384x384 uint8 pesa ~150 kB

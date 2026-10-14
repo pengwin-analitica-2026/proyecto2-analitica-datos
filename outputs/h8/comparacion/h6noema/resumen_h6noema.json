@@ -1,0 +1,79 @@
+{
+ "nombre": "h6noema",
+ "extra": "--ema 0",
+ "minutos_entrenamiento": 68.29996327956518,
+ "cortado_por_tiempo": false,
+ "tabla": {
+  "base": {
+   "classification_f1_macro": 0.991,
+   "classification_auc_macro": 0.9994,
+   "detection_iou_mean": 0.947,
+   "detection_map50": 0.9737,
+   "detection_map50_95": 0.9027,
+   "segmentation_dice_macro": 0.9711,
+   "segmentation_iou_macro": 0.9439,
+   "instance_dice_matched": 0.8725,
+   "instance_iou_matched": 0.8115,
+   "instance_dice_primary": 0.9064,
+   "instance_dice_secondary": 0.7713,
+   "instance_missed_secondary": 0.0543
+  },
+  "noise10": {
+   "classification_f1_macro": 0.8829,
+   "classification_auc_macro": 0.9736,
+   "detection_iou_mean": 0.6742,
+   "detection_map50": 0.6092,
+   "detection_map50_95": 0.4434,
+   "segmentation_dice_macro": 0.8209,
+   "segmentation_iou_macro": 0.7134,
+   "instance_dice_matched": 0.6486,
+   "instance_iou_matched": 0.5766,
+   "instance_dice_primary": 0.7429,
+   "instance_dice_secondary": 0.367,
+   "instance_missed_secondary": 0.3249
+  },
+  "noise25": {
+   "classification_f1_macro": 0.8565,
+   "classification_auc_macro": 0.8362,
+   "detection_iou_mean": 0.1345,
+   "detection_map50": 0.0955,
+   "detection_map50_95": 0.0359,
+   "segmentation_dice_macro": 0.1772,
+   "segmentation_iou_macro": 0.0974,
+   "instance_dice_matched": 0.0899,
+   "instance_iou_matched": 0.0573,
+   "instance_dice_primary": 0.1007,
+   "instance_dice_secondary": 0.0575,
+   "instance_missed_secondary": 0.7022
+  },
+  "rotmm60": {
+   "classification_f1_macro": 0.9347,
+   "classification_auc_macro": 0.9847,
+   "detection_iou_mean": 0.3711,
+   "detection_map50": 0.2933,
+   "detection_map50_95": 0.2039,
+   "segmentation_dice_macro": 0.6915,
+   "segmentation_iou_macro": 0.5315,
+   "instance_dice_matched": 0.57,
+   "instance_iou_matched": 0.481,
+   "instance_dice_primary": 0.6079,
+   "instance_dice_secondary": 0.4563,
+   "instance_missed_secondary": 0.2774
+  },
+  "rotmm60_norm": {
+   "classification_f1_macro": 0.99,
+   "classification_auc_macro": 0.9988,
+   "detection_iou_mean": 0.9212,
+   "detection_map50": 0.9615,
+   "detection_map50_95": 0.8814,
+   "segmentation_dice_macro": 0.9569,
+   "segmentation_iou_macro": 0.9175,
+   "instance_dice_matched": 0.8554,
+   "instance_iou_matched": 0.7824,
+   "instance_dice_primary": 0.8885,
+   "instance_dice_secondary": 0.7561,
+   "instance_missed_secondary": 0.0595
+  }
+ },
+ "fallos": []
+}

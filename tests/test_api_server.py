@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-CHECKPOINT = ROOT / "outputs" / "s10" / "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth"
+CHECKPOINT = ROOT / "outputs" / "s10" / "h8_aumm_noise01_noema_w32_e60_s42.pth"
 
 try:
     from fastapi.testclient import TestClient
