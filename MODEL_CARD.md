@@ -249,6 +249,19 @@ detectado.
 No detectados: tres secundarios en validación y cuatro en test. La media supera a la mediana por
 unos pocos fragmentos con un trozo aislado lejos del hueso, que el HD95 castiga.
 
+### 4.11 Otras rotaciones (medidas con H7)
+
+Volúmenes oblicuos e inclinados fuera del plano axial, en validación. Se midieron con H7, que
+comparte con H8 la orientación por metadatos y el giro del aumento en milímetros.
+
+- **Volumen oblicuo** (casos 014, 044 y 099, con cabeceo de 10°, inclinación lateral de 20°, ambos
+  combinados y giro de 15° en el plano): la normalización lee la inclinación de la matriz de
+  dirección (de 10.0° a 22.3°) y la corrige. El Dice de la orientación pasa de 0.24-0.55 sin
+  corregir a 0.93-0.99 corregido (`outputs/h7/otras_rotaciones/prueba1_oblicuo.csv`).
+- **Paciente inclinado dentro del escáner** (no está en los metadatos y no se corrige): con 10° y
+  20° de cabeceo, el Dice por fragmento de H7 baja de 0.873 a 0.864 y 0.858; con 10° y 20° de
+  inclinación lateral, a 0.869 y 0.858 (`outputs/h7/otras_rotaciones/prueba2_inclinacion.csv`).
+
 ## 5. Protocolo de evaluación
 
 - Todo se elige en validación. Una variante se adopta solo si mejora al menos 0.003, con bootstrap
@@ -307,12 +320,13 @@ El sistema es un solo modelo multitarea, así que hay un model card. Los pesos v
 | Archivo | Qué es | En qué difiere del entregado |
 |---|---|---|
 | `outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth` | **Modelo entregado** (H8, semilla 42) | — |
+| `outputs/h7/h7_auggeo_rot35_canon_aumm_noema_w32_e60_s42.pth` | H7, modelo de la tercera evaluación en test | Sin aumento de ruido |
 | `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s4{2,3,4}.pth` | H6, el modelo anterior, con tres semillas | Con EMA, giro del aumento en píxeles y sin aumento de ruido |
 | `outputs/s10/d5_ema_w32_e60_s42.pth` | D5, el modelo de la primera evaluación en test | Además, sin orientación canónica ni aumento geométrico |
 | `outputs/gamma/w10g_384neg.pth` y `w10g_sec3.pth` | Primera versión de la Semana 10, usada como línea base | Backbone de 16 canales y entrenamiento en etapas |
 
 Los modelos de la comparación de la sección 4.3 (H6 sin EMA, H7 con EMA) y el de la ablación de
-CBAM no se versionan; sus resultados están en `outputs/h8/`. Los resultados de H7 están en
+CBAM no se versionan; sus resultados están en `outputs/h8/`. Los pesos y resultados de H7 están en
 `outputs/h7/`.
 
 Datos de entrenamiento, alcances, limitaciones y advertencia de uso son los mismos para todos:

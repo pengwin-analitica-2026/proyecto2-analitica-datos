@@ -1,0 +1,6 @@
+,classification_f1_macro,detection_map50,segmentation_dice_macro,instance_dice_matched
+sin inclinación,0.992,0.974,0.971,0.873
+pitch=10,0.99,0.97,0.966,0.864
+pitch=20,0.985,0.961,0.964,0.858
+roll=10,0.988,0.965,0.964,0.869
+roll=20,0.97,0.916,0.955,0.858
