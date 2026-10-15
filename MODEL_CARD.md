@@ -170,22 +170,28 @@ modelo (F1 0.39 a 0.47): eso mide dependencia, no aporte.
 | Transfer learning (backbone preentrenado en Intel Image Classification, 2 semillas) | Dice por fragmento 0.851 y 0.856; secundarios +0.011 y −0.007 | Neutral; el modelo final no usa preentrenamiento |
 | λ × 2 | Dice por fragmento 0.855 (ruido); mAP50 crudo 0.827 contra 0.868 | Se mantiene λ por defecto |
 
-### 4.6 Comparación con SAM (test, medida con H6)
+### 4.6 Comparación con SAM zero-shot
 
-SAM ViT-B en modo zero-shot, con la caja predicha por el detector como prompt, comparado con la
-máscara semántica del modelo propio dentro de la misma caja (1 181 cortes de test, uno de cada tres;
-3 002 pares corte-región). SAM no forma parte del pipeline. **Se midió con H6**; con H8 no se ha
-repetido.
+SAM ViT-B en modo zero-shot, con la caja que predice H8 como prompt, comparado con la máscara
+semántica de H8 dentro de la misma caja. Uno de cada tres cortes con hueso: 1 181 cortes y 3 002
+pares corte-región en test; 1 308 cortes y 3 393 pares en validación. SAM no forma parte del
+pipeline ni genera etiquetas (`src/sam_baseline.py`).
 
-| Región | Dice SAM | Dice H6 | IoU SAM | IoU H6 |
+| Región (test) | Dice SAM | Dice H8 | IoU SAM | IoU H8 |
 |---|---|---|---|---|
-| Sacro | 0.792 | 0.884 | 0.690 | 0.820 |
-| Coxal izquierdo | 0.915 | 0.947 | 0.859 | 0.905 |
-| Coxal derecho | 0.930 | 0.957 | 0.879 | 0.921 |
-| **Global** | **0.889** | **0.935** | **0.823** | **0.889** |
+| Sacro | 0.794 | 0.886 | 0.690 | 0.824 |
+| Coxal izquierdo | 0.914 | 0.943 | 0.860 | 0.901 |
+| Coxal derecho | 0.930 | 0.952 | 0.880 | 0.913 |
+| **Global test** | **0.889** | **0.931** | **0.824** | **0.886** |
+| Global validación | 0.866 | 0.919 | 0.791 | 0.866 |
 
-H8 tiene un Dice semántico en test casi igual al de H6 (0.968 contra 0.971), así que es de esperar
-la misma diferencia frente a SAM, pero no se ha medido.
+H8 supera a SAM en las tres regiones y en las dos particiones (+0.042 de Dice global en test). La
+mayor diferencia está en el sacro (+0.092), donde la caja es grande y el hueso esponjoso confunde a
+SAM. Con H6 la comparación había dado lo mismo (SAM 0.889 contra 0.935 en test). Matices: SAM
+recibe las cajas de nuestro detector, lo que lo favorece en localización, y se compara la región
+completa porque SAM no separa ni clasifica fragmentos, que es lo que aporta el modelo propio. SAM
+tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se habían medido
+259 ms), frente a unos 64 ms del modelo propio completo en una L4.
 
 ### 4.7 Peores casos (test)
 
@@ -270,8 +276,9 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
 - Las cifras de test se reportan todas, incluidas las que no se usaron, y no se ajusta ningún
   umbral después de verlas.
 - Ruido y giro se miden solo en validación (`evaluate_volumes.py --stress`).
-- HD95, ASSD y la distancia de separación en test usan el mismo modelo y la misma configuración
-  congelada de la evaluación de H8; son mediciones adicionales, no una nueva elección.
+- HD95, ASSD, la distancia de separación y la comparación con SAM en test usan el mismo modelo y
+  la misma configuración congelada de la evaluación de H8; son mediciones adicionales, no una nueva
+  elección.
 
 ## 6. Limitaciones
 
@@ -295,7 +302,8 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
 8. **Modelo 2D.** Procesa corte a corte. La coherencia entre cortes depende del post-proceso 3D.
 9. **Tamaño de la muestra.** Test tiene 15 pacientes de un solo dataset.
 10. **Evaluaciones repetidas en test.** La cifra de H8 no es una estimación limpia (sección 4.1).
-11. **SAM medido con H6** (sección 4.6).
+11. **SAM se compara solo por región.** SAM no separa fragmentos, así que la comparación de la
+    sección 4.6 es de la segmentación semántica dentro de la caja, no del Dice por fragmento.
 12. **El pulido 3D es solo visual.** En el visualizador 1 la malla "pulida" agrega la recuperación de
     hueso tenue (histéresis 150/250 HU, cierre y relleno de cavidades), y en el visualizador 3 cada
     fragmento se dibuja con sus cavidades cerradas rellenas. Nada de eso entra al modelo, a las

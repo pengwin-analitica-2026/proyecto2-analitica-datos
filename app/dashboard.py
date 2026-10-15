@@ -176,12 +176,14 @@ def test_metrics_section() -> None:
                   help=f"{r['n_con_distancia_predicha']} de {r['n_fragmentos_secundarios']} fragmentos secundarios "
                        f"con distancia predicha · mediana {r['error_distancia_mm_mediana']:.1f} mm · "
                        f"correlación {r['correlacion_distancia']:.2f}")
-    sam = read_json("s10/sam_baseline_test_h6.json")
+    sam, who = read_json("h8/test/sam_baseline_test_h8.json"), "H8"
+    if not sam:
+        sam, who = read_json("s10/sam_baseline_test_h6.json"), "H6"
     if sam:
-        c3.metric("Dice por región en test: propio vs SAM (H6)",
+        c3.metric(f"Dice por región en test: {who} vs SAM zero-shot",
                   f"{sam['global_nuestro']['dice']:.3f} vs {sam['global_sam']['dice']:.3f}",
                   help=f"{sam['global_sam']['n']} regiones en {sam['cortes']} cortes (uno de cada {sam['stride']}). "
-                       "SAM zero-shot recibe como indicación la caja que predice el detector. Medido con H6.")
+                       f"SAM recibe como indicación la caja que predice {who}; no forma parte del pipeline.")
 
 
 def latency_section() -> None:

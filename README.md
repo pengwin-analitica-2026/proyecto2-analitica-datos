@@ -219,8 +219,9 @@ recomienda volver a correr test para ajustar nada.
 ### 3.4 Línea base SAM (solo comparación)
 
 SAM ViT-B no forma parte del sistema: recibe como prompt la caja que predice nuestro detector y se
-compara con nuestra máscara semántica. La comparación publicada se hizo con H6
-(`outputs/s10/sam_baseline_test_h6.json`). Pesos: `sam_vit_b_01ec64.pth`, del repositorio oficial de
+compara con nuestra máscara semántica. Con H8, en test, SAM da 0.889 de Dice por región y H8 0.931
+(`outputs/h8/test/sam_baseline_test_h8.json`; la medición anterior con H6 está en
+`outputs/s10/sam_baseline_test_h6.json`). Pesos: `sam_vit_b_01ec64.pth`, del repositorio oficial de
 Segment Anything.
 
 ```bash

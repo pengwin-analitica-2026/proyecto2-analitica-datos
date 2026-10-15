@@ -13,6 +13,7 @@ Uso, desde la raíz del repo:
     kaggle kernels push -p build/kaggle_h8/h8                 # entrena H8 y lo valida (5 pruebas)
     kaggle kernels push -p build/kaggle_h8/h8test             # test, HD95/ASSD y ablación de CBAM
     kaggle kernels push -p build/kaggle_h8/h8dist             # distancia de separación en mm
+    kaggle kernels push -p build/kaggle_h8/h8sam              # SAM zero-shot contra H8 (solo comparación)
 
 Kaggle permite dos sesiones de GPU a la vez. Los resultados se bajan con
 ``kaggle kernels output <usuario>/pengwin-exp-<nombre> -p <carpeta>``.
@@ -40,6 +41,7 @@ KERNELS = {
                 "h6noema_auggeo_rot35_canon_noema_w32_e60_s42.pth", ["pengwin-cache-trainval"]),
     "h8test": ("plantilla_test_cbam_superficie.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
     "h8dist": ("plantilla_distancias.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
+    "h8sam": ("plantilla_sam.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
 }
 
 
@@ -68,7 +70,7 @@ def main() -> None:
         carpeta = Path(args.salida) / nombre
         carpeta.mkdir(parents=True, exist_ok=True)
         (carpeta / "script.py").write_text(codigo, encoding="utf8", newline="\n")
-        slug = f"pengwin-exp-{nombre.replace('h8test', 'h8-test').replace('h8dist', 'h8-dist')}"
+        slug = f"pengwin-exp-{nombre.replace('h8test', 'h8-test').replace('h8dist', 'h8-dist').replace('h8sam', 'h8-sam')}"
         metadatos = {"id": f"{args.usuario}/{slug}", "title": slug, "code_file": "script.py",
                      "language": "python", "kernel_type": "script", "is_private": "true",
                      "enable_gpu": "true", "enable_internet": "true",

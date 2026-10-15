@@ -289,6 +289,29 @@ reales, 18.6 predichos) y el del 087 (5.3 mm reales, dado por pegado). Solo 5 de
 de validación y 4 de test están realmente separados del principal, así que estas cifras se apoyan
 en pocos casos.
 
+### 5.7 Comparación con SAM zero-shot
+
+SAM ViT-B en modo zero-shot, con la caja que predice H8 como prompt, comparado con la máscara
+semántica de H8 dentro de la misma caja. Uno de cada tres cortes con hueso: 1 181 cortes y 3 002
+pares corte-región en test; 1 308 cortes y 3 393 pares en validación. SAM no forma parte del
+pipeline ni genera etiquetas (`src/sam_baseline.py`).
+
+| Región (test) | Dice SAM | Dice H8 | IoU SAM | IoU H8 |
+|---|---|---|---|---|
+| Sacro | 0.794 | 0.886 | 0.690 | 0.824 |
+| Coxal izquierdo | 0.914 | 0.943 | 0.860 | 0.901 |
+| Coxal derecho | 0.930 | 0.952 | 0.880 | 0.913 |
+| **Global test** | **0.889** | **0.931** | **0.824** | **0.886** |
+| Global validación | 0.866 | 0.919 | 0.791 | 0.866 |
+
+H8 supera a SAM en las tres regiones y en las dos particiones (+0.042 de Dice global en test). La
+mayor diferencia está en el sacro (+0.092), donde la caja es grande y el hueso esponjoso confunde a
+SAM. Con H6 la comparación había dado lo mismo (SAM 0.889 contra 0.935 en test). Matices: SAM
+recibe las cajas de nuestro detector, lo que lo favorece en localización, y se compara la región
+completa porque SAM no separa ni clasifica fragmentos, que es lo que aporta el modelo propio. SAM
+tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se habían medido
+259 ms), frente a unos 64 ms del modelo propio completo en una L4.
+
 ## 6. Protocolo de evaluación
 
 - H8 se eligió **solo con validación**, comparándolo con H6, H6 sin EMA, H7 y H7 con EMA.
@@ -317,8 +340,8 @@ en pocos casos.
    fragmento real. Las métricas del curso no los penalizan.
 8. **Modelo 2D.** Procesa corte a corte; la coherencia entre cortes depende del post-proceso 3D.
 9. **Muestra pequeña.** 15 pacientes por partición, de un solo dataset.
-10. **SAM medido con H6.** La comparación con SAM zero-shot no se repitió con H8. Su Dice semántico
-    en test es casi igual al de H6 (0.968 contra 0.971), así que es de esperar la misma diferencia.
+10. **SAM se compara solo por región.** SAM no separa fragmentos, así que la comparación de la
+    sección 5.7 es de la segmentación semántica dentro de la caja, no del Dice por fragmento.
 
 ## 8. Integración en el repositorio
 
@@ -344,6 +367,7 @@ en pocos casos.
 | Test y su configuración congelada | `outputs/h8/test/` |
 | HD95 y ASSD | `outputs/h8/{validacion,test}/superficie_*_h8.json` |
 | Distancia de separación | `outputs/h8/{validacion,test}/distancias_*_h8.json` |
+| Comparación con SAM | `outputs/h8/{validacion,test}/sam_baseline_*_h8.json` |
 | Modelo sin CBAM y CBAM apagado | `outputs/h8/cbam/` |
 | Comparación con los otros cuatro modelos | `outputs/h8/comparacion/` y `docs/experimentos_ema_rotacion_ruido.md` |
 | Figuras | `outputs/h8/figuras/` (las genera el notebook 11) |
