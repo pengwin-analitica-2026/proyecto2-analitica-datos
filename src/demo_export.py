@@ -20,6 +20,17 @@ cortes ya enderezados. Si un volumen está girado se decide con la cabecera del 
 lista fija de PENGWIN. D5 se entrenó sin ese paso: con D5 no se endereza. ``meta.json`` guarda
 ``canonical`` (si el modelo lo pide) y ``flipped`` (si este caso se giró).
 
+ENDEREZADO DEL GIRO AXIAL. Después de la orientación, si el paciente está girado dentro del escáner
+(algo que la cabecera no dice), ``normalizacion.normalizar`` estima el ángulo con la simetría
+izquierda-derecha de la pelvis vista desde arriba y gira el volumen y el ground truth para
+enderezarlo. Solo corrige giros claros, de al menos ``GIRO_MINIMO_DEMO`` grados: así un paciente
+bien acostado queda igual. ``meta.json`` guarda el ángulo estimado y si se corrigió. Con
+``--sin-enderezar`` se omite.
+
+UMBRALES EN MM³. Los tamaños mínimos del post-proceso 3D (fragmento y región) se fijan en mm³ con el
+espaciado del caso (``volume_postprocess.umbrales_en_voxeles``), así no dependen del grosor de los
+cortes. Con ``--umbral-voxeles`` se usan los 30 y 200 vóxeles fijos de la evaluación oficial.
+
 DISTANCIA EN MM. ``postprocess_3d(fill_unlabeled=False)``: los vóxeles de la región que no son ni
 principal ni fragmento quedan sin etiqueta, así no se rellena el hueco entre fragmentos (ver
 docs/decisiones_semana10.md, sección 5). Es el mismo método de ``infer_volume.py --distance-nofill``.
@@ -39,11 +50,16 @@ from skimage import measure
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fragment_distances import REGIONS, measure_fragment_distances
-from volume_postprocess import match_fragments, postprocess_3d
+from volume_postprocess import match_fragments, postprocess_3d, umbrales_en_voxeles
 
 REGION_LABELS = {"sacro": "Sacro", "coxal_izquierdo": "Coxal izquierdo", "coxal_derecho": "Coxal derecho"}
 REGION_STARTS = {"sacro": 1, "coxal_izquierdo": 11, "coxal_derecho": 21}
 DISTANCE_METHOD = "postprocess_3d(fill_unlabeled=False)"
+
+
+# Umbral del enderezado en la demo. Con 10° no cambia ningún caso de validación sin girar (los dos
+# que se corregían con 5°, 014 y 095, tenían 6°) y los giros de 30° y 60° se siguen corrigiendo.
+GIRO_MINIMO_DEMO = 10.0
 
 
 def region_of(fragment_id: int) -> str:
@@ -53,14 +69,20 @@ def region_of(fragment_id: int) -> str:
     raise ValueError(f"ID fuera de rango: {fragment_id}")
 
 
-def build_id_volume(semantic: np.ndarray, primary_secondary: np.ndarray,
-                    min_voxels: int = 30) -> tuple[np.ndarray, str]:
+def build_id_volume(semantic: np.ndarray, primary_secondary: np.ndarray, min_voxels: int = 30,
+                    spacing_xyz: tuple[float, float, float] | None = None) -> tuple[np.ndarray, str]:
     """Volumen de IDs PENGWIN a partir de las predicciones, sin el relleno que pega fragmentos.
 
-    Devuelve (volumen, descripción del método). Lo que se ve en los visualizadores es el mismo
-    volumen sobre el que se mide la distancia.
+    Con ``spacing_xyz`` los umbrales de tamaño se fijan en mm³ (``umbrales_en_voxeles``) y se
+    adaptan al grosor de los cortes; sin él se usan ``min_voxels`` y 200 vóxeles. Devuelve
+    (volumen, descripción del método). Lo que se ve en los visualizadores es el mismo volumen sobre
+    el que se mide la distancia.
     """
-    return postprocess_3d(semantic, primary_secondary, min_voxels, fill_unlabeled=False), DISTANCE_METHOD
+    min_region = 200
+    if spacing_xyz is not None:
+        min_voxels, min_region = umbrales_en_voxeles(spacing_xyz)
+    return (postprocess_3d(semantic, primary_secondary, min_voxels, min_region, fill_unlabeled=False),
+            DISTANCE_METHOD)
 
 
 def fragment_table(volume: np.ndarray, spacing_xyz: tuple[float, float, float]) -> list[dict]:
@@ -151,7 +173,8 @@ def checkpoint_is_canonical(checkpoint: str | Path) -> bool:
 
 def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", size: int = 384,
                 tta: bool = True, batch_size: int = 8, min_voxels: int = 30, raw_view: bool = True,
-                reuse: bool = False, progress=None) -> Path:
+                reuse: bool = False, progress=None, enderezar: bool = True,
+                umbral_mm: bool = True) -> Path:
     """Corre el pipeline sobre un caso y escribe la carpeta del dashboard. Devuelve su ruta.
 
     Con ``reuse=True`` y una exportación previa del mismo caso, no vuelve a correr el modelo: lee
@@ -177,14 +200,29 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
             if case.label is not None:
                 case.label = flip_inplane(case.label)
             log(f"[{case_id}] guardado girado 180° (cabecera LPI): enderezado a la orientación canónica")
+    giro = None
+    if enderezar:
+        from normalizacion import normalizar
+        case.image, case.label, est = normalizar(case.image, case.spacing_xyz, case.label,
+                                                 giro_minimo=GIRO_MINIMO_DEMO)
+        giro = {"angulo": round(float(est.angulo), 2), "corregido": bool(est.corregir),
+                "giro_minimo": GIRO_MINIMO_DEMO, "simetria_antes": round(float(est.simetria_sin_girar), 3),
+                "simetria_despues": round(float(est.simetria), 3)}
+        log(f"[{case_id}] giro axial estimado {est.angulo:+.1f}°: "
+            + ("enderezado" if est.corregir else "sin corregir (menor al umbral o no es claro)"))
     spacing = cache_spacing_xyz(case.spacing_xyz, case.image.shape, size)
     log(f"[{case_id}] volumen {case.image.shape} spacing nativo {tuple(round(float(s), 3) for s in case.spacing_xyz)} mm")
 
     out_dir = Path(out_root) / Path(checkpoint).stem / case_id
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = out_dir / "predictions.npz"
-    if reuse and saved.exists() and (out_dir / "meta.json").exists():
-        old = json.loads((out_dir / "meta.json").read_text())
+    old = json.loads((out_dir / "meta.json").read_text()) if (out_dir / "meta.json").exists() else None
+    same_input = old is not None and bool((old.get("enderezado") or {}).get("corregido")) == \
+        bool((giro or {}).get("corregido")) and (not (giro or {}).get("corregido")
+                                                or old["enderezado"]["angulo"] == giro["angulo"])
+    if reuse and saved.exists() and old is not None and not same_input:
+        log(f"[{case_id}] el enderezado cambió la entrada: no se reutilizan las predicciones")
+    if reuse and saved.exists() and old is not None and same_input:
         with np.load(saved) as arrays, np.load(out_dir / "volume.npz") as volume:
             pred = {"semantic": arrays["semantic"], "primary_secondary": arrays["primary_secondary"],
                     "classification": np.array([s["classification"] for s in old["slices"]], dtype=np.float32),
@@ -205,7 +243,11 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
         log(f"[{case_id}] inferencia: {pred['seconds']:.1f} s ({1000 * pred['seconds'] / len(images):.0f} ms por corte)")
         np.savez_compressed(saved, semantic=pred["semantic"], primary_secondary=pred["primary_secondary"])
 
-    ids, method = build_id_volume(pred["semantic"], pred["primary_secondary"], min_voxels)
+    ids, method = build_id_volume(pred["semantic"], pred["primary_secondary"], min_voxels,
+                                  spacing_xyz=spacing if umbral_mm else None)
+    umbrales = {"modo": "mm3" if umbral_mm else "voxeles",
+                "min_voxels": umbrales_en_voxeles(spacing)[0] if umbral_mm else min_voxels,
+                "min_region_voxels": umbrales_en_voxeles(spacing)[1] if umbral_mm else 200}
     t = time.perf_counter()
     rows = fragment_table(ids, spacing)
     log(f"[{case_id}] distancias predichas ({len(rows)} fragmentos) en {time.perf_counter() - t:.1f} s")
@@ -254,7 +296,8 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
             "orig_shape_zyx": [int(s) for s in case.image.shape], "tta": tta,
             "device": str(device), "seconds_model": pred["seconds"],
             "ms_per_slice": 1000 * pred["seconds"] / len(images), "min_voxels": min_voxels,
-            "distance_method": method, "canonical": canonical, "flipped": flipped,
+            "distance_method": method, "canonical": canonical, "flipped": flipped, "enderezado": giro,
+            "umbrales_postproceso": umbrales,
             "bone_z_range": [int(bone_z[0]), int(bone_z[-1])] if len(bone_z) else None,
             "fragments_pred": rows, "fragments_gt": gt_rows, "comparison": comparison,
             "slices": [{"z": z, "classification": [round(float(p), 4) for p in pred["classification"][z]],
@@ -277,10 +320,15 @@ def main() -> None:
     parser.add_argument("--no-raw-view", action="store_true")
     parser.add_argument("--reuse", action="store_true",
                         help="No corre el modelo: reutiliza predictions.npz de una exportación previa.")
+    parser.add_argument("--umbral-voxeles", action="store_true",
+                        help="Umbrales del post-proceso 3D en vóxeles (30 y 200) en vez de mm³.")
+    parser.add_argument("--sin-enderezar", action="store_true",
+                        help="No corrige el giro axial del paciente (normalizacion.normalizar).")
     args = parser.parse_args()
     for case_id in args.case:
         export_case(case_id, args.checkpoint, args.out_root, args.size, args.tta, args.batch_size,
-                    args.min_voxels, raw_view=not args.no_raw_view, reuse=args.reuse)
+                    args.min_voxels, raw_view=not args.no_raw_view, reuse=args.reuse,
+                    enderezar=not args.sin_enderezar, umbral_mm=not args.umbral_voxeles)
 
 
 if __name__ == "__main__":

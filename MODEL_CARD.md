@@ -76,7 +76,10 @@ y la comparación con los demás modelos en `docs/experimentos_ema_rotacion_ruid
   No se aplica en validación ni en test.
 - **Pesos:** los del propio entrenamiento, **sin EMA** (`--ema 0`).
 - **Inferencia:** TTA de espejo (se promedia con la predicción de la imagen reflejada) y
-  post-proceso 3D con `min_size=12`, sin CASR, sin enderezado del giro axial y sin suavizado.
+  post-proceso 3D con `min_size=12`, sin CASR, sin enderezado del giro axial y sin suavizado. Es la
+  configuración de todas las cifras de la sección 4. La demo agrega dos pasos que no cambian el
+  modelo: el enderezado del giro axial (sección 4.11) y los umbrales del post-proceso 3D en mm³
+  (sección 4.12).
 
 ## 4. Resultados
 
@@ -132,19 +135,36 @@ fragmento.
 | H7 con EMA | sí | mm | no | 0.871 | 0.720 | 0.208 | 0.635 | 0.853 |
 | **H8** | no | mm | sí | 0.865 | **0.860** | **0.835** | 0.612 | 0.849 |
 
-El ruido es gaussiano con la desviación indicada sobre 255; el giro se aplica en milímetros.
+El ruido es gaussiano, con desviación σ de 10 y 25 niveles de gris sobre 255 en la imagen de
+entrada (no es un porcentaje); el giro se aplica en milímetros.
 
 - **EMA:** quitarlo no cuesta nada en imágenes limpias (+0.002 y +0.003, dentro del ruido entre
   semillas de ±0.004). Con ruido leve el EMA ayudaba algo (0.04 a 0.07).
 - **Giro en milímetros:** no cuesta nada en limpio y mejora la tolerancia a un giro de 60° (+0.03 y
   +0.07).
-- **Ruido al entrenar:** H8 es el único que resiste el ruido. Cuesta 0.008 en imágenes limpias
-  frente a H7 y gana +0.21 y +0.61 con ruido leve y fuerte; mejora a H7 con ruido en los 15 casos.
+- **Ruido al entrenar:** H8 es el más robusto de los cinco frente al ruido gaussiano. Cuesta 0.008
+  en imágenes limpias frente a H7 y gana +0.21 y +0.61 con ruido de σ = 10 y 25; mejora a H7 con ruido
+  en los 15 casos.
 - **Giro:** ningún modelo aguanta 60° por sí solo; con el enderezado previo todos quedan entre
   0.849 y 0.855.
 
 Con ruido, las demás cabezas de H8 casi no se mueven: con ruido 25, F1 0.987, mAP50 0.957 y Dice
 semántico 0.955.
+
+**Alcance de la robustez.** H8 es el más robusto de los cinco frente a ruido gaussiano sintético,
+pero no garantiza superar el objetivo bajo cualquier daño:
+
+| Condición (validación) | Dice por fragmento de H8 | ¿Supera 0.85? |
+|---|---|---|
+| Sin daño | 0.865 | sí |
+| Ruido gaussiano σ = 10 sobre 255 (≈ 4 % del rango) | 0.860 | sí |
+| Ruido gaussiano σ = 25 sobre 255 (≈ 10 % del rango) | 0.835 | no |
+| Giro de 60° sin enderezar | 0.612 | no |
+| Giro de 60° con enderezado | 0.849 | no, por 0.001 |
+
+El ruido probado es el mismo tipo que se usó para entrenar; no se midió con artefactos reales de CT.
+El giro grande depende del enderezado previo, que la demo aplica desde esta versión
+(`src/demo_export.py`) y la evaluación oficial no.
 
 ### 4.4 Ablación de CBAM (sobre H8)
 
@@ -268,6 +288,52 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
   20° de cabeceo, el Dice por fragmento de H7 baja de 0.873 a 0.864 y 0.858; con 10° y 20° de
   inclinación lateral, a 0.869 y 0.858 (`outputs/h7/otras_rotaciones/prueba2_inclinacion.csv`).
 
+### 4.12 Grosor de corte y umbrales del post-proceso en mm³
+
+Volúmenes con cortes más gruesos, en validación. El modelo es 2D y recibe cada corte llevado a
+384 × 384, así que acepta cualquier número de cortes y cualquier tamaño de corte; lo que depende de
+la dimensión es el post-proceso 3D, cuyos tamaños mínimos (30 vóxeles por fragmento y 200 por región)
+se contaban en vóxeles. Desde esta versión se pueden fijar en mm³ (`--umbral-mm`, 26.1 y 173.8 mm³,
+el equivalente con el vóxel mediano del caché de PENGWIN). La prueba conserva 1 de cada k cortes
+(`--zstep k`) y multiplica el espaciado z por k (`outputs/h8/validacion/grosor_corte/`).
+
+| Cortes | Grosor aprox. | Umbrales | Error medio de distancia | Correlación | Dice 3D principal / secundario | Cobertura | HD95 / ASSD medianos | Predichos sin pareja |
+|---|---|---|---|---|---|---|---|---|
+| todos | 0.8 mm | vóxeles | 0.312 mm | 0.956 | 0.918 / 0.722 | 96.5 % | 4.05 / 0.86 mm | 297 |
+| todos | 0.8 mm | mm³ | 0.312 mm | 0.956 | 0.918 / 0.722 | 96.5 % | 4.05 / 0.86 mm | 278 |
+| 1 de 2 | 1.6 mm | vóxeles | 0.328 mm | 0.945 | 0.918 / 0.721 | 96.5 % | 4.23 / 0.83 mm | 257 |
+| 1 de 2 | 1.6 mm | mm³ | 0.328 mm | 0.945 | 0.918 / 0.721 | 96.5 % | 4.23 / 0.83 mm | 278 |
+| 1 de 3 | 2.4 mm | vóxeles | 0.319 mm | 0.945 | 0.917 / 0.726 | 96.5 % | 4.25 / 0.75 mm | 238 |
+| 1 de 3 | 2.4 mm | mm³ | 0.319 mm | 0.945 | 0.917 / 0.726 | 96.5 % | 4.25 / 0.75 mm | 284 |
+
+Lectura:
+
+- **El sistema tolera cortes hasta tres veces más gruesos.** El error de distancia pasa de 0.31 a
+  0.33 mm, la cobertura se mantiene en 96.5 % y el Dice 3D del principal en 0.92. Las nueve métricas
+  del curso se calculan corte a corte, así que no dependen del número de cortes.
+- **Los umbrales en mm³ hacen el comportamiento estable.** Dan exactamente las mismas distancias,
+  Dice y cobertura que los de vóxeles en los tres grosores. La diferencia está en los fragmentos
+  espurios: en vóxeles su número cambia con el grosor (297, 257, 238), porque el mismo umbral equivale
+  a más milímetros cúbicos; en mm³ se mantiene entre 278 y 284. La demo usa los umbrales en mm³ desde
+  esta versión; en los cuatro casos exportados la comparación con el ground truth no cambió y solo
+  desaparecieron fragmentos predichos pequeños (de 30 a 26 en el caso 044, de 27 a 26 en el 099).
+- **La propia medida cambia con el grosor.** La distancia real de un mismo fragmento, medida sobre
+  el ground truth submuestreado, se mueve hasta 1.4 mm (5.3 → 6.7 mm en el caso 087 y 3.2 → 4.2 mm en
+  el 024 con la mitad de los cortes): con cortes gruesos la separación mínima se resuelve peor. El
+  error del modelo frente al ground truth del mismo grosor sigue en unos 0.3 mm.
+- **Alcance.** Se probó hasta unos 2.4 mm. No se probaron cortes de 3 a 5 mm, comunes en clínica, ni
+  cortes gruesos reales: quedarse con uno de cada k no reproduce el promediado de volumen parcial de
+  un corte grueso adquirido así.
+
+### 4.13 Enderezado del giro axial en la demo
+
+La demo endereza el giro axial del paciente antes de predecir (`src/demo_export.py`, con
+`normalizacion.normalizar`): estima el ángulo con la simetría izquierda-derecha de la pelvis y solo
+corrige giros claros de 10° o más. En los cuatro casos exportados el giro estimado fue de −1.5°,
++0.5°, −0.5° y +4.8°, así que ninguno se corrigió y su resultado no cambió. Sobre el caso 024 girado
+a propósito, estimó 28.5° para 30° y 58.8° para 60° y los corrigió. La evaluación oficial no aplica
+este paso.
+
 ## 5. Protocolo de evaluación
 
 - Todo se elige en validación. Una variante se adopta solo si mejora al menos 0.003, con bootstrap
@@ -288,9 +354,10 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
 3. **Ruido sintético.** Se probó ruido gaussiano, el mismo tipo con que se entrenó, y solo en
    validación. No se midió con artefactos reales de CT (metal, movimiento, dosis baja).
 4. **Orientación de la entrada.** El modelo espera los volúmenes en orientación canónica; la demo
-   (`src/demo_export.py`) lee la cabecera de cada archivo. Un paciente girado dentro del escáner no
-   se corrige en la inferencia por defecto: el enderezado del giro axial (`--normalizar`) existe pero
-   no está conectado a la demo ni a la API, y un giro de 60° sin él baja el Dice a 0.61.
+   (`src/demo_export.py`) lee la cabecera de cada archivo y endereza el giro axial del paciente si es
+   de 10° o más (sección 4.13). Sin ese paso, un giro de 60° baja el Dice a 0.61; con él, a 0.849. El
+   enderezado solo corrige el giro en el plano axial, no el cabeceo ni la inclinación lateral, y la
+   API recibe cortes ya enderezados porque estimar el giro necesita el volumen completo.
 5. **Fragmentos en contacto en la superficie de fractura.** Cuando dos fragmentos se tocan, la
    segmentación puede fusionarlos en uno solo. En ese caso se pierde el fragmento secundario y su
    distancia de separación al principal no es confiable (puede salir 0 mm o no existir).
@@ -300,6 +367,8 @@ comparte con H8 la orientación por metadatos y el giro del aumento en milímetr
    (258 en test sin pareja real). El dashboard oculta los menores de 1000 mm³; es un filtro de
    presentación que no cambia la métrica.
 8. **Modelo 2D.** Procesa corte a corte. La coherencia entre cortes depende del post-proceso 3D.
+   Acepta cualquier número de cortes; con cortes más gruesos el post-proceso se probó hasta unos
+   2.4 mm (sección 4.12), no con los 3 a 5 mm habituales en clínica.
 9. **Tamaño de la muestra.** Test tiene 15 pacientes de un solo dataset.
 10. **Evaluaciones repetidas en test.** La cifra de H8 no es una estimación limpia (sección 4.1).
 11. **SAM se compara solo por región.** SAM no separa fragmentos, así que la comparación de la

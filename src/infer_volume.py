@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_case_cache import load_case_cache
 from evaluate_volumes import cases_of_split, evaluate_case, load_model
 from volume_postprocess import (cache_spacing_xyz, fragment_distance_table, postprocess_3d,
-                                summarize_volume)
+                                summarize_volume, umbrales_en_voxeles)
 
 
 def read_index(cache_dir: Path) -> dict[str, dict]:
@@ -77,11 +77,19 @@ def main() -> None:
     parser.add_argument("--distance-nofill", action="store_true",
                         help="Mide las distancias sobre el volumen sin rellenar huecos entre fragmentos.")
     parser.add_argument("--surface-metrics", action="store_true", help="Agrega ASSD y HD95.")
+    parser.add_argument("--umbral-mm", action="store_true",
+                        help="Umbrales del post-proceso 3D en mm³ (volume_postprocess.umbrales_en_voxeles), "
+                             "no en vóxeles: no dependen del grosor de los cortes.")
+    parser.add_argument("--zstep", type=int, default=1,
+                        help="Conserva 1 de cada k cortes (imagen y etiqueta) y multiplica el espaciado z "
+                             "por k: simula un volumen con cortes más gruesos. Solo validación.")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
     if args.split == "test":
         print("AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.")
+    if args.zstep > 1 and args.split == "test":
+        raise SystemExit("--zstep es una prueba de estrés: solo validación.")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, two_pass = load_model(args.checkpoint, device, args.tta)
     two_pass = two_pass or args.two_pass
@@ -93,20 +101,25 @@ def main() -> None:
     cases = []
     for number, case_id in enumerate(case_ids, 1):
         case = load_case_cache(cache_dir, case_id, canonical=getattr(model, "canonical", False))
+        case["images"], case["labels"] = case["images"][::args.zstep], case["labels"][::args.zstep]
+        spacing = cache_spacing_xyz(index[case_id], size)
+        spacing = (spacing[0], spacing[1], spacing[2] * args.zstep)
+        min_voxels, min_region = (umbrales_en_voxeles(spacing) if args.umbral_mm
+                                  else (args.min_voxels, 200))
         started = time.time()
         _, pred = evaluate_case(model, case_id, case["images"], case["labels"], device,
                                 args.batch_size, two_pass=two_pass, keep_predictions=True)
         if "primary_secondary" not in pred:
             raise SystemExit("El post-proceso 3D necesita un modelo con instancia 'primary'.")
         t_model = time.time() - started
-        volume = postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels)
+        volume = postprocess_3d(pred["semantic"], pred["primary_secondary"], min_voxels, min_region)
         t_total = time.time() - started
-        spacing = cache_spacing_xyz(index[case_id], size)
-        dist_volume = (postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels,
+        dist_volume = (postprocess_3d(pred["semantic"], pred["primary_secondary"], min_voxels, min_region,
                                       fill_unlabeled=False) if args.distance_nofill else volume)
         distances = fragment_distance_table(dist_volume, case["labels"], spacing, args.surface_metrics)
         cases.append({"case_id": case_id, "n_slices": int(len(volume)),
-                      "spacing_xyz_mm": spacing, "segundos_modelo": round(t_model, 1),
+                      "spacing_xyz_mm": spacing, "min_voxels": min_voxels, "min_region_voxels": min_region,
+                      "segundos_modelo": round(t_model, 1),
                       "segundos_total": round(t_total, 1),
                       "volumen": summarize_volume(volume, case["labels"]), "distancias": distances})
         v = cases[-1]["volumen"]
@@ -115,7 +128,8 @@ def main() -> None:
               f"{len(distances)} fragmentos secundarios | {t_total:.0f} s", flush=True)
 
     result = {"checkpoint": args.checkpoint, "split": args.split, "tta": args.tta,
-              "two_pass": two_pass, "min_voxels": args.min_voxels, "device": str(device),
+              "two_pass": two_pass, "min_voxels": args.min_voxels, "umbral_mm": args.umbral_mm,
+              "zstep": args.zstep, "device": str(device),
               "resumen": aggregate(cases), "casos": cases}
     for key, value in result["resumen"].items():
         print(f"  {key:32s} {value:.3f}" if isinstance(value, float) else f"  {key:32s} {value}")

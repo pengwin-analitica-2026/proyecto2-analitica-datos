@@ -4,7 +4,10 @@ Un solo modelo cargado al arrancar. El dashboard (Streamlit Cloud) manda un cort
 preprocesado y recibe la semántica, las cajas y la latencia del modelo.
 
 Orientación: H8 espera cortes en orientación canónica (``src/orientacion.py``). El servidor no gira
-nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderezó el volumen.
+nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderezó el volumen
+(giro de 180° según la cabecera y, si el paciente estaba girado en el escáner, el giro axial con
+``normalizacion.normalizar``). Un corte suelto no basta para estimar ese giro, que necesita el
+volumen completo; por eso se corrige al exportar el caso y no aquí.
 ``/health?deep=1`` informa ``canonical`` para que el cliente lo compruebe.
 
     MODEL_PATH=outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080

@@ -26,9 +26,10 @@ reales** (±35°) y **aumento de ruido gaussiano**.
 | Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.970 / 0.943 | 0.968 / 0.939 |
 | Dice / IoU por fragmento | 0.85 / 0.70 | 0.865 / 0.800 | 0.874 / 0.812 |
 
-H8 se eligió entre cinco variantes por ser la única robusta a imágenes con ruido: con ruido
-gaussiano leve y fuerte mantiene 0.860 y 0.835 de Dice por fragmento en validación, donde las demás
-caen a 0.72 y 0.23 como mucho. La cifra de test es la **sexta consulta a test** del proyecto; la
+H8 se eligió entre cinco variantes por ser la más robusta al ruido gaussiano: con σ = 10 y 25
+niveles de gris mantiene 0.860 y 0.835 de Dice por fragmento en validación, donde las demás caen a
+0.72 y 0.23 como mucho. No es robusto a todo: con ruido fuerte y con un giro de 60° queda por debajo
+del objetivo (model card, sección 4.3). La cifra de test es la **sexta consulta a test** del proyecto; la
 primera evaluación limpia fue D5 (0.845). Cómo se eligió H8, las ablaciones, la robustez y las
 limitaciones están en el [model card](MODEL_CARD.md) y en [`docs/modelo_h8.md`](docs/modelo_h8.md).
 
@@ -212,6 +213,10 @@ python src/infer_volume.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e6
     --output outputs/h8/validacion/distancias_val_h8.json
 ```
 
+Grosor de corte (solo validación): `--zstep 2` o `--zstep 3` conserva 1 de cada 2 o 3 cortes, y
+`--umbral-mm` fija los tamaños mínimos del post-proceso 3D en mm³ en vez de vóxeles; valen para
+`infer_volume.py` y `metricas_superficie.py`. Resultados en `outputs/h8/validacion/grosor_corte/`.
+
 **Test:** el protocolo es evaluar una sola vez con la configuración congelada. La configuración de H8
 está en `outputs/h8/test/CONFIG_CONGELADA_TEST_H8.md` y sus resultados en `outputs/h8/test/`. No se
 recomienda volver a correr test para ajustar nada.
@@ -256,7 +261,9 @@ streamlit run app/dashboard.py
 | 2. Corte por corte | Cajas, máscaras por hueso, ground truth opcional e ID y distancia en mm de cada fragmento |
 | 3. Reconstrucción 3D | Una malla por fragmento, con su ID y su distancia en mm al principal |
 
-Con H8 la demo endereza los volúmenes guardados girados 180° (cabecera `TransformMatrix = -1 0 0 0
+La demo endereza además el giro axial del paciente si es de 10° o más (`--sin-enderezar` lo
+omite) y fija los tamaños mínimos del post-proceso 3D en mm³ (`--umbral-voxeles` vuelve a los 30 y
+200 vóxeles de la evaluación oficial). Con H8 la demo endereza los volúmenes guardados girados 180° (cabecera `TransformMatrix = -1 0 0 0
 -1 0 0 0 1`) antes de predecir, una sola vez y para las tres vistas y el ground truth; el dashboard
 indica en la barra lateral si el caso se enderezó. Detalle en
 [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md).

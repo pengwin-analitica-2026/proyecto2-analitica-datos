@@ -119,5 +119,20 @@ class MeshFillIsVisualOnly(unittest.TestCase):
         self.assertEqual(int(inside.sum()), 0)
 
 
+
+class EnderezadoDeLaDemo(unittest.TestCase):
+    """La demo endereza solo giros claros: GIRO_MINIMO_DEMO grados o más."""
+
+    def test_umbral_de_la_demo(self):
+        from demo_export import GIRO_MINIMO_DEMO
+        from normalizacion import estimar_giro_axial
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_normalizacion import _pelvis_sintetica
+        self.assertFalse(estimar_giro_axial(_pelvis_sintetica(6.0), giro_minimo=GIRO_MINIMO_DEMO).corregir)
+        grande = estimar_giro_axial(_pelvis_sintetica(30.0), giro_minimo=GIRO_MINIMO_DEMO)
+        self.assertTrue(grande.corregir)
+        self.assertLess(abs(abs(grande.angulo) - 30.0), 3.0)
+
+
 if __name__ == "__main__":
     unittest.main()

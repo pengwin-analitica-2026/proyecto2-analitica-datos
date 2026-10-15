@@ -33,7 +33,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_case_cache import load_case_cache
 from evaluate_volumes import cases_of_split, evaluate_case, load_model
 from infer_volume import read_index
-from volume_postprocess import cache_spacing_xyz, match_fragments, postprocess_3d, surface_distances
+from volume_postprocess import (cache_spacing_xyz, match_fragments, postprocess_3d, surface_distances,
+                                umbrales_en_voxeles)
 
 REGION_NAMES = {0: "sacro", 1: "coxal_izquierdo", 2: "coxal_derecho"}
 IOU_UMBRALES = (0.1, 0.5)
@@ -97,11 +98,19 @@ def main() -> None:
     parser.add_argument("--tta", action="store_true")
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--min-voxels", type=int, default=30)
+    parser.add_argument("--umbral-mm", action="store_true",
+                        help="Umbrales del post-proceso 3D en mm³ (volume_postprocess.umbrales_en_voxeles), "
+                             "no en vóxeles: no dependen del grosor de los cortes.")
+    parser.add_argument("--zstep", type=int, default=1,
+                        help="Conserva 1 de cada k cortes (imagen y etiqueta) y multiplica el espaciado z "
+                             "por k: simula un volumen con cortes más gruesos. Solo validación.")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
     if args.split == "test":
         print("AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.")
+    if args.zstep > 1 and args.split == "test":
+        raise SystemExit("--zstep es una prueba de estrés: solo validación.")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, two_pass = load_model(args.checkpoint, device, args.tta)
     cache_dir = Path(args.cache_dir)
@@ -113,18 +122,23 @@ def main() -> None:
     for number, case_id in enumerate(case_ids, 1):
         started = time.time()
         case = load_case_cache(cache_dir, case_id, canonical=getattr(model, "canonical", False))
+        case["images"], case["labels"] = case["images"][::args.zstep], case["labels"][::args.zstep]
+        spacing = cache_spacing_xyz(index[case_id], size)
+        spacing = (spacing[0], spacing[1], spacing[2] * args.zstep)
+        min_voxels, min_region = (umbrales_en_voxeles(spacing) if args.umbral_mm
+                                  else (args.min_voxels, 200))
         _, pred = evaluate_case(model, case_id, case["images"], case["labels"], device,
                                 args.batch_size, two_pass=two_pass, keep_predictions=True)
         if "primary_secondary" not in pred:
             raise SystemExit("El post-proceso 3D necesita un modelo con instancia 'primary'.")
-        volume = postprocess_3d(pred["semantic"], pred["primary_secondary"], args.min_voxels)
-        spacing = cache_spacing_xyz(index[case_id], size)
+        volume = postprocess_3d(pred["semantic"], pred["primary_secondary"], min_voxels, min_region)
         rows, extra = fragment_rows(volume, case["labels"], spacing)
         for row in rows:
             row["case_id"] = case_id
         all_rows.extend(rows)
         resumen = summarize(rows)
-        cases.append({"case_id": case_id, "spacing_xyz_mm": spacing, "predichos_sin_pareja": extra,
+        cases.append({"case_id": case_id, "spacing_xyz_mm": spacing, "min_voxels": min_voxels,
+                      "min_region_voxels": min_region, "predichos_sin_pareja": extra,
                       "resumen": resumen, "fragmentos": rows})
         print(f"  {number}/{len(case_ids)} caso {case_id}: {resumen['n_detectados']}/{resumen['n_fragmentos']} "
               f"detectados | HD95 mediana {resumen.get('hd95_mm_mediana', float('nan')):.2f} mm | "
@@ -132,7 +146,8 @@ def main() -> None:
               f"{time.time() - started:.0f} s", flush=True)
 
     result = {"checkpoint": args.checkpoint, "split": args.split, "tta": args.tta,
-              "min_voxels": args.min_voxels, "device": str(device), "n_casos": len(cases),
+              "min_voxels": args.min_voxels, "umbral_mm": args.umbral_mm, "zstep": args.zstep,
+              "device": str(device), "n_casos": len(cases),
               "predichos_sin_pareja": int(sum(c["predichos_sin_pareja"] for c in cases)),
               "resumen": summarize_groups(all_rows), "casos": cases}
     for name, group in result["resumen"].items():

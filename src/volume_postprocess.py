@@ -11,6 +11,12 @@ hueso, ni si un fragmento pequeño que aparece en un solo corte es real. Aquí s
 
 Las distancias salen de ``fragment_distances`` (EDT con el spacing del header). Se agregan
 ASSD y HD95 por fragmento, que el enunciado deja como opcionales.
+
+Umbrales en mm³. ``min_voxels`` y ``min_region_voxels`` cuentan vóxeles, así que dependen del
+espaciado: con cortes más gruesos un fragmento ocupa menos vóxeles y puede borrarse por "pequeño".
+``umbrales_en_voxeles`` convierte umbrales en mm³ a vóxeles para cada volumen. Los valores por
+defecto en mm³ equivalen a 30 y 200 vóxeles del vóxel mediano del caché de PENGWIN
+(``VOXEL_REFERENCIA_MM3``).
 """
 
 from __future__ import annotations
@@ -22,6 +28,18 @@ from fragment_distances import REGIONS, edge_distance_mm
 
 STRUCTURE_3D = np.ones((3, 3, 3), dtype=np.uint8)
 REGION_STARTS = (1, 11, 21)
+
+# Vóxel mediano del caché a 384 px de los 100 casos de PENGWIN (0.22 a 1.43 mm³ entre casos).
+VOXEL_REFERENCIA_MM3 = 0.869
+MIN_FRAGMENTO_MM3 = 30 * VOXEL_REFERENCIA_MM3      # 26.1 mm³, el equivalente de min_voxels=30
+MIN_REGION_MM3 = 200 * VOXEL_REFERENCIA_MM3        # 173.8 mm³, el de min_region_voxels=200
+
+
+def umbrales_en_voxeles(spacing_xyz: tuple[float, float, float], min_mm3: float = MIN_FRAGMENTO_MM3,
+                        min_region_mm3: float = MIN_REGION_MM3) -> tuple[int, int]:
+    """(min_voxels, min_region_voxels) que corresponden a umbrales en mm³ con este espaciado."""
+    voxel = float(np.prod(spacing_xyz))
+    return max(1, int(np.ceil(min_mm3 / voxel))), max(1, int(np.ceil(min_region_mm3 / voxel)))
 
 
 def cache_spacing_xyz(row: dict, size: int) -> tuple[float, float, float]:

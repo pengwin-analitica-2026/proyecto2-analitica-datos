@@ -10,8 +10,9 @@ con medidas se entrenaron cinco modelos que solo difieren en tres opciones (EMA,
 ruido en el entrenamiento) y se evaluaron todos igual, sobre validación.
 
 Conclusión: **el modelo elegido es H8** (sin EMA, rotación en milímetros y aumento de ruido). En
-imágenes limpias pierde 0.008 de Dice por fragmento frente a H7, y a cambio es el único que resiste
-el ruido: con ruido fuerte da 0.835, donde los demás quedan entre 0.09 y 0.23. Cumple los nueve
+imágenes limpias pierde 0.008 de Dice por fragmento frente a H7, y a cambio es el más robusto al
+ruido gaussiano: con σ = 25 da 0.835, donde los demás quedan entre 0.09 y 0.23. No es robusto a todo:
+ese 0.835 y el 0.612 con un giro de 60° sin enderezar quedan por debajo del objetivo. Cumple los nueve
 objetivos del curso en validación y en test (Dice por fragmento de 0.874 en test, sección 5).
 El documento incluye además el aporte de CBAM por cabeza (sección 6) y las métricas HD95 y ASSD por
 fragmento (sección 7).
@@ -186,8 +187,9 @@ Justificación:
 
 1. **Responde a las dos observaciones del profesor.** No usa EMA y el giro del entrenamiento es
    físico, en milímetros y a partir de los metadatos.
-2. **Es el único robusto a imágenes dañadas.** Era la preocupación de fondo de la asesoría. Con
-   ruido leve y fuerte da 0.860 y 0.835 de Dice por fragmento; el mejor de los otros da 0.720 y 0.228.
+2. **Es el más robusto al ruido gaussiano.** Era la preocupación de fondo de la asesoría. Con
+   σ = 10 y 25 da 0.860 y 0.835 de Dice por fragmento; el mejor de los otros da 0.720 y 0.228. No
+   garantiza el objetivo bajo cualquier daño (ver Limitaciones).
 3. **Cumple los nueve objetivos del curso** en validación, sin daño (0.865) y con ruido leve (0.860).
 4. **El costo es pequeño y está medido:** 0.008 en imágenes limpias frente a H7.
 5. **Simplifica el pipeline.** No hace falta el suavizado previo ni un detector de ruido en la demo.

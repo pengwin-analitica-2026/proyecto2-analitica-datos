@@ -242,6 +242,11 @@ with st.sidebar:
             "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
             "las tres vistas y el ground truth están enderezados." if meta.get("flipped")
             else "este volumen ya venía en esa orientación."))
+    giro = meta.get("enderezado")
+    if giro:
+        st.caption(f"Giro axial del paciente: {giro['angulo']:+.1f}° estimado; " + (
+            "se enderezó antes de predecir (las tres vistas y el ground truth están enderezados)."
+            if giro["corregido"] else f"no se corrigió (solo se corrigen giros claros de {giro['giro_minimo']:.0f}° o más)."))
     st.markdown(legend_html(meta["fragments_pred"]), unsafe_allow_html=True)
 
 all_fragments = meta["fragments_pred"]

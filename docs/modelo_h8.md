@@ -17,9 +17,10 @@ Proyecto PENGWIN, corte 2. Octubre de 2026.
 | **Dice por fragmento** | 0.865 en validación y 0.874 en test |
 | **Objetivos del curso** | Cumple los nueve, en validación y en test |
 
-Por qué se eligió: es el único de los cinco modelos comparados que resiste imágenes con ruido (0.860
-con ruido leve y 0.835 con ruido fuerte, donde los demás dan como mucho 0.720 y 0.228), y lo hace
-sin EMA, que era la observación del profesor. El costo es de 0.008 de Dice por fragmento en
+Por qué se eligió: es el más robusto de los cinco modelos comparados frente a ruido gaussiano
+(0.860 con σ = 10 y 0.835 con σ = 25, donde los demás dan como mucho 0.720 y 0.228), y lo hace sin
+EMA, que era la observación del profesor. No garantiza el objetivo bajo cualquier daño: ver la
+sección 5.3. El costo es de 0.008 de Dice por fragmento en
 imágenes limpias frente a H7. La comparación completa está en `docs/experimentos_ema_rotacion_ruido.md`
 y el recorrido con tablas y figuras, en `notebooks/11_modelo_h8.ipynb`.
 
@@ -208,6 +209,23 @@ el test con D5 (0.692), queda en 0.898.
 
 ### 5.3 Robustez (solo validación)
 
+**Alcance de la robustez.** H8 es el más robusto de los cinco frente a ruido gaussiano sintético,
+pero no garantiza superar el objetivo bajo cualquier daño:
+
+| Condición (validación) | Dice por fragmento de H8 | ¿Supera 0.85? |
+|---|---|---|
+| Sin daño | 0.865 | sí |
+| Ruido gaussiano σ = 10 sobre 255 (≈ 4 % del rango) | 0.860 | sí |
+| Ruido gaussiano σ = 25 sobre 255 (≈ 10 % del rango) | 0.835 | no |
+| Giro de 60° sin enderezar | 0.612 | no |
+| Giro de 60° con enderezado | 0.849 | no, por 0.001 |
+
+El ruido probado es el mismo tipo que se usó para entrenar; no se midió con artefactos reales de CT.
+El giro grande depende del enderezado previo, que la demo aplica desde esta versión
+(`src/demo_export.py`) y la evaluación oficial no.
+
+Comparación con los modelos anteriores:
+
 Dice por fragmento. El ruido es gaussiano, con la desviación indicada sobre 255; el giro se aplica
 en milímetros.
 
@@ -312,6 +330,52 @@ completa porque SAM no separa ni clasifica fragmentos, que es lo que aporta el m
 tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se habían medido
 259 ms), frente a unos 64 ms del modelo propio completo en una L4.
 
+### 5.8 Grosor de corte y umbrales del post-proceso en mm³
+
+Volúmenes con cortes más gruesos, en validación. El modelo es 2D y recibe cada corte llevado a
+384 × 384, así que acepta cualquier número de cortes y cualquier tamaño de corte; lo que depende de
+la dimensión es el post-proceso 3D, cuyos tamaños mínimos (30 vóxeles por fragmento y 200 por región)
+se contaban en vóxeles. Desde esta versión se pueden fijar en mm³ (`--umbral-mm`, 26.1 y 173.8 mm³,
+el equivalente con el vóxel mediano del caché de PENGWIN). La prueba conserva 1 de cada k cortes
+(`--zstep k`) y multiplica el espaciado z por k (`outputs/h8/validacion/grosor_corte/`).
+
+| Cortes | Grosor aprox. | Umbrales | Error medio de distancia | Correlación | Dice 3D principal / secundario | Cobertura | HD95 / ASSD medianos | Predichos sin pareja |
+|---|---|---|---|---|---|---|---|---|
+| todos | 0.8 mm | vóxeles | 0.312 mm | 0.956 | 0.918 / 0.722 | 96.5 % | 4.05 / 0.86 mm | 297 |
+| todos | 0.8 mm | mm³ | 0.312 mm | 0.956 | 0.918 / 0.722 | 96.5 % | 4.05 / 0.86 mm | 278 |
+| 1 de 2 | 1.6 mm | vóxeles | 0.328 mm | 0.945 | 0.918 / 0.721 | 96.5 % | 4.23 / 0.83 mm | 257 |
+| 1 de 2 | 1.6 mm | mm³ | 0.328 mm | 0.945 | 0.918 / 0.721 | 96.5 % | 4.23 / 0.83 mm | 278 |
+| 1 de 3 | 2.4 mm | vóxeles | 0.319 mm | 0.945 | 0.917 / 0.726 | 96.5 % | 4.25 / 0.75 mm | 238 |
+| 1 de 3 | 2.4 mm | mm³ | 0.319 mm | 0.945 | 0.917 / 0.726 | 96.5 % | 4.25 / 0.75 mm | 284 |
+
+Lectura:
+
+- **El sistema tolera cortes hasta tres veces más gruesos.** El error de distancia pasa de 0.31 a
+  0.33 mm, la cobertura se mantiene en 96.5 % y el Dice 3D del principal en 0.92. Las nueve métricas
+  del curso se calculan corte a corte, así que no dependen del número de cortes.
+- **Los umbrales en mm³ hacen el comportamiento estable.** Dan exactamente las mismas distancias,
+  Dice y cobertura que los de vóxeles en los tres grosores. La diferencia está en los fragmentos
+  espurios: en vóxeles su número cambia con el grosor (297, 257, 238), porque el mismo umbral equivale
+  a más milímetros cúbicos; en mm³ se mantiene entre 278 y 284. La demo usa los umbrales en mm³ desde
+  esta versión; en los cuatro casos exportados la comparación con el ground truth no cambió y solo
+  desaparecieron fragmentos predichos pequeños (de 30 a 26 en el caso 044, de 27 a 26 en el 099).
+- **La propia medida cambia con el grosor.** La distancia real de un mismo fragmento, medida sobre
+  el ground truth submuestreado, se mueve hasta 1.4 mm (5.3 → 6.7 mm en el caso 087 y 3.2 → 4.2 mm en
+  el 024 con la mitad de los cortes): con cortes gruesos la separación mínima se resuelve peor. El
+  error del modelo frente al ground truth del mismo grosor sigue en unos 0.3 mm.
+- **Alcance.** Se probó hasta unos 2.4 mm. No se probaron cortes de 3 a 5 mm, comunes en clínica, ni
+  cortes gruesos reales: quedarse con uno de cada k no reproduce el promediado de volumen parcial de
+  un corte grueso adquirido así.
+
+### 5.9 Enderezado del giro axial en la demo
+
+La demo endereza el giro axial del paciente antes de predecir (`src/demo_export.py`, con
+`normalizacion.normalizar`): estima el ángulo con la simetría izquierda-derecha de la pelvis y solo
+corrige giros claros de 10° o más. En los cuatro casos exportados el giro estimado fue de −1.5°,
++0.5°, −0.5° y +4.8°, así que ninguno se corrigió y su resultado no cambió. Sobre el caso 024 girado
+a propósito, estimó 28.5° para 30° y 58.8° para 60° y los corrigió. La evaluación oficial no aplica
+este paso.
+
 ## 6. Protocolo de evaluación
 
 - H8 se eligió **solo con validación**, comparándolo con H6, H6 sin EMA, H7 y H7 con EMA.
@@ -330,8 +394,8 @@ tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se h
 2. **Costo en imágenes limpias.** 0.008 menos que H7 en validación y 0.005 menos en test.
 3. **El ruido probado es sintético.** Gaussiano, el mismo tipo con que se entrenó, y solo en
    validación. No se midió con artefactos reales de CT (metal, movimiento, dosis baja).
-4. **Pacientes girados.** Un giro grande sigue necesitando el enderezado previo, que solo corrige el
-   giro en el plano axial y todavía no está conectado a la demo ni a la API.
+4. **Pacientes girados.** Un giro grande necesita el enderezado previo, que la demo ya aplica
+   (sección 5.9) y que solo corrige el giro en el plano axial.
 5. **Fragmentos secundarios.** Dice de 0.76 a 0.77, uno de cada diez sin detectar en 3D y HD95
    mediano cercano a 8 mm.
 6. **Fragmentos en contacto.** Cuando dos fragmentos se tocan en la superficie de fractura, la
@@ -339,6 +403,7 @@ tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se h
 7. **Fragmentos predichos de más.** 297 en validación y 258 en test no corresponden a ningún
    fragmento real. Las métricas del curso no los penalizan.
 8. **Modelo 2D.** Procesa corte a corte; la coherencia entre cortes depende del post-proceso 3D.
+   Con cortes más gruesos se probó hasta unos 2.4 mm (sección 5.8).
 9. **Muestra pequeña.** 15 pacientes por partición, de un solo dataset.
 10. **SAM se compara solo por región.** SAM no separa fragmentos, así que la comparación de la
     sección 5.7 es de la segmentación semántica dentro de la caja, no del Dice por fragmento.
@@ -350,7 +415,7 @@ tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se h
 | Pesos | `outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth` (con excepción en `.gitignore`) |
 | `--aug-noise` | `src/train_s10.py` |
 | HD95 y ASSD por fragmento | `src/metricas_superficie.py` y `tests/test_metricas_superficie.py` |
-| Demo | Casos 024, 044, 099 y 039 exportados con H8 en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`; los de H6 se retiraron |
+| Demo | Casos 024, 044, 099 y 039 exportados con H8 en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`; los de H6 se retiraron. Endereza el giro axial (10° o más) y usa umbrales del post-proceso en mm³ |
 | Dashboard | Lee los casos de H8 y muestra las cuatro evaluaciones en test (D5, H6, H7 y H8), HD95/ASSD y la distancia |
 | API | `api/server.py` y `api/Dockerfile` cargan H8. La Lambda publicada se actualiza cuando la rama llegue a `main` |
 | Latencia | Medida con H8 en CPU (`outputs/demo/latency.json`) |
@@ -367,6 +432,7 @@ tarda unos 450 a 475 ms por corte en una GPU T4 solo en su parte (en una L4 se h
 | Test y su configuración congelada | `outputs/h8/test/` |
 | HD95 y ASSD | `outputs/h8/{validacion,test}/superficie_*_h8.json` |
 | Distancia de separación | `outputs/h8/{validacion,test}/distancias_*_h8.json` |
+| Prueba de grosor de corte | `outputs/h8/validacion/grosor_corte/` (`tabla_grosor_corte.csv`) |
 | Comparación con SAM | `outputs/h8/{validacion,test}/sam_baseline_*_h8.json` |
 | Modelo sin CBAM y CBAM apagado | `outputs/h8/cbam/` |
 | Comparación con los otros cuatro modelos | `outputs/h8/comparacion/` y `docs/experimentos_ema_rotacion_ruido.md` |

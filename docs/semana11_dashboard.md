@@ -54,8 +54,12 @@ guardados girados 180° en el plano (`TransformMatrix = -1 0 0 0 -1 0 0 0 1`, or
 3. Si el volumen está girado, gira 180° en el plano la imagen en HU y el ground truth, una sola vez.
    Todo lo que sigue sale de ese volumen enderezado: la vista cruda (visualizador 1), los cortes del
    modelo (visualizador 2), las mallas (visualizador 3) y los cortes que se mandan a la API en vivo.
-4. `meta.json` guarda `canonical` y `flipped`; la barra lateral del dashboard dice si el caso se
-   enderezó.
+4. Después, `normalizacion.normalizar` estima el giro axial del paciente dentro del escáner, que la
+   cabecera no trae, con la simetría izquierda-derecha de la pelvis, y lo corrige si es de 10° o más
+   (`GIRO_MINIMO_DEMO`). En los cuatro casos versionados el giro fue menor (de −1.5° a +4.8°) y no se
+   corrigió. `--sin-enderezar` omite este paso.
+5. `meta.json` guarda `canonical`, `flipped` y `enderezado` (ángulo y si se corrigió); la barra
+   lateral del dashboard dice si el caso se enderezó.
 
 No se devuelve el resultado a la orientación original: en la canónica todos los casos se ven igual
 (sacro abajo) y la distancia en mm no cambia con un giro de 180°.
@@ -91,6 +95,10 @@ Dice por fragmento; H6, 0.875; H7, 0.879; y H8, 0.874, el modelo de la demo), HD
 fragmento, el error de distancia y SAM sobre test, leídos de `outputs/`; y la latencia por imagen.
 
 ## Distancia en mm
+
+Los tamaños mínimos del post-proceso 3D se fijan en mm³ con el espaciado de cada caso (26.1 mm³ por
+fragmento y 173.8 por región), así no dependen del grosor de los cortes; `meta.json` los guarda en
+`umbrales_postproceso`. `--umbral-voxeles` vuelve a los 30 y 200 vóxeles.
 
 Mínima borde a borde entre el fragmento y el principal de su hueso, con `distance_transform_edt` y
 el spacing del header (ajustado al estiramiento a 384 px). El volumen de IDs sale de
