@@ -1,0 +1,5 @@
+# Configuración del dashboard (la lee Streamlit al correr `streamlit run app/dashboard.py` desde la
+# raíz del repo, y Streamlit Community Cloud).
+[server]
+# Subir un CT propio: un .mha de PENGWIN pesa hasta ~400 MB y el tope por defecto es 200 MB (error 413).
+maxUploadSize = 1024
