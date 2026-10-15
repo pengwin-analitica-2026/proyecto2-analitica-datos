@@ -690,6 +690,25 @@ pedido de Gustavo con los prompts copiados tal cual.
   - Apagar CBAM al predecir (F1 de 0.992 a 0.444) mide dependencia, no aporte; la IA lo aclaró antes
     de reportarlo para no confundirlo con la ablación entrenada.
 
+
+### 35. Subir un CT propio al dashboard (.mha, NIfTI o carpeta DICOM)
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  15 de octubre de 2026, rama `feat/subir-ct` sobre `modelo_h8`.
+- **Prompt exacto:**
+  > Listo. Algo importante es que queremos también poder nosotros subir un punto de MHA o subir una carpeta con todos los cortes. Eso fue lo que el profe nos dijo que quería: él quiere poder subir un punto de MHA y, pum, que se vean las cosas, se genere la predicción, todo eso, y se puede empezar a trabajar con eso. Sí, y también una  carpeta con los cortes
+- **Qué produjo la IA:** `src/volumen_entrada.py` (lectura de `.mha`/NIfTI/NRRD y de series DICOM,
+  orientación con `normalizacion.a_orientacion_estandar`, sin torch); la separación de
+  `demo_export.export_case` en `exportar_volumen` (volumen ya cargado + función que predice);
+  `src/inferencia_remota.py` y el endpoint `POST /predict_batch` de la API para inferir el volumen
+  en AWS cuando el dashboard corre en Streamlit Cloud; la página «Subir un CT» del dashboard; y las
+  pruebas `tests/test_volumen_entrada.py` y las nuevas de `tests/test_api_server.py`.
+- **Qué se hizo a mano:** la decisión de soportar `.mha` y carpeta de cortes, pedida por el profesor.
+- **Análisis crítico:** se interpretó «carpeta con los cortes» como una serie DICOM; una carpeta de
+  PNG/JPG se rechaza con explicación porque pierde las HU y el spacing. Para comprobar que el refactor
+  no cambió nada se reexportó el caso 024 con H8 y salió idéntico al versionado (meta y arreglos).
+  En Streamlit Cloud un volumen muy grande puede no caber en memoria; no se probó ahí todavía porque
+  el endpoint nuevo llega a la Lambda solo al integrar a `main`.
 ---
 
 # Parte 2. Análisis crítico

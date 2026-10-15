@@ -63,7 +63,12 @@ aparte, solo con la app y los casos, si algún día el repo principal no puede c
 | Repositorio ECR | `pelvis-api` (escaneo de vulnerabilidades al subir) |
 | Función Lambda | `pelvis-api`: imagen de contenedor, 3008 MB, tiempo máximo 120 s |
 | Rol de ejecución | `pelvis-api-lambda-exec` (solo `AWSLambdaBasicExecutionRole`, para los logs) |
-| URL | Function URL pública con autenticación `NONE`; `/predict_slice` exige la cabecera `X-API-Key` |
+| URL | Function URL pública con autenticación `NONE`; `/predict_slice` y `/predict_batch` exigen la cabecera `X-API-Key` |
+
+Endpoints: `GET /health` (al instante), `GET /health?deep=1` (carga el modelo), `POST /predict_slice`
+(un corte, para la inferencia en vivo del visualizador 2) y `POST /predict_batch` (hasta 16 cortes
+uint8 de 384×384 en un `.npy`; lo usa el dashboard para inferir un CT subido completo, ver
+`docs/semana11_dashboard.md`). Lambda acepta hasta 6 MB por pedido; 16 cortes son ~2.4 MB.
 
 La función se creó una vez a mano (imagen `bootstrap`); desde entonces la actualiza
 `deploy-api.yml` en cada push a `main` (ver `docs/cicd_github_actions.md`).
