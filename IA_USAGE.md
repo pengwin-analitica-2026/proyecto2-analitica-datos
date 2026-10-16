@@ -709,6 +709,26 @@ pedido de Gustavo con los prompts copiados tal cual.
   no cambió nada se reexportó el caso 024 con H8 y salió idéntico al versionado (meta y arreglos).
   En Streamlit Cloud un volumen muy grande puede no caber en memoria; no se probó ahí todavía porque
   el endpoint nuevo llega a la Lambda solo al integrar a `main`.
+
+### 36. Los 100 casos desde S3 y el preprocesamiento paso a paso
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  15 de octubre de 2026, rama `feat/subir-ct`.
+- **Prompts exactos (fragmentos):**
+  > algo que el profe pues, dijo que sería chévere es como poner todos los puntos de MHA, que creo que serían 100 […] que haya una sección o haya una parte donde yo pueda escoger cuál de los 100 […] primero nosotros queremos mostrar la imagen como viene, raw, como viene, ¿sí? Luego, pues la imagen de cómo se le, se le agrega pues el giro de 180 grados […] Me imagino que será mejor poner todo esto en un S3 para que los pueda leer de ahí Streamlit, ¿no?
+
+  > me gustan los dos, la verdad. Sería bueno, pues, lo, tener los dos, tanto los precalculados como el procesar al elegir. […] crear el bucket en la cuenta de Almia, sí, créalo.
+- **Qué produjo la IA:** el bucket privado en la cuenta de Almia, `deploy/aws/subir_crudos_s3.py`
+  (los 100 casos comprimidos sin pérdida), `src/almacen_s3.py`, `deploy/precalcular_casos.py` (4
+  procesos en paralelo, reanudable), `src/pasos_preproceso.py` y la pestaña «Preprocesamiento», el
+  origen «Casos PENGWIN (100)» con los modos precalculado y procesar ahora, el usuario IAM de solo
+  lectura para Streamlit Cloud, y las pruebas `tests/test_almacen_s3.py`.
+- **Qué se hizo a mano:** Gustavo eligió tener los dos modos y autorizó el bucket. La clave del
+  usuario de solo lectura la crea él y la pone en los Secrets de Streamlit Cloud.
+- **Análisis crítico:** Gustavo prefería precalcular en Colab por la GPU; la IA midió que casi la
+  mitad del tiempo por caso es CPU (distancias, mallas, vista cruda) y propuso el Mac con 4 procesos,
+  con los datos ya en disco. La IA también creyó caídos los procesos de subida por una consulta mal
+  hecha y lanzó duplicados; los detectó enseguida y los detuvo sin pérdida.
 ---
 
 # Parte 2. Análisis crítico

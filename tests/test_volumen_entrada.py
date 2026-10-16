@@ -63,12 +63,19 @@ class LeerSubida(unittest.TestCase):
         self.assertEqual(vol.spacing_xyz, (0.8, 0.9, 1.5))
         self.assertEqual(vol.nombre, "caso_nuevo")
         self.assertFalse(vol.orientacion["estandar"])
+        textos = {p["clave"]: p for p in vol.pasos.textos}
+        self.assertIn("180°", textos["crudo"]["texto"])
+        self.assertIn("girado", textos["orientado"]["texto"])
+        # misma escala, mismo corte: el paso «orientado» es el crudo girado 180°
+        np.testing.assert_array_equal(vol.pasos.arreglos["orientado_corte"],
+                                      vol.pasos.arreglos["crudo_corte"][::-1, ::-1])
 
     def test_mha_estandar_queda_igual(self):
         array = volumen_prueba()
         vol = leer_subida([("a.mha", a_bytes(array, ".mha"))])
         np.testing.assert_array_equal(vol.image, array)
         self.assertTrue(vol.orientacion["estandar"])
+        self.assertIn("no se cambió nada", vol.pasos.textos[1]["texto"])
 
     def test_nifti_comprimido(self):
         array = volumen_prueba()
@@ -137,7 +144,10 @@ class ExportarVolumenSinGroundTruth(unittest.TestCase):
             with np.load(out / "volume.npz") as v:
                 self.assertNotIn("gt_ids", v.files)
                 self.assertEqual(v["images"].shape, (12, size, size))
-            self.assertTrue((out / "meshes.npz").exists())   # raw_view.npz puede faltar: el V1 es opcional
+            self.assertTrue((out / "meshes.npz").exists())
+            self.assertEqual([p["clave"] for p in meta["pasos"]], ["giro_axial", "entrada"])
+            with np.load(out / "pasos.npz") as pasos:
+                self.assertEqual(pasos["entrada_corte"].shape, (size, size))   # raw_view.npz puede faltar: el V1 es opcional
 
 
 if __name__ == "__main__":

@@ -55,6 +55,23 @@ Se habilitaron en la configuración de la organización y el despliegue pasó.
 `deploy/build_streamlit_cloud.py` sigue sirviendo para publicar el dashboard desde un repositorio
 aparte, solo con la app y los casos, si algún día el repo principal no puede conectarse.
 
+### Casos PENGWIN desde S3
+
+El origen «Casos PENGWIN (100)» lee el bucket privado `pengwin-ct-050752608083` (ver
+`docs/semana11_dashboard.md`). En Streamlit Cloud necesita, en los Secrets:
+
+```toml
+AWS_ACCESS_KEY_ID = "<clave del usuario pengwin-streamlit-lectura>"
+AWS_SECRET_ACCESS_KEY = "<su secreto>"
+AWS_DEFAULT_REGION = "us-east-2"
+```
+
+`pengwin-streamlit-lectura` es un usuario IAM que solo puede listar el bucket y leer `crudos/` y
+`exportados/` (`deploy/aws/streamlit-lectura-policy.json`); no puede escribir ni ver nada más de la
+cuenta. Su clave se crea una vez a mano (`aws iam create-access-key --user-name
+pengwin-streamlit-lectura`) y va directo a los Secrets de Streamlit Cloud, no al repositorio. En local
+basta un perfil con acceso (`AWS_PROFILE=almia`).
+
 ## 2. API de inferencia en AWS Lambda
 
 | Recurso | Valor |
@@ -116,5 +133,5 @@ Sin verificar todavía:
 
 ## Al terminar el curso
 
-Borrar la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
+Borrar el bucket `pengwin-ct-050752608083` y el usuario `pengwin-streamlit-lectura`, la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
 `github-actions-pelvis-api` y `pelvis-api-lambda-exec`, y la app de Streamlit Cloud.
