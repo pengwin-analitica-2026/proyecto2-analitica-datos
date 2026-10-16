@@ -26,6 +26,9 @@ reales** (±35°) y **aumento de ruido gaussiano**.
 | Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.970 / 0.943 | 0.968 / 0.939 |
 | Dice / IoU por fragmento | 0.85 / 0.70 | 0.865 / 0.800 | 0.874 / 0.812 |
 
+Con tres semillas (42, 43 y 44) el Dice por fragmento en test es 0.874, 0.875 y 0.877
+(0.875 ± 0.001), y las tres cumplen los nueve objetivos.
+
 H8 se eligió entre cinco variantes por ser la más robusta al ruido gaussiano: con σ = 10 y 25
 niveles de gris mantiene 0.860 y 0.835 de Dice por fragmento en validación, donde las demás caen a
 0.72 y 0.23 como mucho. No es robusto a todo: con ruido fuerte y con un giro de 60° queda por debajo

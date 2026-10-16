@@ -43,4 +43,6 @@ build/
 !outputs/s10/d5_ema_w32_e60_s42.pth
 # Modelo definitivo: H8 (sin EMA, giro en mm y aumento de ruido)
 !outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth
+!outputs/s10/h8_aumm_noise01_noema_w32_e60_s43.pth
+!outputs/s10/h8_aumm_noise01_noema_w32_e60_s44.pth
 

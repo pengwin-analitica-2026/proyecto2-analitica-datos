@@ -85,19 +85,19 @@ y la comparación con los demás modelos en `docs/experimentos_ema_rotacion_ruid
 
 ### 4.1 Test (15 pacientes, 4 664 cortes)
 
-| Métrica | Objetivo | **H8 (entregado)** | H7 | H6 | D5 (primera evaluación) |
-|---|---|---|---|---|---|
-| Dice por fragmento | 0.85 | **0.874** | 0.879 | 0.875 | 0.845 |
-| IoU por fragmento | 0.70 | 0.812 | 0.819 | 0.816 | 0.781 |
-| F1 de clasificación | 0.85 | 0.989 | 0.989 | 0.990 | 0.984 |
-| AUC de clasificación | 0.85 | 0.999 | 0.999 | 0.999 | 0.998 |
-| IoU de detección | 0.65 | 0.938 | 0.940 | 0.943 | 0.898 |
-| mAP50 | 0.65 | 0.953 | 0.962 | 0.961 | 0.920 |
-| mAP50:95 | 0.40 | 0.898 | 0.899 | 0.902 | 0.853 |
-| Dice semántico | 0.85 | 0.968 | 0.971 | 0.971 | 0.949 |
-| IoU semántico | 0.70 | 0.939 | 0.944 | 0.943 | 0.904 |
+| Métrica | Objetivo | **H8 (entregado, s42)** | H8, media de 3 semillas | H7 | H6 | D5 (primera evaluación) |
+|---|---|---|---|---|---|---|
+| Dice por fragmento | 0.85 | **0.874** | 0.875 ± 0.001 | 0.879 | 0.875 | 0.845 |
+| IoU por fragmento | 0.70 | 0.812 | 0.814 | 0.819 | 0.816 | 0.781 |
+| F1 de clasificación | 0.85 | 0.989 | 0.988 | 0.989 | 0.990 | 0.984 |
+| AUC de clasificación | 0.85 | 0.999 | 0.999 | 0.999 | 0.999 | 0.998 |
+| IoU de detección | 0.65 | 0.938 | 0.940 | 0.940 | 0.943 | 0.898 |
+| mAP50 | 0.65 | 0.953 | 0.958 | 0.962 | 0.961 | 0.920 |
+| mAP50:95 | 0.40 | 0.898 | 0.900 | 0.899 | 0.902 | 0.853 |
+| Dice semántico | 0.85 | 0.968 | 0.969 | 0.971 | 0.971 | 0.949 |
+| IoU semántico | 0.70 | 0.939 | 0.940 | 0.944 | 0.943 | 0.904 |
 
-H8 cumple los nueve objetivos. Desglose del Dice por fragmento: principal 0.910, secundario 0.760,
+H8 cumple los nueve objetivos, y también cada una de sus tres semillas (sección 4.14). Desglose del Dice por fragmento: principal 0.910, secundario 0.760,
 con 7.2 % de secundarios sin pareja; centro del volumen 0.885 y extremos 0.836.
 
 **Cómo leer estas cifras.** Test se consultó seis veces durante el proyecto: receta c2 (0.848),
@@ -120,7 +120,8 @@ cabeza grid sola, el mAP50 es 0.909 en test y 0.903 en validación, y el mAP50:9
 | Dice / IoU semántico | 0.85 / 0.70 | 0.970 / 0.943 |
 | Dice / IoU por fragmento | 0.85 / 0.70 | 0.865 / 0.800 |
 
-Desglose: principal 0.897, secundario 0.769; secundarios no detectados 6.3 %, primarios 0.2 %.
+Desglose: principal 0.897, secundario 0.769; secundarios no detectados 6.3 %, primarios 0.2 %. Con
+las tres semillas, el Dice por fragmento en validación es 0.865, 0.870 y 0.869 (media 0.868).
 
 ### 4.3 Por qué H8: comparación de cinco modelos (validación, semilla 42)
 
@@ -334,6 +335,40 @@ corrige giros claros de 10° o más. En los cuatro casos exportados el giro esti
 a propósito, estimó 28.5° para 30° y 58.8° para 60° y los corrigió. La evaluación oficial no aplica
 este paso.
 
+### 4.14 Variación entre semillas
+
+H8 se volvió a entrenar con las semillas 43 y 44, con la receta exacta de la 42, y cada semilla se
+evaluó igual. La regla se escribió antes de mirar (`outputs/h8/semillas/REGLA_SEMILLAS_H8.md`): las
+semillas nuevas miden la variación y no sirven para elegir modelo; el entregado sigue siendo la 42.
+Dice por fragmento:
+
+| Prueba | s42 (entregada) | s43 | s44 | Media ± desviación |
+|---|---|---|---|---|
+| Validación sin daño | 0.865 | 0.870 | 0.869 | 0.868 ± 0.003 |
+| Ruido σ = 10 | 0.860 | 0.864 | 0.861 | 0.862 ± 0.002 |
+| Ruido σ = 25 | 0.835 | 0.836 | 0.834 | 0.835 ± 0.001 |
+| Giro de 60° sin enderezar | 0.612 | 0.621 | 0.658 | 0.631 ± 0.024 |
+| Giro de 60° enderezado | 0.849 | 0.850 | 0.851 | 0.850 ± 0.001 |
+| **Test sin daño** | **0.874** | **0.875** | **0.877** | **0.875 ± 0.001** |
+
+- **El resultado no depende de la semilla.** En test las tres dan 0.874 a 0.877, y las tres cumplen
+  los nueve objetivos en validación y en test. Las demás métricas varían todavía menos (F1 0.987 a
+  0.989, Dice semántico 0.968 a 0.970 en test).
+- **La semilla entregada es la más baja en validación** (0.865 contra 0.870 y 0.869). Las cifras que
+  se reportan de H8 no son las de una semilla afortunada.
+- **La robustez al ruido es propia de la receta, no de la semilla.** Con σ = 10 y 25 las tres quedan
+  dentro de ±0.002. Lo que sí varía es la detección con ruido fuerte (mAP50 de 0.927 a 0.957).
+- **El giro grande sin enderezar es lo más inestable** (0.612 a 0.658, ±0.024): el modelo no aprendió
+  de forma fiable a tolerar 60°. Con el enderezado previo las tres quedan en 0.849 a 0.851.
+- **Frente a H7**, de una sola semilla (0.873), la media de H8 en validación es 0.868: el costo del
+  aumento de ruido en imágenes limpias es de unos 0.005, menor que el 0.008 que se veía con una sola
+  semilla. En test la media de H8 (0.875) es igual a la de H6 (0.875).
+- **Peores casos de test:** 039 es el peor en las tres semillas (0.787 a 0.797); 054, 061 y 007 se
+  repiten entre los cinco peores. Son dificultades de los casos, no de una semilla.
+
+Los resultados por semilla están en `outputs/h8/semillas/` (tabla en `tabla_semillas_h8.csv`) y los
+pesos en `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth`.
+
 ## 5. Protocolo de evaluación
 
 - Todo se elige en validación. Una variante se adopta solo si mejora al menos 0.003, con bootstrap
@@ -348,9 +383,11 @@ este paso.
 
 ## 6. Limitaciones
 
-1. **Una sola semilla.** H8 se entrenó solo con la semilla 42; no se conoce su variación propia
-   (en el proyecto el ruido entre semillas es de ±0.004 en Dice por fragmento).
-2. **Costo en imágenes limpias.** 0.008 menos que H7 en validación y 0.005 menos en test.
+1. **Variación entre semillas.** Medida con tres semillas: ±0.003 en validación y ±0.001 en test en
+   Dice por fragmento (sección 4.14). El giro de 60° sin enderezar varía más (±0.024).
+2. **Costo en imágenes limpias.** Frente a H7 (una sola semilla), la semilla entregada pierde 0.008 en
+   validación y 0.005 en test; con la media de las tres semillas de H8 el costo es de 0.005 en
+   validación y 0.004 en test.
 3. **Ruido sintético.** Se probó ruido gaussiano, el mismo tipo con que se entrenó, y solo en
    validación. No se midió con artefactos reales de CT (metal, movimiento, dosis baja).
 4. **Orientación de la entrada.** El modelo espera los volúmenes en orientación canónica; la demo
@@ -403,6 +440,7 @@ El sistema es un solo modelo multitarea, así que hay un model card. Los pesos v
 | Archivo | Qué es | En qué difiere del entregado |
 |---|---|---|
 | `outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth` | **Modelo entregado** (H8, semilla 42) | — |
+| `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth` | H8 con otras semillas | Solo la semilla; sirven para medir la variación (sección 4.14) |
 | `outputs/h7/h7_auggeo_rot35_canon_aumm_noema_w32_e60_s42.pth` | H7, modelo de la tercera evaluación en test | Sin aumento de ruido |
 | `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s4{2,3,4}.pth` | H6, el modelo anterior, con tres semillas | Con EMA, giro del aumento en píxeles y sin aumento de ruido |
 | `outputs/s10/d5_ema_w32_e60_s42.pth` | D5, el modelo de la primera evaluación en test | Además, sin orientación canónica ni aumento geométrico |

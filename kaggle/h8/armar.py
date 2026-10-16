@@ -15,6 +15,7 @@ Uso, desde la raíz del repo:
     kaggle kernels push -p build/kaggle_h8/h8dist             # distancia de separación en mm
     kaggle kernels push -p build/kaggle_h8/h8sam              # SAM zero-shot contra H8 (solo comparación)
     kaggle kernels push -p build/kaggle_h8/h8zstep            # grosor de corte y umbrales en mm³ (validación)
+    kaggle kernels push -p build/kaggle_h8/h8s43              # H8 con la semilla 43 (y h8s44 con la 44)
 
 Kaggle permite dos sesiones de GPU a la vez. Los resultados se bajan con
 ``kaggle kernels output <usuario>/pengwin-exp-<nombre> -p <carpeta>``.
@@ -44,6 +45,8 @@ KERNELS = {
     "h8dist": ("plantilla_distancias.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
     "h8sam": ("plantilla_sam.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
     "h8zstep": ("plantilla_zstep.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
+    "h8s43": ("plantilla_semilla.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
+    "h8s44": ("plantilla_semilla.py", None, None, ["pengwin-cache-trainval", "pengwin-h8-test"]),
 }
 
 
@@ -66,13 +69,15 @@ def main() -> None:
     for nombre in args.kernels:
         plantilla, extra, pth, datasets = KERNELS[nombre]
         codigo = (AQUI / plantilla).read_text(encoding="utf8").replace("__PAYLOAD__", payload)
+        if plantilla == "plantilla_semilla.py":
+            codigo = codigo.replace("__SEMILLA__", nombre[len("h8s"):])
         if extra is not None:
             codigo = (codigo.replace("__NOMBRE__", nombre).replace("__EXTRA__", extra)
                       .replace("__PTH__", pth))
         carpeta = Path(args.salida) / nombre
         carpeta.mkdir(parents=True, exist_ok=True)
         (carpeta / "script.py").write_text(codigo, encoding="utf8", newline="\n")
-        slug = f"pengwin-exp-{nombre.replace('h8test', 'h8-test').replace('h8dist', 'h8-dist').replace('h8sam', 'h8-sam').replace('h8zstep', 'h8-zstep')}"
+        slug = f"pengwin-exp-{nombre.replace('h8test', 'h8-test').replace('h8dist', 'h8-dist').replace('h8sam', 'h8-sam').replace('h8zstep', 'h8-zstep').replace('h8s4', 'h8-s4')}"
         metadatos = {"id": f"{args.usuario}/{slug}", "title": slug, "code_file": "script.py",
                      "language": "python", "kernel_type": "script", "is_private": "true",
                      "enable_gpu": "true", "enable_internet": "true",
