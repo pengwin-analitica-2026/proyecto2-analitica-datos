@@ -97,10 +97,15 @@ class AlmacenS3PorLaApi(unittest.TestCase):
     def setUp(self):
         import io
         import os
+        anterior = os.environ.get("API_KEY")
         os.environ["API_KEY"] = "clave-s3"
         sys.path.insert(0, str(ROOT))
-        sys.modules.pop("api.server", None)
+        self._olvidar_servidor()
         from api import server
+        # Deja el módulo y la variable como estaban: otras pruebas importan la API con su propia clave.
+        self.addCleanup(self._olvidar_servidor)
+        self.addCleanup(lambda: os.environ.__setitem__("API_KEY", anterior) if anterior is not None
+                        else os.environ.pop("API_KEY", None))
         self.api = TestClient(server.app)
         self.s3 = S3Falso({"crudos/imagenes/024.mha": b"img", "exportados/h8/024/meta.json": b"{}",
                            "otros/secreto.txt": b"no"})
@@ -123,6 +128,12 @@ class AlmacenS3PorLaApi(unittest.TestCase):
             self.addCleanup(parche.stop)
         almacen_s3.configurar_api("http://api", "clave-s3")
         self.addCleanup(almacen_s3.configurar_api, None, None)
+
+    @staticmethod
+    def _olvidar_servidor():
+        sys.modules.pop("api.server", None)
+        if "api" in sys.modules and hasattr(sys.modules["api"], "server"):
+            delattr(sys.modules["api"], "server")
 
     def test_listar_y_descargar_sin_credenciales(self):
         self.assertEqual(almacen_s3.modo(), "api")
