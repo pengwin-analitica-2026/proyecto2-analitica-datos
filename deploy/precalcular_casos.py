@@ -33,9 +33,21 @@ def trabajar(casos: list[str], checkpoint: str, tta: bool, salida: Path) -> None
             print(f"{caso}: ya estaba en S3", flush=True)
             continue
         t = time.time()
-        carpeta = export_case(caso, checkpoint, out_root=str(salida), tta=tta, progress=lambda m: None)
-        almacen_s3.subir_exportado(carpeta, modelo, caso)
-        print(f"{caso}: listo y subido en {time.time() - t:.0f} s", flush=True)
+        carpeta = salida / modelo / caso
+        if (carpeta / "meta.json").exists() and (carpeta / "pasos.npz").exists():
+            print(f"{caso}: ya estaba calculado en disco, solo se sube", flush=True)   # meta.json se escribe al final
+        else:
+            carpeta = export_case(caso, checkpoint, out_root=str(salida), tta=tta, progress=lambda m: None)
+        for intento in range(5):           # la conexión de la casa se corta a veces a mitad de una subida
+            try:
+                almacen_s3.subir_exportado(carpeta, modelo, caso)
+                print(f"{caso}: listo y subido en {time.time() - t:.0f} s", flush=True)
+                break
+            except Exception as error:
+                if intento == 4:
+                    print(f"{caso}: NO se pudo subir ({error})", flush=True)
+                else:
+                    time.sleep(30 * (intento + 1))
 
 
 def main() -> None:
