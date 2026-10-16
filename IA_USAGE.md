@@ -17,16 +17,16 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 > - Gustavo: revisar el análisis crítico de las entradas 21 a 24 y 31 a 33, que redactó la IA.
 > - Jacobo: el modelo de Claude que usó (entradas 1–7), los prompts exactos si los tiene, y una
 >   entrada para su versión del notebook 03 (Semana 9).
-> - Unificar la cifra del overfit de la Semana 9: la entrada 9 dice 1.687 → 0.002 (758×) y el
->   notebook 03 registra 1.673 → 0.00115 (1454×). Son dos corridas; el informe y este archivo deben
->   citar la misma.
+> - Gustavo: entrada de la cuantización, si se hizo con IA.
+> - Informe técnico y mini-paper: citar el overfit de la Semana 9 como 1454× (ya unificado en la
+>   entrada 9).
 
 ## Herramientas usadas
 
 | Integrante | Herramienta | Modelo | Entradas |
 |---|---|---|---|
 | Jacobo | Claude (claude.ai) | *(completar)* | 1–7 |
-| María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28 |
+| María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28, 34 |
 | Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–33 |
 | Federico | *(completar)* | *(completar)* | 29 |
 
@@ -177,7 +177,8 @@ pedido de Gustavo con los prompts copiados tal cual.
 - **Qué produjo la IA:**
   - **Semana 9:** el código y las pruebas del backbone propio, CBAM, la cabeza de detección por grid
     y el NMS propio (`week9_detection.py`, `tests/test_week9_detection.py`); el overfit intencional
-    (pérdida de 1.687 a 0.002, 758× con un criterio mínimo de 4×; ver el bloque de pendientes); y
+    (pérdida de 1.673 a 0.00115, 1454× con un criterio mínimo de 4×, la corrida registrada en el
+    notebook 03; una corrida anterior dio 1.687 → 0.002, 758×); y
     `docs/resumen_semana9.md`.
   - **Preprocesamiento:** la comparación de 166 configuraciones por contraste-ruido (CLAHE 3.2,
     ventana sola 6.6, gamma 8.1) y la revisión visual de los 100 casos.
@@ -648,6 +649,66 @@ pedido de Gustavo con los prompts copiados tal cual.
   Al recalcular la matriz de confusión apareció además un redondeo mal hecho en el informe largo
   (recall del coxal izquierdo 0.996, no 0.997).
 
+## Corrección del profesor — orientación, EMA e imágenes "feas"
+
+### 34. Orientación con metadatos, H7 sin EMA, robustez a ruido y dependencia de CBAM
+
+- **Integrante y herramienta:** María · Claude Opus 5.5 (claude.ai). 9 a 12 de octubre de 2026,
+  rama `feat/normalizacion-orientacion`.
+- **Prompt (fragmentos clave; el texto exacto está en el chat):** la transcripción de la asesoría
+  (*"esas rotaciones toca hacerlas a través de productos punto y productos cruz con unos metadatos…
+  y el EMA es mejor que no lo utilicemos"*, *"tengo que poner un pipeline super robusto"*), con el
+  pedido de cumplirla; luego "dame el notebook todo corregido… que en el entrenamiento yo vea los
+  outputs", "lo del aporte del CBAM para cada cabeza… de este modelo" y la lista de mejoras que
+  propuso Jacobo (enderezado en casos sin giro, suavizado contra el ruido).
+- **Qué produjo la IA:**
+  - `src/normalizacion.py`: paso 1, orientación a RAI con productos punto y cruz sobre la cabecera
+    (método del artículo del profesor, doi:10.1016/j.mex.2024.103073); paso 2, enderezado del giro
+    del paciente por la simetría izquierda-derecha del hueso, en milímetros; con sus pruebas
+    (`tests/test_normalizacion.py`, `tests/test_evaluar_normalizado.py`).
+  - El giro de entrenamiento en milímetros (`--aug-mm`) y, en `evaluate_volumes.py`, las opciones
+    `--normalizar`, `--sin-cbam` y las pruebas de estrés `rotmm=`, `noise=`, `blur=` y `suav=`.
+  - Los notebooks 07 (rotación con H6), 09 (entrenamiento de H7 en Kaggle, validación y tercera
+    evaluación en test), 10 (ruido, suavizado y CBAM apagado) y 09b (H7 con EMA, solo para
+    comparar), y el resumen `outputs/h7/RESUMEN_COMPLETO.pdf`.
+- **Qué se hizo a mano:** el entrenamiento de H7 en Kaggle (Colab gratis no alcanzó en RAM), todas
+  las corridas de validación, la decisión de que H7 es el modelo final, y la tercera evaluación en
+  test, una sola vez y con la configuración decidida en validación (0.879). El equipo (Jacobo) revisó
+  el resumen y pidió las pruebas de enderezado sin giro y de suavizado.
+- **Análisis crítico:**
+  - La primera prueba de estrés de la IA giraba la imagen en píxeles. En el caso 044 (píxeles de
+    0.84 × 0.42 mm) el enderezado estimaba +2.8° para un giro de 30°; al revisarlo se vio que el giro
+    en píxeles deformaba la pelvis en 10 de los 15 casos de validación. Se corrigió con `rotmm=`.
+  - La IA estimó mal la memoria: el entrenamiento falló dos veces en Colab gratis (sin memoria y
+    *Bus error*) antes de pasar a Kaggle.
+  - En el resumen, la IA mezcló cifras de dos experimentos de CBAM (mAP50 de la Semana 10 con el F1
+    de la ablación final) y exageró la conclusión ("H6 y H7 parejos", "H7 igual o mejor en todo").
+    Lo detectó Jacobo al revisar; se corrigió con las cifras del model card.
+  - En el parche de suavizado propuesto en la revisión, el filtro se aplicaba antes de recortar la
+    imagen a 0–255, lo que cancela el ruido negativo del fondo y da un resultado optimista. La IA lo
+    cambió para recortar primero.
+  - Apagar CBAM al predecir (F1 de 0.992 a 0.444) mide dependencia, no aporte; la IA lo aclaró antes
+    de reportarlo para no confundirlo con la ablación entrenada.
+
+
+### 35. Subir un CT propio al dashboard (.mha, NIfTI o carpeta DICOM)
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  15 de octubre de 2026, rama `feat/subir-ct` sobre `modelo_h8`.
+- **Prompt exacto:**
+  > Listo. Algo importante es que queremos también poder nosotros subir un punto de MHA o subir una carpeta con todos los cortes. Eso fue lo que el profe nos dijo que quería: él quiere poder subir un punto de MHA y, pum, que se vean las cosas, se genere la predicción, todo eso, y se puede empezar a trabajar con eso. Sí, y también una  carpeta con los cortes
+- **Qué produjo la IA:** `src/volumen_entrada.py` (lectura de `.mha`/NIfTI/NRRD y de series DICOM,
+  orientación con `normalizacion.a_orientacion_estandar`, sin torch); la separación de
+  `demo_export.export_case` en `exportar_volumen` (volumen ya cargado + función que predice);
+  `src/inferencia_remota.py` y el endpoint `POST /predict_batch` de la API para inferir el volumen
+  en AWS cuando el dashboard corre en Streamlit Cloud; la página «Subir un CT» del dashboard; y las
+  pruebas `tests/test_volumen_entrada.py` y las nuevas de `tests/test_api_server.py`.
+- **Qué se hizo a mano:** la decisión de soportar `.mha` y carpeta de cortes, pedida por el profesor.
+- **Análisis crítico:** se interpretó «carpeta con los cortes» como una serie DICOM; una carpeta de
+  PNG/JPG se rechaza con explicación porque pierde las HU y el spacing. Para comprobar que el refactor
+  no cambió nada se reexportó el caso 024 con H8 y salió idéntico al versionado (meta y arreglos).
+  En Streamlit Cloud un volumen muy grande puede no caber en memoria; no se probó ahí todavía porque
+  el endpoint nuevo llega a la Lambda solo al integrar a `main`.
 ---
 
 # Parte 2. Análisis crítico
@@ -694,6 +755,8 @@ pedido de Gustavo con los prompts copiados tal cual.
 | Detector geométrico de giro con el signo al revés y 13 falsos positivos de 16 | 23 | Revisión visual de los casos marcados |
 | F1 de 0.991 reportado en vez de 0.990 | 23 | Contraste con el JSON |
 | `sam_baseline.py` cargaba los volúmenes sin enderezar | 24 | Detectado antes de correrlo con H6 |
+| Prueba de giro en píxeles que deformaba la pelvis | 34 | El enderezado estimaba +2.8° para 30° en el caso 044 |
+| Mezclar cifras de dos experimentos de CBAM en el resumen | 34 | Revisión de Jacobo contra el model card |
 | Dejar un `index.lock` en `.git` | 10 | La propia IA lo reportó |
 
 Patrón común: casi todos los errores eran hipótesis o heurísticas **plausibles** que fallaron al
@@ -730,13 +793,16 @@ su versión final:
 | Caso 025 | Fijador externo, limitación conocida | Histograma óseo corrido; se corrige con normalización | 3 → 7 |
 | Visualizador 1 | MIP estático → isosuperficie 3D | MIP en tres ejes + isosuperficie | 3 → 26, 28 |
 | Post-proceso | `min_size=1` y CASR mejoraban validación | `min_size=12`, sin CASR (no cumplieron la regla) | 18 → 20 |
-| Modelo principal | c2 → D5 | H6 s42 | 18, 21 → 23 |
+| Modelo principal | c2 → D5 → H6 s42 | H7 s42 (sin EMA, giro en mm), por pedido del profesor | 18, 21 → 23 → 34 |
+| Pesos | EMA 0.999 (D5, H6) | Sin EMA (H7). El EMA no era la causa de la fragilidad al ruido | 21 → 34 |
+| Orientación | Lista de casos LPI / `TransformMatrix` | Productos punto y cruz sobre la cabecera (`normalizacion.py`), mismo resultado en los 100 casos | 23, 31 → 34 |
 | Despliegue | Túnel de Cloudflare desde el Mac | Streamlit Community Cloud + API en AWS Lambda, publicados y probados desde computador y celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado | 25, 27 → 30, 31 |
-| Detector de giro | Detectar el giro con geometría (`estimate_angle`) | Descartado; se usa la cabecera del `.mha` | 23 |
+| Detector de giro | Detectar el giro con geometría (`estimate_angle`) | Descartado en la Semana 10; retomado como enderezado por simetría en milímetros, opcional al predecir | 23 → 34 |
 
 **Consultas a test.** Por la regla de la entrada 19, test debía consultarse una sola vez. Se
-consultó cuatro veces y se declara: receta c2 (0.848), EMA + CASR (0.847), D5 (0.845, la cifra
-oficial de la primera evaluación) y H6 (0.875, el modelo entregado). En la evaluación de D5 también
+consultó cinco veces y se declara: receta c2 (0.848), EMA + CASR (0.847), D5 (0.845, la cifra
+oficial de la primera evaluación), H6 (0.875, segunda evaluación) y H7 (0.879, tercera evaluación y
+modelo entregado; en la misma consulta se corrió también la variante con enderezado, 0.874). En la evaluación de D5 también
 se pasaron por test los demás checkpoints que superaban el umbral de validación, con la regla
 escrita de antemano de que solo medían la variación y no servían para elegir modelo (entrada 22).
 No se ajustó nada mirando esos resultados. El 0.875 de H6 es una segunda evaluación, posterior al

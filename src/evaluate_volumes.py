@@ -18,6 +18,12 @@ Uso:
     python src/evaluate_volumes.py --checkpoint outputs/gamma/w10g_384neg.pth \\
         --cache-dir data/cache/s10/cache_384 --split val --tta \\
         --output outputs/s10/linea_base_val.json
+
+Con ``--normalizar`` cada volumen pasa por el paso 2 de ``normalizacion.py`` (giro axial del
+paciente, estimado con la simetría izquierda-derecha de la pelvis en milímetros) antes de entrar
+al modelo; el paso 1 (orientación con los metadatos) ya lo hace el caché canónico. Se aplica
+después de ``--stress``, así ``--stress rot=60 --normalizar`` mide si el giro se recupera. Imagen y
+etiqueta reciben el mismo giro, de modo que las métricas se comparan en el marco enderezado.
 """
 
 from __future__ import annotations
@@ -36,6 +42,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from aumento_fisico import mm_por_pixel
 from build_case_cache import from_uint8, load_case_cache
 from instance_postprocess import primary_secondary_to_instances, semantic_to_instances
 from pengwin_metrics import detection_metrics, multilabel_f1_auc, refine_boxes_with_semantic
@@ -286,21 +293,55 @@ def load_model(checkpoints: list[str], device: torch.device, tta: bool) -> tuple
     return model, (False if len(models) > 1 or tta else two_pass)
 
 
-def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str) -> tuple[np.ndarray, np.ndarray]:
+def inclinar_3d(images_u8: np.ndarray, labels: np.ndarray, pitch: float, roll: float,
+                mm_xy=None, mm_z=None) -> tuple[np.ndarray, np.ndarray]:
+    """Inclina el volumen (z, y, x) fuera del plano axial, en milímetros reales.
+
+    ``pitch`` gira en el plano (z, y): cabeceo. ``roll`` gira en el plano (z, x): inclinación
+    lateral. El centro del volumen queda fijo; lo que sale del recuadro se rellena con 0.
+    """
+    import math
+    from scipy import ndimage as ndi
+    mx, my = mm_xy if mm_xy is not None else (1.0, 1.0)
+    mz = float(mm_z) if mm_z else 1.0
+    d = np.diag([mz, my, mx])
+    a, b = math.radians(pitch), math.radians(roll)
+    rot_zy = np.array([[math.cos(a), -math.sin(a), 0.0], [math.sin(a), math.cos(a), 0.0], [0.0, 0.0, 1.0]])
+    rot_zx = np.array([[math.cos(b), 0.0, -math.sin(b)], [0.0, 1.0, 0.0], [math.sin(b), 0.0, math.cos(b)]])
+    giro = rot_zx @ rot_zy
+    m = np.linalg.inv(d) @ giro.T @ d          # salida(o) = entrada(m @ o + offset)
+    centro = (np.array(images_u8.shape, dtype=np.float64) - 1) / 2
+    offset = centro - m @ centro
+    img = ndi.affine_transform(images_u8.astype(np.float32), m, offset=offset, order=1, cval=0.0)
+    lab = ndi.affine_transform(labels, m, offset=offset, order=0, cval=0)
+    return np.clip(np.round(img), 0, 255).astype(np.uint8), lab.astype(labels.dtype)
+
+
+def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str, mm_xy=None, mm_z=None) -> tuple[np.ndarray, np.ndarray]:
     """Deforma un volumen de validación para medir robustez sin tocar test.
 
     ``spec`` combina claves separadas por coma: ``rot=60`` (grados), ``scale=0.7``,
     ``aspect=1.6`` (estira el eje vertical y encoge el horizontal), ``shift=0.15`` (fracción del
-    lado, hacia la derecha) y ``lowres=2.5`` (reduce filas por ese factor y vuelve a ampliar).
+    lado, hacia la derecha) y ``lowres=2.5`` (reduce filas por ese factor y vuelve a ampliar), ``noise=10`` (ruido gaussiano,
+    niveles de gris 0-255) y ``blur=1.5`` (desenfoque gaussiano en píxeles).
     Imagen bilineal, etiqueta con vecino más cercano.
     """
     import math
     opts = {k: float(v) for k, v in (item.split("=") for item in spec.split(",") if item)}
+    if opts.get("pitch", 0.0) or opts.get("roll", 0.0):
+        images_u8, labels = inclinar_3d(images_u8, labels, opts.get("pitch", 0.0), opts.get("roll", 0.0),
+                                        mm_xy, mm_z)
     angle = math.radians(opts.get("rot", 0.0))
     scale, aspect, shift = opts.get("scale", 1.0), opts.get("aspect", 1.0), opts.get("shift", 0.0)
     sx, sy = scale / aspect, scale * aspect
     theta = torch.tensor([[math.cos(angle) / sx, -math.sin(angle) / sy, -2 * shift],
                           [math.sin(angle) / sx, math.cos(angle) / sy, 0.0]], dtype=torch.float32)
+    if "rotmm" in opts:   # giro en milímetros reales (no deforma con píxeles no cuadrados)
+        from aumento_fisico import theta_mm
+        mm = torch.tensor([list(mm_xy) if mm_xy is not None else [1.0, 1.0]], dtype=torch.float32)
+        theta = theta_mm(torch.tensor([math.radians(opts["rotmm"])]), torch.tensor([scale]),
+                         torch.tensor([1.0 / aspect]), torch.tensor([[-2 * shift, 0.0]]), mm,
+                         images_u8.shape[-2], images_u8.shape[-1])[0]
     out_i, out_l = [], []
     for start in range(0, len(images_u8), 64):
         x = torch.from_numpy(images_u8[start:start + 64].astype(np.float32))[:, None]
@@ -313,6 +354,23 @@ def apply_stress(images_u8: np.ndarray, labels: np.ndarray, spec: str) -> tuple[
             x = F.interpolate(F.interpolate(x, size=(int(h / opts["lowres"]), int(w / (1 + (opts["lowres"] - 1) / 3))),
                                             mode="bilinear", align_corners=False),
                               size=(h, w), mode="bilinear", align_corners=False)
+        if opts.get("blur", 0.0) > 0:      # desenfoque gaussiano separable, solo imagen
+            sigma = opts["blur"]
+            radio = max(1, int(round(3 * sigma)))
+            t = torch.arange(-radio, radio + 1, dtype=torch.float32)
+            k = torch.exp(-0.5 * (t / sigma) ** 2); k = k / k.sum()
+            x = F.conv2d(F.pad(x, (radio, radio, 0, 0), mode="reflect"), k.view(1, 1, 1, -1))
+            x = F.conv2d(F.pad(x, (0, 0, radio, radio), mode="reflect"), k.view(1, 1, -1, 1))
+        if opts.get("noise", 0.0) > 0:     # ruido gaussiano reproducible, solo imagen
+            g = torch.Generator().manual_seed(1234 + start)
+            x = x + torch.randn(x.shape, generator=g) * opts["noise"]
+        if opts.get("suav", 0.0) > 0:   # filtro del pipeline: después del ruido, sobre 0-255
+            x = x.round().clamp(0, 255)
+            sigma = opts["suav"]; radio = max(1, int(round(3 * sigma)))
+            t = torch.arange(-radio, radio + 1, dtype=torch.float32)
+            k = torch.exp(-0.5 * (t / sigma) ** 2); k = k / k.sum()
+            x = F.conv2d(F.pad(x, (radio, radio, 0, 0), mode="reflect"), k.view(1, 1, 1, -1))
+            x = F.conv2d(F.pad(x, (0, 0, radio, radio), mode="reflect"), k.view(1, 1, -1, 1))
         out_i.append(x[:, 0].round().clamp(0, 255).numpy().astype(np.uint8))
         out_l.append(y[:, 0].numpy().astype(np.uint8))
     return np.concatenate(out_i), np.concatenate(out_l)
@@ -355,16 +413,37 @@ def main() -> None:
                         help="Deformación de robustez sobre validación, p. ej. rot=60 o aspect=1.6,lowres=2.5.")
     parser.add_argument("--save-predictions", default=None,
                         help="Carpeta donde guardar semántica e instancias predichas por caso.")
+    parser.add_argument("--normalizar", action="store_true",
+                        help="Endereza el giro axial de cada volumen antes del modelo (normalizacion.py).")
+    parser.add_argument("--sin-cbam", action="store_true",
+                        help="Ablación en inferencia: reemplaza CBAM del backbone por la identidad.")
     args = parser.parse_args()
 
     if args.split == "test":
         print("AVISO: test se evalúa una sola vez, con la configuración ya congelada en validación.")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, two_pass = load_model(args.checkpoint, device, args.tta)
+    if args.sin_cbam:
+        apagados = 0
+        for modulo in model.modules():
+            if type(modulo).__name__ == "FundidoraBackbone":
+                modulo.cbam = torch.nn.Identity()
+                modulo.cbam_intermedios = torch.nn.ModuleDict()
+                modulo.use_cbam, modulo.learnable_gamma = False, False
+                apagados += 1
+        print(f"CBAM apagado en {apagados} backbone(s) (ablación en inferencia)")
+        if apagados == 0:
+            raise SystemExit("No encontré FundidoraBackbone en el modelo")
     two_pass = two_pass or args.two_pass
     cache_dir = Path(args.cache_dir)
     case_ids = [str(c).zfill(3) for c in args.cases] if args.cases else cases_of_split(cache_dir, args.split)
-    print(f"{len(case_ids)} casos de {args.split} | dispositivo {device} | TTA={args.tta} | segundo pase={two_pass}")
+    print(f"{len(case_ids)} casos de {args.split} | dispositivo {device} | TTA={args.tta} | segundo pase={two_pass}"
+          f" | normalizar={args.normalizar}")
+    if args.normalizar:
+        import normalizacion
+        if not getattr(model, "canonical", False):
+            print("AVISO: el modelo no es canónico; el giro se estima igual, pero el paso 1 no se aplica.")
+    giros: dict[str, dict] = {}
 
     records: list[SliceRecord] = []
     started = time.time()
@@ -373,7 +452,18 @@ def main() -> None:
         if args.stress:
             if args.split == "test":
                 raise SystemExit("La prueba de estrés es solo para validación.")
-            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress)
+            case["images"], case["labels"] = apply_stress(case["images"], case["labels"], args.stress, mm_por_pixel(case),
+                                                     mm_z=float(case["spacing_xyz"][2]))
+        if args.normalizar:
+            mm_xy = mm_por_pixel(case)
+            case["images"], case["labels"], est = normalizacion.enderezar_caso(
+                case["images"], case["labels"], mm_xy)
+            giros[case_id] = {"angulo": round(est.angulo, 2), "corregido": est.corregir,
+                              "simetria_antes": round(est.simetria_sin_girar, 3),
+                              "simetria_despues": round(est.simetria, 3),
+                              "mm_xy": [round(float(v), 4) for v in mm_xy]}
+            print(f"    giro estimado {est.angulo:+6.1f}° "
+                  f"({'corregido' if est.corregir else 'sin corregir'})", flush=True)
         case_records, predictions = evaluate_case(
             model, case_id, case["images"], case["labels"], device, args.batch_size,
             args.confidence, two_pass, keep_predictions=bool(args.save_predictions))
@@ -387,7 +477,8 @@ def main() -> None:
 
     seconds = time.time() - started
     result = {"checkpoint": args.checkpoint, "cache_dir": str(cache_dir), "split": args.split,
-              "cases": case_ids, "stress": args.stress, "canonical": bool(getattr(model, "canonical", False)), "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
+              "cases": case_ids, "stress": args.stress, "sin_cbam": bool(getattr(args, "sin_cbam", False)), "canonical": bool(getattr(model, "canonical", False)),
+              "normalizar": args.normalizar, "giros": giros, "tta": args.tta, "two_pass": two_pass, "confidence": args.confidence,
               "device": str(device), "seconds": round(seconds, 1),
               "ms_per_slice": round(1000 * seconds / max(len(records), 1), 1),
               "subsets": {name: summarize(records, name) for name in SUBSETS},

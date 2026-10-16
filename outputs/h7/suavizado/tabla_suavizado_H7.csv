@@ -1,0 +1,9 @@
+,classification_f1_macro,detection_map50,segmentation_dice_macro,instance_dice_matched
+sin daño,0.992,0.974,0.971,0.873
+sin daño + enderezado,0.993,0.972,0.97,0.872
+suav=1,0.99,0.969,0.957,0.859
+noise=10,0.879,0.73,0.825,0.654
+"noise=10,suav=1",0.984,0.968,0.955,0.851
+"noise=10,suav=1.5",0.98,0.95,0.933,0.816
+noise=25,0.517,0.224,0.383,0.228
+"noise=25,suav=1",0.822,0.742,0.876,0.658

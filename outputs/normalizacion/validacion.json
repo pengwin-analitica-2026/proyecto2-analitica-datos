@@ -1,0 +1,368 @@
+{
+  "casos": [
+    {
+      "caso": "014",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 6.5,
+      "simetria": 0.906,
+      "simetria_sin_girar": 0.814,
+      "corregir": true,
+      "error_-60": -0.25,
+      "error_-30": -0.5,
+      "error_-20": -0.5,
+      "error_-10": -0.5,
+      "error_+10": 0.0,
+      "error_+20": -0.25,
+      "error_+30": -0.25,
+      "error_+60": -0.25
+    },
+    {
+      "caso": "019",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": 1.5,
+      "simetria": 0.897,
+      "simetria_sin_girar": 0.889,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": 0.0,
+      "error_-20": 0.0,
+      "error_-10": 0.0,
+      "error_+10": -0.25,
+      "error_+20": 0.0,
+      "error_+30": 0.0,
+      "error_+60": 0.0
+    },
+    {
+      "caso": "024",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": -1.5,
+      "simetria": 0.881,
+      "simetria_sin_girar": 0.862,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": 0.0,
+      "error_-20": 0.0,
+      "error_-10": 0.0,
+      "error_+10": 0.0,
+      "error_+20": -0.25,
+      "error_+30": 0.0,
+      "error_+60": 0.0
+    },
+    {
+      "caso": "027",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": 3.5,
+      "simetria": 0.876,
+      "simetria_sin_girar": 0.807,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": -0.25,
+      "error_-20": 0.0,
+      "error_-10": 0.0,
+      "error_+10": 0.0,
+      "error_+20": 0.0,
+      "error_+30": 0.0,
+      "error_+60": -0.25
+    },
+    {
+      "caso": "033",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 2.25,
+      "simetria": 0.899,
+      "simetria_sin_girar": 0.879,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": 0.25,
+      "error_-20": 0.25,
+      "error_-10": 0.5,
+      "error_+10": -0.75,
+      "error_+20": -0.75,
+      "error_+30": -1.0,
+      "error_+60": -2.5
+    },
+    {
+      "caso": "044",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 0.5,
+      "simetria": 0.961,
+      "simetria_sin_girar": 0.957,
+      "corregir": false,
+      "error_-60": 0.5,
+      "error_-30": 4.75,
+      "error_-20": 3.0,
+      "error_-10": 0.75,
+      "error_+10": -0.5,
+      "error_+20": -1.0,
+      "error_+30": -13.0,
+      "error_+60": -21.5
+    },
+    {
+      "caso": "050",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": -2.75,
+      "simetria": 0.95,
+      "simetria_sin_girar": 0.905,
+      "corregir": false,
+      "error_-60": 0.5,
+      "error_-30": -0.25,
+      "error_-20": -0.25,
+      "error_-10": -0.25,
+      "error_+10": 0.0,
+      "error_+20": -0.25,
+      "error_+30": -0.25,
+      "error_+60": -3.5
+    },
+    {
+      "caso": "057",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 4.0,
+      "simetria": 0.855,
+      "simetria_sin_girar": 0.816,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": 0.0,
+      "error_-20": 0.0,
+      "error_-10": 0.0,
+      "error_+10": -0.25,
+      "error_+20": 0.0,
+      "error_+30": 0.0,
+      "error_+60": -0.25
+    },
+    {
+      "caso": "060",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 1.75,
+      "simetria": 0.912,
+      "simetria_sin_girar": 0.901,
+      "corregir": false,
+      "error_-60": 1.0,
+      "error_-30": 0.0,
+      "error_-20": 0.25,
+      "error_-10": 0.0,
+      "error_+10": 0.25,
+      "error_+20": 0.25,
+      "error_+30": 0.0,
+      "error_+60": 0.0
+    },
+    {
+      "caso": "067",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": -0.75,
+      "simetria": 0.884,
+      "simetria_sin_girar": 0.882,
+      "corregir": false,
+      "error_-60": 2.75,
+      "error_-30": 0.0,
+      "error_-20": 0.5,
+      "error_-10": 0.25,
+      "error_+10": 0.25,
+      "error_+20": 0.5,
+      "error_+30": 0.0,
+      "error_+60": -2.0
+    },
+    {
+      "caso": "077",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": 3.0,
+      "simetria": 0.859,
+      "simetria_sin_girar": 0.831,
+      "corregir": false,
+      "error_-60": 0.0,
+      "error_-30": 0.0,
+      "error_-20": 0.25,
+      "error_-10": 0.0,
+      "error_+10": 0.0,
+      "error_+20": 0.25,
+      "error_+30": 0.0,
+      "error_+60": 0.0
+    },
+    {
+      "caso": "078",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": 2.75,
+      "simetria": 0.918,
+      "simetria_sin_girar": 0.88,
+      "corregir": false,
+      "error_-60": 1.0,
+      "error_-30": 0.25,
+      "error_-20": 0.0,
+      "error_-10": 0.0,
+      "error_+10": 0.0,
+      "error_+20": 0.0,
+      "error_+30": -0.5,
+      "error_+60": -4.75
+    },
+    {
+      "caso": "087",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": -4.5,
+      "simetria": 0.875,
+      "simetria_sin_girar": 0.835,
+      "corregir": false,
+      "error_-60": 0.5,
+      "error_-30": -0.5,
+      "error_-20": -0.75,
+      "error_-10": 0.25,
+      "error_+10": -0.25,
+      "error_+20": -0.75,
+      "error_+30": 0.25,
+      "error_+60": -1.25
+    },
+    {
+      "caso": "095",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        1,
+        1,
+        1
+      ],
+      "giro_estimado": -6.25,
+      "simetria": 0.83,
+      "simetria_sin_girar": 0.75,
+      "corregir": true,
+      "error_-60": 0.25,
+      "error_-30": 0.0,
+      "error_-20": 0.25,
+      "error_-10": 0.25,
+      "error_+10": 0.5,
+      "error_+20": 0.25,
+      "error_+30": 0.25,
+      "error_+60": 0.0
+    },
+    {
+      "caso": "099",
+      "espejado": false,
+      "oblicuo": false,
+      "signos": [
+        -1,
+        -1,
+        1
+      ],
+      "giro_estimado": -0.5,
+      "simetria": 0.868,
+      "simetria_sin_girar": 0.862,
+      "corregir": false,
+      "error_-60": 5.5,
+      "error_-30": -0.75,
+      "error_-20": 0.0,
+      "error_-10": -0.5,
+      "error_+10": -0.25,
+      "error_+20": -0.5,
+      "error_+30": 0.0,
+      "error_+60": -6.5
+    }
+  ],
+  "resumen_giros": {
+    "-60°": {
+      "error_medio_abs": 0.82,
+      "error_max_abs": 5.5
+    },
+    "-30°": {
+      "error_medio_abs": 0.5,
+      "error_max_abs": 4.75
+    },
+    "-20°": {
+      "error_medio_abs": 0.4,
+      "error_max_abs": 3.0
+    },
+    "-10°": {
+      "error_medio_abs": 0.22,
+      "error_max_abs": 0.75
+    },
+    "+10°": {
+      "error_medio_abs": 0.22,
+      "error_max_abs": 0.75
+    },
+    "+20°": {
+      "error_medio_abs": 0.33,
+      "error_max_abs": 1.0
+    },
+    "+30°": {
+      "error_medio_abs": 1.03,
+      "error_max_abs": 13.0
+    },
+    "+60°": {
+      "error_medio_abs": 2.85,
+      "error_max_abs": 21.5
+    }
+  }
+}

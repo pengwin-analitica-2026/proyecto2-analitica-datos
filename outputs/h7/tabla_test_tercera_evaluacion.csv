@@ -1,0 +1,3 @@
+test,classification_f1_macro,classification_auc_macro,detection_map50,detection_iou_mean,segmentation_dice_macro,instance_dice_matched
+sin_enderezar,0.989,0.999,0.962,0.94,0.971,0.879
+enderezado,0.989,0.999,0.958,0.938,0.968,0.874

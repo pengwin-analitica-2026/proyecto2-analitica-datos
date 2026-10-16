@@ -1,25 +1,25 @@
 [
  {
-  "Modelo": "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth",
+  "Modelo": "h8_aumm_noise01_noema_w32_e60_s42.pth",
   "Dispositivo": "CPU",
-  "Hardware": "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz",
+  "Hardware": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
   "TTA": "no",
-  "Hilos CPU": 8,
-  "Cortes por segundo": 2.98,
-  "Mediana (ms)": 336.1,
-  "p90 (ms)": 395.8,
+  "Hilos CPU": 6,
+  "Cortes por segundo": 6.47,
+  "Mediana (ms)": 154.6,
+  "p90 (ms)": 167.0,
   "Pasadas": 30,
   "Tamaño": "384×384"
  },
  {
-  "Modelo": "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth",
+  "Modelo": "h8_aumm_noise01_noema_w32_e60_s42.pth",
   "Dispositivo": "CPU",
-  "Hardware": "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz",
+  "Hardware": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
   "TTA": "sí",
-  "Hilos CPU": 8,
-  "Cortes por segundo": 1.44,
-  "Mediana (ms)": 695.5,
-  "p90 (ms)": 920.1,
+  "Hilos CPU": 6,
+  "Cortes por segundo": 2.66,
+  "Mediana (ms)": 375.4,
+  "p90 (ms)": 416.9,
   "Pasadas": 30,
   "Tamaño": "384×384"
  }

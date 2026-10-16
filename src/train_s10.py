@@ -19,7 +19,11 @@ ellas el comportamiento es el de B1):
 - ``--deep-supervision-weight``: salidas auxiliares en el decodificador;
 - ``--ema``: promedio móvil exponencial de los pesos (se evalúa y guarda el promedio);
 - ``--secondary-oversample``: muestrea más los cortes con fragmentos secundarios;
-- ``--backbone-init``: pesos del backbone preentrenados con ``pretrain_backbone.py``.
+- ``--backbone-init``: pesos del backbone preentrenados con ``pretrain_backbone.py``;
+- ``--aug-mm``: el aumento geométrico gira en milímetros reales (``aumento_fisico.py``), no en
+  la grilla de píxeles estirada; sin la opción se conserva el comportamiento anterior;
+- ``--aug-noise``: ruido gaussiano en el 30 % de las muestras, con sigma al azar hasta ese valor
+  (escala 0-1); 0 = apagado.
 
 La evaluación durante el entrenamiento usa un subconjunto fijo de validación (un corte
 de cada ``--val-stride``). La cifra definitiva sale de ``evaluate_volumes.py`` sobre el
@@ -47,6 +51,7 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from aumento_fisico import mm_de_cortes, mm_por_pixel, random_affine_mm
 from build_case_cache import cache_dir_name, from_uint8, load_case_cache
 from train_week10_multitask import evaluate, seed_everything
 from week9_detection import labels_to_grid
@@ -70,6 +75,7 @@ def load_slices(cache_dir: Path, case_ids: list[str], margin: int, stride: int =
     Devuelve arrays uint8 concatenados y un vector ``has_bone`` para muestrear.
     """
     images, labels, bone, case_of, lows, highs, secondary = [], [], [], [], [], [], []
+    mm_x, mm_y = [], []
     total = 0
     for case_id in case_ids:
         data = load_case_cache(cache_dir, case_id, canonical=canonical)
@@ -86,11 +92,15 @@ def load_slices(cache_dir: Path, case_ids: list[str], margin: int, stride: int =
         lab = data["labels"][picks]
         secondary.append(((lab % 10 != 1) & (lab > 0)).any(axis=(1, 2)))  # IDs 2..10, 12..20, 22..30
         lows.append(np.full(len(picks), total)); highs.append(np.full(len(picks), total + len(picks) - 1))
+        mx, my = mm_por_pixel(data)                     # mm por píxel del caché, de la cabecera
+        mm_x.append(np.full(len(picks), mx, dtype=np.float32))
+        mm_y.append(np.full(len(picks), my, dtype=np.float32))
         total += len(picks)
     return {"images": np.concatenate(images), "labels": np.concatenate(labels),
             "has_bone": np.concatenate(bone), "case": np.asarray(case_of),
             "has_secondary": np.concatenate(secondary),
-            "case_lo": np.concatenate(lows), "case_hi": np.concatenate(highs)}
+            "case_lo": np.concatenate(lows), "case_hi": np.concatenate(highs),
+            "mm_x": np.concatenate(mm_x), "mm_y": np.concatenate(mm_y)}
 
 
 def to_batch(images_u8: np.ndarray, labels_u8: np.ndarray) -> tuple[torch.Tensor, torch.Tensor]:
@@ -248,6 +258,10 @@ def main() -> None:
                         help="Probabilidad de simular baja resolución por muestra; 0 = apagado.")
     parser.add_argument("--aug-gamma", type=float, default=0.0,
                         help="Amplitud log del aumento de gamma por muestra; 0 = apagado.")
+    parser.add_argument("--aug-noise", type=float, default=0.0,
+                        help="Sigma máxima del ruido gaussiano (escala 0-1) en el 30 %% de las muestras; 0 = apagado.")
+    parser.add_argument("--aug-mm", action="store_true",
+                        help="Aumento geométrico en milímetros reales (aumento_fisico.py), no en píxeles.")
     parser.add_argument("--backbone-init", default=None)
     args = parser.parse_args()
 
@@ -341,7 +355,7 @@ def main() -> None:
                 "in_channels": in_channels, "context": args.context,
                 "deep_supervision": args.deep_supervision_weight > 0, "ema": args.ema,
                 "use_cbam": use_cbam, "cbam_stages": cbam_stages, "canonical": args.canonical,
-                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "cosine": args.cosine,
+                "learnable_gamma": args.learnable_gamma, "augment": args.augment, "aug_geo": args.aug_geo, "aug_gamma": args.aug_gamma, "aug_rot_wide": args.aug_rot_wide, "aug_rot_deg": args.aug_rot_deg, "aug_lowres": args.aug_lowres, "aug_mm": args.aug_mm, "aug_noise": args.aug_noise, "cosine": args.cosine,
                 "input_size": args.size, "mode": args.mode, "seed": args.seed,
                 "fracture_weight": args.fracture_weight, "secondary_weight": args.secondary_weight,
                 "best_validation": metrics, "args": vars(args)}
@@ -364,7 +378,11 @@ def main() -> None:
                 gain = 1.0 + 0.1 * (torch.rand(x.shape[0], 1, 1, 1) - 0.5)
                 bias = 0.05 * (torch.rand(x.shape[0], 1, 1, 1) - 0.5)
                 x = (x * gain + bias).clamp(0.0, 1.0)
-            if args.aug_geo > 0:
+            if args.aug_geo > 0 and args.aug_mm:
+                x, y = random_affine_mm(x, y, mm_de_cortes(train, pick), strength=args.aug_geo,
+                                        wide_rotation=args.aug_rot_wide,
+                                        rotation_degrees=args.aug_rot_deg)
+            elif args.aug_geo > 0:
                 x, y = random_affine(x, y, strength=args.aug_geo, wide_rotation=args.aug_rot_wide,
                                      rotation_degrees=args.aug_rot_deg)
             if args.aug_lowres > 0:
@@ -372,6 +390,10 @@ def main() -> None:
             if args.aug_gamma > 0:
                 gamma = torch.exp((torch.rand(x.shape[0], 1, 1, 1) * 2 - 1) * args.aug_gamma)
                 x = x.clamp(0.0, 1.0) ** gamma
+            if args.aug_noise > 0:
+                on = torch.rand(x.shape[0]) < 0.3
+                sigma = torch.rand(x.shape[0], 1, 1, 1) * args.aug_noise
+                x[on] = (x[on] + torch.randn_like(x[on]) * sigma[on]).clamp(0.0, 1.0)
             if args.fracture_weight > 0:
                 w = fracture_distance_weight(y, args.fracture_weight)
             target = labels_to_grid(y)

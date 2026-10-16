@@ -3,11 +3,14 @@
 Un solo modelo cargado al arrancar. El dashboard (Streamlit Cloud) manda un corte uint8 [S,S] ya
 preprocesado y recibe la semántica, las cajas y la latencia del modelo.
 
-Orientación: H6 espera cortes en orientación canónica (``src/orientacion.py``). El servidor no gira
-nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderezó el volumen.
+Orientación: H8 espera cortes en orientación canónica (``src/orientacion.py``). El servidor no gira
+nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderezó el volumen
+(giro de 180° según la cabecera y, si el paciente estaba girado en el escáner, el giro axial con
+``normalizacion.normalizar``). Un corte suelto no basta para estimar ese giro, que necesita el
+volumen completo; por eso se corrige al exportar el caso y no aquí.
 ``/health?deep=1`` informa ``canonical`` para que el cliente lo compruebe.
 
-    MODEL_PATH=outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080
+    MODEL_PATH=outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080
 """
 from __future__ import annotations
 
@@ -24,10 +27,11 @@ from fastapi import FastAPI, Header, HTTPException, Request
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-MODEL_PATH = os.environ.get("MODEL_PATH", str(ROOT / "outputs" / "s10" / "h6_auggeo_rot35_canon_ema_w32_e60_s42.pth"))
+MODEL_PATH = os.environ.get("MODEL_PATH", str(ROOT / "outputs" / "s10" / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 API_KEY = os.environ.get("API_KEY", "")
 TTA = os.environ.get("TTA", "0") == "1"
 MAX_BYTES = 2_000_000          # un corte 384x384 uint8 pesa ~150 kB
+MAX_LOTE = 16                  # /predict_batch: 16 cortes son ~2.4 MB; Lambda acepta hasta 6 MB por pedido
 
 app = FastAPI(title="Inferencia por corte · fracturas pélvicas", docs_url=None, redoc_url=None)
 _state: dict = {}
@@ -57,7 +61,7 @@ def health(deep: int = 0) -> dict:
     state = _load()
     return {"ok": True, "model": state["info"]["checkpoint"], "device": str(state["device"]),
             "parameters": state["info"]["parameters"], "tta": state["info"]["tta"],
-            "canonical": state["info"]["canonical"]}
+            "canonical": state["info"]["canonical"], "input_size": state["info"]["input_size"]}
 
 
 @app.post("/predict_slice")
@@ -81,4 +85,35 @@ async def predict_slice_endpoint(request: Request, x_api_key: str | None = Heade
     return {"semantic_npz_b64": base64.b64encode(buffer.getvalue()).decode("ascii"),
             "boxes_refined": result["boxes_refined"][0], "boxes_raw": result["boxes_raw"][0],
             "latency_ms": result["latency_ms"], "device": str(state["device"]),
+            "model": state["info"]["checkpoint"], "tta": state["info"]["tta"]}
+
+
+@app.post("/predict_batch")
+async def predict_batch_endpoint(request: Request, x_api_key: str | None = Header(default=None)) -> dict:
+    """Varios cortes uint8 [n,S,S] (.npy) → semántica, primario/secundario, clasificación y cajas.
+
+    Lo usa el dashboard para inferir un CT subido completo (``src/inferencia_remota.py``). Los cortes
+    llegan ya preprocesados y en la orientación canónica; el servidor no gira nada.
+    """
+    _check_key(x_api_key)
+    body = await request.body()
+    if len(body) > MAX_LOTE * MAX_BYTES // 10:
+        raise HTTPException(status_code=413, detail=f"lote demasiado grande (máximo {MAX_LOTE} cortes)")
+    try:
+        images = np.load(io.BytesIO(body), allow_pickle=False)
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"no pude leer los cortes (.npy): {error}") from error
+    state = _load()
+    size = state["info"]["input_size"]
+    if images.dtype != np.uint8 or images.ndim != 3 or images.shape[1:] != (size, size) \
+            or not 1 <= len(images) <= MAX_LOTE:
+        raise HTTPException(status_code=422, detail=f"se espera uint8 de [1..{MAX_LOTE}, {size}, {size}]")
+    from predict_volume import predict_volume
+    result = predict_volume(state["model"], images, state["device"], batch_size=len(images))
+    buffer = io.BytesIO()
+    np.savez_compressed(buffer, semantic=result["semantic"], primary_secondary=result["primary_secondary"],
+                        classification=result["classification"])
+    return {"arrays_npz_b64": base64.b64encode(buffer.getvalue()).decode("ascii"),
+            "boxes_refined": result["boxes_refined"], "boxes_raw": result["boxes_raw"],
+            "seconds": result["seconds"], "device": str(state["device"]),
             "model": state["info"]["checkpoint"], "tta": state["info"]["tta"]}

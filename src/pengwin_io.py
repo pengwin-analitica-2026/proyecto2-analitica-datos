@@ -241,9 +241,12 @@ DEPTH_DOWNSAMPLE = 2           # submuestreo del mapa de profundidad (memoria); 
 #      fragmentos separados por un espacio fino, que es justo lo que el
 #      proyecto debe mostrar y medir.
 # Sigue disponible pasando low_threshold=BONE_LOW_HU_THRESHOLD y
-# fill_cavities=True (lo hace src/diag_semana8/diag_final_v1.py para la
-# comparacion documentada). Costo aceptado: el V1 vuelve a mostrar el hueso
-# esponjoso hueco, sobre todo en el caso 025.
+# fill_cavities=True. Se usa SOLO en la malla 3D "pulida" del Visualizador 1
+# (raw_view.bone_mask_for(..., pulido=True), que exporta demo_export.py junto a
+# la cruda) y en src/diag_semana8/diag_final_v1.py para la comparacion
+# documentada. Las MIP del V1 siguen con la mascara cruda, y la mascara osea no
+# entra al modelo, a las metricas ni a la medicion de distancias. Sin pulido el
+# V1 muestra el hueso esponjoso hueco, sobre todo en el caso 025.
 BONE_LOW_HU_THRESHOLD = 150   # umbral bajo del crecimiento (semilla = mascara ya limpia)
 CLOSING_RADIUS_VOX = 2        # radio (voxeles) del cierre morfologico que sella grietas
 

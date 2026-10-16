@@ -1,12 +1,14 @@
 # Despliegue: Streamlit Community Cloud y API en AWS Lambda
 
-Estado al 6 de octubre de 2026. Modelo desplegado: **H6** (`h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`).
+Estado al 13 de octubre de 2026. Modelo de la imagen de la API: **H8** (`h8_aumm_noise01_noema_w32_e60_s42.pth`).
+La Lambda publicada se actualiza sola cuando esta versión llegue a `main`; hasta entonces sigue con
+H6, y el dashboard avisa si el modelo del servicio no es el del caso exportado.
 
 ```
 Celular / computador ──► Streamlit Community Cloud (app/dashboard.py, sin torch)
                                  │  solo al pulsar «Inferir el corte seleccionado»
                                  ▼
-                       AWS Lambda pelvis-api (contenedor con H6, api/server.py)
+                       AWS Lambda pelvis-api (contenedor con H8, api/server.py)
 ```
 
 Las tres pestañas leen los casos ya exportados (`outputs/demo/<modelo>/<caso>/`), que viajan en el
@@ -61,7 +63,12 @@ aparte, solo con la app y los casos, si algún día el repo principal no puede c
 | Repositorio ECR | `pelvis-api` (escaneo de vulnerabilidades al subir) |
 | Función Lambda | `pelvis-api`: imagen de contenedor, 3008 MB, tiempo máximo 120 s |
 | Rol de ejecución | `pelvis-api-lambda-exec` (solo `AWSLambdaBasicExecutionRole`, para los logs) |
-| URL | Function URL pública con autenticación `NONE`; `/predict_slice` exige la cabecera `X-API-Key` |
+| URL | Function URL pública con autenticación `NONE`; `/predict_slice` y `/predict_batch` exigen la cabecera `X-API-Key` |
+
+Endpoints: `GET /health` (al instante), `GET /health?deep=1` (carga el modelo), `POST /predict_slice`
+(un corte, para la inferencia en vivo del visualizador 2) y `POST /predict_batch` (hasta 16 cortes
+uint8 de 384×384 en un `.npy`; lo usa el dashboard para inferir un CT subido completo, ver
+`docs/semana11_dashboard.md`). Lambda acepta hasta 6 MB por pedido; 16 cortes son ~2.4 MB.
 
 La función se creó una vez a mano (imagen `bootstrap`); desde entonces la actualiza
 `deploy-api.yml` en cada push a `main` (ver `docs/cicd_github_actions.md`).
@@ -72,7 +79,7 @@ responde 403. El AWS CLI 2.27 no tiene la opción del segundo; se agregó con bo
 
 ### Orientación
 
-H6 espera cortes en orientación canónica. La API no gira nada: el dashboard le manda cortes del
+H8 espera cortes en orientación canónica. La API no gira nada: el dashboard le manda cortes del
 caso exportado, y `demo_export.py` ya enderezó el volumen. `/health?deep=1` devuelve
 `"canonical": true` para que se pueda comprobar.
 

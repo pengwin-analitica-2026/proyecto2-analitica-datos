@@ -6,8 +6,8 @@ de ``--repeats`` pasadas. En GPU se sincroniza antes de leer el reloj.
 
 Uso:
 
-    python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \\
-        --volume outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/volume.npz --device cpu --device cuda
+    python src/measure_latency.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \\
+        --volume outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/024/volume.npz --device cpu --device cuda
 
 Escribe (y acumula) las filas en ``outputs/demo/latency.json``, que el dashboard muestra. Si pides
 ``cuda`` y no hay GPU, lo dice y lo omite; no inventa la cifra.
@@ -105,11 +105,11 @@ def main() -> None:
             print(f"{row['Dispositivo']} TTA {row['TTA']}: mediana {row['Mediana (ms)']} ms, p90 {row['p90 (ms)']} ms")
 
     path = Path(args.output)
-    previous = json.loads(path.read_text()) if path.exists() else []
+    previous = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     keys = {(r["Modelo"], r["Dispositivo"], r["Hardware"], r["TTA"]) for r in rows}
     kept = [r for r in previous if (r["Modelo"], r["Dispositivo"], r["Hardware"], r["TTA"]) not in keys]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(kept + rows, indent=1, ensure_ascii=False))
+    path.write_text(json.dumps(kept + rows, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"Guardado: {path}")
 
 

@@ -102,3 +102,35 @@ def test_sin_relleno_conserva_la_separacion_entre_fragmentos():
     d_raw = fragment_distance_table(raw, truth, spacing)[0]["predicted_mm"]
     assert d_filled == 0.0
     assert d_raw > 5.0
+
+
+class UmbralesEnMilimetros(unittest.TestCase):
+    def test_vóxel_de_referencia_da_los_umbrales_de_siempre(self):
+        from volume_postprocess import VOXEL_REFERENCIA_MM3, umbrales_en_voxeles
+        lado = VOXEL_REFERENCIA_MM3 ** (1 / 3)
+        self.assertEqual(umbrales_en_voxeles((lado, lado, lado)), (30, 200))
+
+    def test_cortes_tres_veces_mas_gruesos_piden_un_tercio_de_voxeles(self):
+        from volume_postprocess import VOXEL_REFERENCIA_MM3, umbrales_en_voxeles
+        lado = VOXEL_REFERENCIA_MM3 ** (1 / 3)
+        self.assertEqual(umbrales_en_voxeles((lado, lado, 3 * lado)), (10, 67))
+
+    def test_fragmento_real_no_se_borra_con_cortes_gruesos(self):
+        """Un fragmento desplazado de 72 vóxeles (216 mm³ con cortes de 3 mm) sobrevive en mm³.
+
+        Al estar separado del principal forma su propio componente 3D de la región, así que en vóxeles
+        lo borra el umbral de región (72 < 200); en mm³ ese umbral baja a 58 vóxeles.
+        """
+        from volume_postprocess import umbrales_en_voxeles
+        shape = (10, 30, 40)
+        semantic = np.zeros(shape, dtype=np.uint8)
+        ps = np.zeros(shape, dtype=np.uint8)
+        semantic[:, 2:28, 2:20] = 2
+        ps[:, 2:28, 2:20] = 3                       # principal del coxal izquierdo
+        semantic[4:7, 10:14, 30:36] = 2
+        ps[4:7, 10:14, 30:36] = 4                   # secundario: 3 x 4 x 6 = 72 vóxeles
+        spacing = (1.0, 1.0, 3.0)                   # vóxel de 3 mm³
+        en_voxeles = postprocess_3d(semantic, ps, min_voxels=30)
+        en_mm = postprocess_3d(semantic, ps, *umbrales_en_voxeles(spacing))
+        self.assertEqual(int((en_voxeles == 12).sum()), 0)
+        self.assertEqual(int((en_mm == 12).sum()), 72)

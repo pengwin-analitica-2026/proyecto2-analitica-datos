@@ -23,12 +23,12 @@ kaggle.json
 outputs/demo/*
 # Casos que lee el dashboard desplegado en Streamlit Community Cloud (CI/CD al hacer push a main)
 !outputs/demo/latency.json
-!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/
-outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/*
-!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/
-!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/044/
-!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/099/
-!outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/039/
+!outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/
+outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/*
+!outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/024/
+!outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/044/
+!outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/099/
+!outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/039/
 # predictions.npz solo sirve para --reuse en local
 outputs/demo/**/predictions.npz
 
@@ -41,4 +41,6 @@ build/
 !outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s43.pth
 !outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s44.pth
 !outputs/s10/d5_ema_w32_e60_s42.pth
+# Modelo definitivo: H8 (sin EMA, giro en mm y aumento de ruido)
+!outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth
 

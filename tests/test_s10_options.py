@@ -27,7 +27,8 @@ def make_cache(root: Path, size: int = 64) -> Path:
     rows = []
     for number, split in enumerate(("train", "train", "val"), 1):
         images, labels = synthetic_case(depth=12, size=size, seed=number)
-        np.savez(cache / f"{number:03d}.npz", images=images, labels=labels)
+        np.savez(cache / f"{number:03d}.npz", images=images, labels=labels, spacing_xyz=np.ones(3),
+                 orig_shape=np.asarray(images.shape), size=np.array(size), mode=np.array("stretch"))
         rows.append({"case_id": f"{number:03d}", "split": split})
     with open(root / "index.csv", "w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=["case_id", "split"])

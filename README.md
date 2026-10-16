@@ -13,29 +13,33 @@ de su hueso. Usa el dataset [PENGWIN 2024](https://pengwin.grand-challenge.org/)
 
 ## Resultado final
 
-El modelo entregado es **H6** (`outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth`): backbone
-propio de 32 canales con CBAM, tres cabezas (clasificación, detección con grid y NMS propios,
-segmentación semántica e instancia), orientación canónica de los volúmenes según su cabecera,
-aumento geométrico con rotación de ±35° y pesos EMA.
+El modelo entregado es **H8** (`outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth`): backbone propio de 32 canales
+con CBAM, tres cabezas (clasificación, detección con grid y NMS propios, segmentación semántica e
+instancia) y orientación canónica de los volúmenes según su cabecera. Frente a H6, el modelo
+anterior, cambia el entrenamiento en tres puntos: **sin EMA**, **giro del aumento en milímetros
+reales** (±35°) y **aumento de ruido gaussiano**.
 
-| Métrica en test (15 casos, H6 semilla 42) | Objetivo | Resultado |
-|---|---|---|
-| F1 / AUC de clasificación | 0.85 / 0.85 | 0.990 / 0.999 |
-| IoU medio / mAP50 / mAP50:95 de detección | 0.65 / 0.65 / 0.40 | 0.943 / 0.961 / 0.902 |
-| Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.971 / 0.943 |
-| Dice / IoU por fragmento | 0.85 / 0.70 | 0.875 / 0.816 |
+| Métrica (15 casos, H8 semilla 42) | Objetivo | Validación | Test |
+|---|---|---|---|
+| F1 / AUC de clasificación | 0.85 / 0.85 | 0.991 / 0.999 | 0.989 / 0.999 |
+| IoU medio / mAP50 / mAP50:95 de detección | 0.65 / 0.65 / 0.40 | 0.946 / 0.969 / 0.900 | 0.938 / 0.953 / 0.898 |
+| Dice / IoU de segmentación semántica | 0.85 / 0.70 | 0.970 / 0.943 | 0.968 / 0.939 |
+| Dice / IoU por fragmento | 0.85 / 0.70 | 0.865 / 0.800 | 0.874 / 0.812 |
 
-Las tres semillas (42, 43 y 44) dan 0.875, 0.875 y 0.876 de Dice por fragmento.
-
-Estas cifras son una **segunda evaluación en test, posterior al análisis de fallos**; la primera
-evaluación oficial fue D5 (Dice por fragmento 0.845). Cómo se eligió H6, las ablaciones, la
-robustez y las limitaciones están en el [model card](MODEL_CARD.md).
+H8 se eligió entre cinco variantes por ser la más robusta al ruido gaussiano: con σ = 10 y 25
+niveles de gris mantiene 0.860 y 0.835 de Dice por fragmento en validación, donde las demás caen a
+0.72 y 0.23 como mucho. No es robusto a todo: con ruido fuerte y con un giro de 60° queda por debajo
+del objetivo (model card, sección 4.3). La cifra de test es la **sexta consulta a test** del proyecto; la
+primera evaluación limpia fue D5 (0.845). Cómo se eligió H8, las ablaciones, la robustez y las
+limitaciones están en el [model card](MODEL_CARD.md) y en [`docs/modelo_h8.md`](docs/modelo_h8.md).
 
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
 | [`MODEL_CARD.md`](MODEL_CARD.md) | Modelo, datos, métricas, ablaciones, protocolo de test y limitaciones |
+| [`docs/modelo_h8.md`](docs/modelo_h8.md) | Modelo entregado H8: qué cambia frente a H6, ficha técnica y resultados en validación y test |
+| [`docs/experimentos_ema_rotacion_ruido.md`](docs/experimentos_ema_rotacion_ruido.md) | Comparación de cinco modelos tras la asesoría (EMA, giro en milímetros y ruido), ablación de CBAM por cabeza y HD95/ASSD por fragmento |
 | [`docs/mini_paper/Mini_paper_PENGWIN.pdf`](docs/mini_paper/Mini_paper_PENGWIN.pdf) | **Informe técnico corto con estructura de mini-paper** (entregable, 8 páginas): decisiones de arquitectura, ablación, matriz de confusión, cinco peores casos y distancia predicha contra la real. Fuente en `.docx` y `build.js` |
 | [`docs/informe/Informe_tecnico_PENGWIN.docx`](docs/informe/Informe_tecnico_PENGWIN.docx) | Versión extendida del informe (21 páginas), con el preprocesamiento, la investigación del Dice por fragmento y el trabajo por semana |
 | [`IA_USAGE.md`](IA_USAGE.md) | Registro y análisis crítico del uso de IA generativa |
@@ -49,6 +53,7 @@ robustez y las limitaciones están en el [model card](MODEL_CARD.md).
 | [`docs/video/demo_computador.mp4`](docs/video/demo_computador.mp4) | Semana 11: recorrido completo del dashboard publicado, grabado en el computador (110 s, con audio): inferencia corte a corte, tres visualizadores, métricas, latencia y tabla de distancias |
 | [`docs/video/demo_celular.mp4`](docs/video/demo_celular.mp4) | Semana 11: video del dashboard publicado, grabado desde un celular |
 | `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles (el 05 se hizo con D5) |
+| `notebooks/11_modelo_h8.ipynb` | Modelo entregado H8: entrenamiento, métricas en validación y test, comparación de modelos, CBAM, HD95/ASSD y distancia |
 
 Cada tema está en un solo documento. Los resultados del modelo están en el model card y no se
 repiten en los demás.
@@ -59,14 +64,14 @@ repiten en los demás.
 src/        scripts y módulos (ver los comandos abajo)
 tests/      pruebas automáticas
 notebooks/  notebooks de seguimiento por semana
-kaggle/     kernels de entrenamiento en GPU (uno por receta)
+kaggle/     kernels de entrenamiento en GPU (uno por receta; los de H8 en kaggle/h8/)
 colab/      genera el cuaderno de Colab que entrena H6 (notebooks/colab/colab_s10.ipynb)
 app/        dashboard Streamlit
 api/        API de inferencia
 deploy/     scripts de despliegue
 data/       manifest, splits y CSVs del EDA (data/raw/ y data/cache/ NO se versionan)
-outputs/    figuras (figures/), EDA (eda/), resultados y checkpoints de la Semana 10 (s10/)
-            y casos exportados para el dashboard (demo/)
+outputs/    figuras (figures/), EDA (eda/), resultados y checkpoints de la Semana 10 (s10/),
+            resultados de H8 (h8/) y casos exportados para el dashboard (demo/)
 docs/       un documento por semana o por tema, informe técnico y mini-paper
 ```
 
@@ -142,7 +147,10 @@ python src/train_week9_detection.py                                 # primer ent
 python src/visualize_week9_validation.py --case-id 014              # validación cualitativa
 ```
 
-## 3. Modelo final H6 (Semana 10)
+## 3. Modelo final H8
+
+H8 es la receta de H6 (Semana 10) con tres cambios en el entrenamiento. Detalle en
+[`docs/modelo_h8.md`](docs/modelo_h8.md).
 
 ### 3.1 Caché por caso
 
@@ -156,62 +164,75 @@ Deja `data/cache/s10/cache_384/<caso>.npz`, `labels_native/` e `index.csv`.
 
 ### 3.2 Entrenamiento
 
-Requiere GPU. Las tres semillas de H6 se entrenaron en Colab con una L4
-(`notebooks/colab/colab_s10.ipynb` lleva esta misma receta); las recetas anteriores, en Kaggle
-(`kaggle/gpu/`, un kernel por receta, incluido el de H6):
+Requiere GPU. H8 se entrenó en Kaggle con una T4 (67 minutos); los kernels están en `kaggle/h8/`
+(`python kaggle/h8/armar.py --salida <carpeta> --usuario <usuario>` los genera):
 
 ```bash
-python src/train_s10.py --cache-root data/cache/s10 \
-    --size 384 --epochs 60 --base-channels 32 --cbam 1 --secondary-weight 3 \
-    --augment --cosine --batch-size 16 --per-epoch 2500 --max-minutes 170 --eval-every 10 \
-    --ema 0.999 --seed 42 --aug-geo 1.0 --aug-rot-deg 35 --canonical \
-    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth
+python src/train_s10.py --cache-root data/cache/s10 --size 384 --mode stretch --epochs 60 \
+    --batch-size 16 --lr 0.002 --base-channels 32 --cbam 1 --instance-mode primary --augment --cosine \
+    --margin 10 --neg-fraction 0.15 --per-epoch 2500 --val-stride 6 --eval-every 10 --max-minutes 170 \
+    --secondary-weight 3.0 --canonical --aug-geo 1.0 --aug-rot-deg 35 --aug-mm --ema 0 \
+    --aug-noise 0.1 --seed 42 --output outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth
 ```
 
-`--canonical` endereza los 34 volúmenes guardados en orientación LPI (ver `src/orientacion.py`).
-Queda registrado en el checkpoint, así que la evaluación lo aplica sola. Las semillas 43 y 44 se
-obtienen cambiando `--seed` y el nombre de salida.
+Frente a H6 cambian tres opciones: `--ema 0` (sin promedio móvil de los pesos), `--aug-mm` (el giro
+del aumento se define en milímetros, `src/aumento_fisico.py`) y `--aug-noise 0.1` (ruido gaussiano en
+el 30 % de las muestras). `--canonical` endereza los 34 volúmenes guardados en orientación LPI y
+queda registrado en el checkpoint, así que la evaluación lo aplica sola.
 
 El checkpoint entregado ya está en el repo, así que este paso se puede saltar.
 
 ### 3.3 Evaluación sobre el volumen completo
 
 ```bash
-python src/evaluate_volumes.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+python src/evaluate_volumes.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \
     --cache-dir data/cache/s10/cache_384 --split val --tta \
-    --output outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42_val.json
+    --output outputs/h8/validacion/val_h8_base.json
 ```
 
-Para el post-proceso 3D y la distancia de separación en mm por fragmento (también sobre el ground
-truth):
+Resultado esperado en validación: Dice por fragmento 0.865 (puede variar en la tercera cifra según
+el hardware). Reporta la detección cruda (cabeza grid) y la refinada, y separa el Dice en fragmento
+primario y secundario.
+
+Robustez (solo validación): `--stress noise=10`, `--stress noise=25`, `--stress rotmm=60` y
+`--stress rotmm=60 --normalizar` (giro con enderezado previo).
+
+HD95 y ASSD por fragmento, con emparejamiento por IoU, no detectados, medias, medianas y cobertura:
 
 ```bash
-python src/infer_volume.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
-    --cache-dir data/cache/s10/cache_384 --split val --tta --distance-nofill --surface-metrics
+python src/metricas_superficie.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \
+    --cache-dir data/cache/s10/cache_384 --split val --tta \
+    --output outputs/h8/validacion/superficie_val_h8.json
 ```
 
-H6 espera los volúmenes en orientación canónica: `evaluate_volumes.py` e `infer_volume.py` los
-enderezan solos según lo que indica el checkpoint.
+Distancia de separación en mm por fragmento, sobre la predicción y sobre el ground truth:
 
-Resultado esperado en validación: Dice por fragmento 0.869 (puede variar en la tercera cifra según
-el hardware). Reporta la detección cruda (cabeza grid) y la refinada, y separa el Dice en
-fragmento primario y secundario.
+```bash
+python src/infer_volume.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \
+    --cache-dir data/cache/s10/cache_384 --split val --tta --distance-nofill --surface-metrics \
+    --output outputs/h8/validacion/distancias_val_h8.json
+```
 
-**Test:** el protocolo es evaluar una sola vez con la configuración congelada. La configuración y el
-comando exactos de la evaluación entregada están en `docs/decisiones_semana10.md`, sección 12.4, y
-sus resultados en `outputs/s10/TEST2_h6_*.json`. No se recomienda volver a correr test para ajustar
-nada.
+Grosor de corte (solo validación): `--zstep 2` o `--zstep 3` conserva 1 de cada 2 o 3 cortes, y
+`--umbral-mm` fija los tamaños mínimos del post-proceso 3D en mm³ en vez de vóxeles; valen para
+`infer_volume.py` y `metricas_superficie.py`. Resultados en `outputs/h8/validacion/grosor_corte/`.
+
+**Test:** el protocolo es evaluar una sola vez con la configuración congelada. La configuración de H8
+está en `outputs/h8/test/CONFIG_CONGELADA_TEST_H8.md` y sus resultados en `outputs/h8/test/`. No se
+recomienda volver a correr test para ajustar nada.
 
 ### 3.4 Línea base SAM (solo comparación)
 
 SAM ViT-B no forma parte del sistema: recibe como prompt la caja que predice nuestro detector y se
-compara con nuestra máscara semántica. Pesos: `sam_vit_b_01ec64.pth`, del repositorio oficial de
+compara con nuestra máscara semántica. Con H8, en test, SAM da 0.889 de Dice por región y H8 0.931
+(`outputs/h8/test/sam_baseline_test_h8.json`; la medición anterior con H6 está en
+`outputs/s10/sam_baseline_test_h6.json`). Pesos: `sam_vit_b_01ec64.pth`, del repositorio oficial de
 Segment Anything.
 
 ```bash
-python src/sam_baseline.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
+python src/sam_baseline.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \
     --sam-checkpoint <ruta>/sam_vit_b_01ec64.pth --cache-dir data/cache/s10/cache_384 \
-    --split test --stride 3 --output outputs/s10/sam_baseline_test_h6.json
+    --split test --stride 3 --output outputs/h8/test/sam_baseline_test_h8.json
 ```
 
 El enunciado pide la comparación sobre test, por eso `--split test` (sin esa opción usa validación).
@@ -226,11 +247,11 @@ python -m unittest discover -s tests -v
 
 `demo_export.py` corre el pipeline completo una vez por caso (de 4 a 25 minutos en CPU con TTA,
 según la máquina y el número de cortes) y deja todo en `outputs/demo/<modelo>/<caso>/`. El
-dashboard solo lee esos archivos. Casos versionados, todos con H6 y TTA: 024 (validación), 044 y 099
+dashboard solo lee esos archivos. Casos versionados, todos con H8 y TTA: 024 (validación), 044 y 099
 (validación, guardados girados 180°) y 039 (test).
 
 ```bash
-python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta
 streamlit run app/dashboard.py
 ```
 
@@ -240,7 +261,9 @@ streamlit run app/dashboard.py
 | 2. Corte por corte | Cajas, máscaras por hueso, ground truth opcional e ID y distancia en mm de cada fragmento |
 | 3. Reconstrucción 3D | Una malla por fragmento, con su ID y su distancia en mm al principal |
 
-Con H6 la demo endereza los volúmenes guardados girados 180° (cabecera `TransformMatrix = -1 0 0 0
+La demo endereza además el giro axial del paciente si es de 10° o más (`--sin-enderezar` lo
+omite) y fija los tamaños mínimos del post-proceso 3D en mm³ (`--umbral-voxeles` vuelve a los 30 y
+200 vóxeles de la evaluación oficial). Con H8 la demo endereza los volúmenes guardados girados 180° (cabecera `TransformMatrix = -1 0 0 0
 -1 0 0 0 1`) antes de predecir, una sola vez y para las tres vistas y el ground truth; el dashboard
 indica en la barra lateral si el caso se enderezó. Detalle en
 [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md).
@@ -248,8 +271,8 @@ indica en la barra lateral si el caso se enderezó. Detalle en
 ### Latencia por imagen
 
 ```bash
-python src/measure_latency.py --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth \
-    --volume outputs/demo/h6_auggeo_rot35_canon_ema_w32_e60_s42/024/volume.npz \
+python src/measure_latency.py --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth \
+    --volume outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/024/volume.npz \
     --device cpu --device cuda
 ```
 
@@ -260,7 +283,7 @@ resultados están en el [model card](MODEL_CARD.md), sección 4.8.
 ### Despliegue
 
 El dashboard está publicado en **Streamlit Community Cloud** (app `app/dashboard.py`, rama `main`) y
-la inferencia en vivo corre en una **API en AWS Lambda** con H6. Cada push a `main` corre las
+la inferencia en vivo corre en una **API en AWS Lambda**, cuya imagen copia el checkpoint de H8. Cada push a `main` corre las
 pruebas y vuelve a desplegar los dos (GitHub Actions para la API, con OIDC y sin claves guardadas;
 Streamlit Cloud para el dashboard). Detalle en
 [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) y
@@ -271,7 +294,7 @@ Streamlit Cloud para el dashboard). Detalle en
 - Con la semilla 42, `data/splits.json` sale idéntico al versionado, y `data/manifest.csv` reporta
   100 de 100 casos válidos.
 - La evaluación de la sección 3.3 sobre el checkpoint entregado debe reproducir el JSON de
-  validación versionado en `outputs/s10/`.
+  validación versionado en `outputs/h8/validacion/`.
 
 ## Restricciones del proyecto
 

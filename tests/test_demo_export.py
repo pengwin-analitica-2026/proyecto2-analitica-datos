@@ -87,5 +87,52 @@ class IdVolumeAndDistances(unittest.TestCase):
         self.assertLess(float(x_mm.max()), 16.0)
 
 
+def hollow_fragments():
+    """Principal del coxal izquierdo con una cavidad cerrada y un secundario separado 4 vóxeles."""
+    volume = np.zeros((20, 30, 50), np.uint8)
+    volume[2:18, 4:26, 4:26] = 11
+    volume[7:13, 10:20, 10:20] = 0                 # cavidad cerrada dentro del principal
+    volume[6:14, 10:20, 30:38] = 12                # secundario, a 4 vóxeles en x
+    return volume
+
+
+class MeshFillIsVisualOnly(unittest.TestCase):
+    def test_fill_does_not_touch_ids_fragments_or_distances(self):
+        volume = hollow_fragments()
+        spacing = (0.8, 0.9, 1.2)
+        before = volume.copy()
+        rows_before = fragment_table(volume, spacing)
+        meshes = fragment_meshes(volume, spacing, step=1)
+        np.testing.assert_array_equal(volume, before)                  # el volumen de IDs no cambia
+        self.assertEqual(sorted(meshes), [11, 12])                      # mismos fragmentos, ninguno se une
+        self.assertEqual(fragment_table(volume, spacing), rows_before)  # tabla y distancias idénticas
+        self.assertAlmostEqual(rows_before[1]["distance_mm"], 4 * 0.8, places=6)
+
+    def test_fill_closes_the_cavity_in_the_mesh(self):
+        volume = hollow_fragments()
+        spacing = (1.0, 1.0, 1.0)
+        verts, _ = fragment_meshes(volume, spacing, step=1)[11]
+        # La superficie exterior está en z ≈ 1.5/17.5 e y, x ≈ 3.5/25.5. Sin relleno habría otra
+        # superficie alrededor de la cavidad (z 6.5-12.5, y y x 9.5-19.5), lejos de la exterior.
+        inside = ((verts[:, 0] > 4) & (verts[:, 0] < 15) & (verts[:, 1] > 6) & (verts[:, 1] < 23)
+                  & (verts[:, 2] > 6) & (verts[:, 2] < 23))
+        self.assertEqual(int(inside.sum()), 0)
+
+
+
+class EnderezadoDeLaDemo(unittest.TestCase):
+    """La demo endereza solo giros claros: GIRO_MINIMO_DEMO grados o más."""
+
+    def test_umbral_de_la_demo(self):
+        from demo_export import GIRO_MINIMO_DEMO
+        from normalizacion import estimar_giro_axial
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_normalizacion import _pelvis_sintetica
+        self.assertFalse(estimar_giro_axial(_pelvis_sintetica(6.0), giro_minimo=GIRO_MINIMO_DEMO).corregir)
+        grande = estimar_giro_axial(_pelvis_sintetica(30.0), giro_minimo=GIRO_MINIMO_DEMO)
+        self.assertTrue(grande.corregir)
+        self.assertLess(abs(abs(grande.angulo) - 30.0), 3.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4,11 +4,18 @@ Lee las carpetas que deja ``src/demo_export.py`` en ``outputs/demo/<modelo>/<cas
 desde la raíz del repo:
 
     pip install -r requirements.txt
-    python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta
+    python src/demo_export.py --case 024 044 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta
     streamlit run app/dashboard.py
 
 Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferencia en vivo del
 visualizador 2 necesita ``torch`` y el checkpoint; el resto solo lee archivos.
+
+SUBIR UN CT. En la barra lateral, «Subir un CT» deja cargar un volumen propio (``.mha``, ``.nii``,
+``.nii.gz``, ``.nrrd``) o una carpeta de cortes DICOM. El dashboard lo lee y lo orienta con los
+metadatos (``volumen_entrada.py``), corre el mismo pipeline de ``demo_export`` (enderezado, modelo,
+post-proceso 3D, distancias y mallas) y lo muestra en los tres visualizadores, sin ground truth. El
+modelo corre en local si hay ``torch`` y el checkpoint; si no (Streamlit Cloud), en la API de AWS
+(``INFERENCE_URL``). Los casos procesados quedan en ``UPLOAD_ROOT`` (por defecto, una carpeta temporal).
 """
 
 from __future__ import annotations
@@ -16,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -29,7 +37,10 @@ from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, RE
 
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
 CHECKPOINT_DIR = ROOT / "outputs" / "s10"
-RESULTS_DIR = ROOT / "outputs" / "s10"          # JSON de la evaluación en test (Semana 10)
+RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en test
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
+MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
+MAX_UPLOAD_MB = 1024
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
 
@@ -115,7 +126,7 @@ def fragments_dataframe(rows: list[dict]):
 
 def read_json(name: str) -> dict | None:
     path = RESULTS_DIR / name
-    return json.loads(path.read_text()) if path.exists() else None
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
 TEST_ROWS = (("F1 de clasificación", "classification_f1_macro", 0.85),
@@ -129,40 +140,61 @@ TEST_ROWS = (("F1 de clasificación", "classification_f1_macro", 0.85),
              ("IoU por fragmento", "instance_iou_matched", 0.70))
 
 
+TEST_EVALUATIONS = (("1.ª · D5", "s10/TEST_d5_s42_tta.json"),
+                    ("2.ª · H6", "s10/TEST2_h6_s42_tta.json"),
+                    ("3.ª · H7", "h7/test_tercera_h7_auggeo_rot35_canon_aumm_noema_w32_e60_s42_sin_enderezar.json"),
+                    ("4.ª · H8", "h8/test/test_h8.json"))
+
+
 def test_metrics_section() -> None:
-    """Las dos evaluaciones en test de la Semana 10, leídas de outputs/s10 (no se recalcula nada)."""
+    """Las evaluaciones en test del proyecto, leídas de outputs/ (no se recalcula nada)."""
     import pandas as pd
-    first, second = read_json("TEST_d5_s42_tta.json"), read_json("TEST2_h6_s42_tta.json")
-    if not first or not second:
+    found = [(label, read_json(name)) for label, name in TEST_EVALUATIONS]
+    found = [(label, data["subsets"]["todo"]) for label, data in found if data]
+    final = dict(found).get("4.ª · H8")
+    if not final:
         return
-    a, b = first["subsets"]["todo"], second["subsets"]["todo"]
-    slices = f"{b['n_slices']:,}".replace(",", " ")
-    st.subheader(f"Resultados en test ({b['n_cases']} casos, {slices} cortes)")
-    st.dataframe(pd.DataFrame([{"Métrica": name, "Objetivo": f"{goal:.2f}",
-                                "1.ª evaluación (D5)": f"{a[key]:.3f}", "2.ª evaluación (H6)": f"{b[key]:.3f}",
-                                "Cumple (H6)": "sí" if b[key] >= goal else "no"} for name, key, goal in TEST_ROWS]),
-                 use_container_width=True, hide_index=True)
-    st.caption("**Cómo leer las dos columnas.** La primera evaluación (D5) se hizo con la configuración congelada "
-               "antes de ver test: es la cifra limpia, y no cumplía el Dice por fragmento (0.845). La segunda (H6, "
-               "el modelo de esta demo) se hizo después de analizar los fallos de la primera, y ese análisis miró "
-               "dos casos de test (012 y 039). H6 se eligió solo con validación y pruebas de estrés; sus tres "
-               "semillas dan 0.875, 0.875 y 0.876 en Dice por fragmento.")
-    c1, c2 = st.columns(2)
-    distances = read_json("TEST2_h6_s42_nofill.json")
+    slices = f"{final['n_slices']:,}".replace(",", " ")
+    st.subheader(f"Resultados en test ({final['n_cases']} casos, {slices} cortes)")
+    rows = []
+    for name, key, goal in TEST_ROWS:
+        row = {"Métrica": name, "Objetivo": f"{goal:.2f}"}
+        row.update({label: f"{values[key]:.3f}" for label, values in found})
+        row["Cumple (H8)"] = "sí" if final[key] >= goal else "no"
+        rows.append(row)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.caption("**Cómo leer las columnas.** H8 es el modelo de esta demo: sin EMA, con el giro del aumento en "
+               "milímetros y con aumento de ruido gaussiano; se eligió solo con validación y se evaluó en test una "
+               "vez, con la configuración escrita de antemano. La primera evaluación (D5) se hizo con la "
+               "configuración congelada antes de ver test y es la única cifra limpia: no cumplía el Dice por "
+               "fragmento (0.845). Las siguientes se hicieron después de analizar los fallos de esa primera "
+               "evaluación, que miró dos casos de test (012 y 039).")
+    c1, c2, c3 = st.columns(3)
+    surface = read_json("h8/test/superficie_test_h8.json")
+    if surface:
+        r = surface["resumen"]["todos"]
+        c1.metric("HD95 / ASSD por fragmento en test (H8)",
+                  f"{r['hd95_mm_mediana']:.1f} / {r['assd_mm_mediana']:.2f} mm",
+                  help=f"Medianas sobre {r['n_detectados']} de {r['n_fragmentos']} fragmentos reales detectados "
+                       f"(cobertura {r['cobertura']:.1%}) · medias {r['hd95_mm_media']:.1f} / "
+                       f"{r['assd_mm_media']:.2f} mm")
+    distances, who = read_json("h8/test/distancias_test_h8.json"), "H8"
+    if not distances:
+        distances, who = read_json("s10/TEST2_h6_s42_nofill.json"), "H6"
     if distances:
         r = distances["resumen"]
-        c1.metric("Error de distancia en test (H6)", f"{r['error_distancia_mm_media']:.2f} mm",
+        c2.metric(f"Error de distancia en test ({who})", f"{r['error_distancia_mm_media']:.2f} mm",
                   help=f"{r['n_con_distancia_predicha']} de {r['n_fragmentos_secundarios']} fragmentos secundarios "
                        f"con distancia predicha · mediana {r['error_distancia_mm_mediana']:.1f} mm · "
                        f"correlación {r['correlacion_distancia']:.2f}")
-        c1.caption(f"Correlación predicción–real {r['correlacion_distancia']:.2f}; un solo fragmento concentra "
-                   "la mayor parte del error medio.")
-    sam = read_json("sam_baseline_test_h6.json")
+    sam, who = read_json("h8/test/sam_baseline_test_h8.json"), "H8"
+    if not sam:
+        sam, who = read_json("s10/sam_baseline_test_h6.json"), "H6"
     if sam:
-        c2.metric("Dice por región en test: propio vs SAM zero-shot",
+        c3.metric(f"Dice por región en test: {who} vs SAM zero-shot",
                   f"{sam['global_nuestro']['dice']:.3f} vs {sam['global_sam']['dice']:.3f}",
                   help=f"{sam['global_sam']['n']} regiones en {sam['cortes']} cortes (uno de cada {sam['stride']}). "
-                       "SAM recibe como indicación la caja del ground truth.")
+                       f"SAM recibe como indicación la caja que predice {who}; no forma parte del pipeline.")
 
 
 def latency_section() -> None:
@@ -171,16 +203,16 @@ def latency_section() -> None:
     st.subheader("Latencia por imagen (384×384, lote 1)")
     rows = []
     measured = DEMO_ROOT / "latency.json"
-    for name in ("latencia_gpu_L4.json", "latencia_cpu_colab.json"):
+    for name in ("s10/latencia_gpu_L4.json", "s10/latencia_cpu_colab.json"):
         data = read_json(name)
         if not data:
             continue
         for config, values in data["config"].items():
             rows.append({"Dispositivo": data["device"], "Configuración": config,
                          "Mediana (ms)": values["mediana_ms"], "Percentil alto (ms)": f"p95 · {values['p95_ms']}",
-                         "Fuente": "Semana 10, Colab"})
+                         "Fuente": "Semana 10, Colab (H6, misma arquitectura)"})
     if measured.exists():
-        for row in json.loads(measured.read_text()):       # filas de src/measure_latency.py
+        for row in json.loads(measured.read_text(encoding="utf-8")):       # filas de src/measure_latency.py
             hilos = f", {row['Hilos CPU']} hilos" if row.get("Hilos CPU") not in (None, "—") else ""
             rows.append({"Dispositivo": f"{row['Dispositivo'].lower()} ({row['Hardware']}{hilos})",
                          "Configuración": "1 modelo" + (" + TTA" if row["TTA"] == "sí" else ""),
@@ -195,32 +227,143 @@ def latency_section() -> None:
                "corte suelto en el servicio de AWS Lambda.")
 
 
+@st.cache_resource(show_spinner="Cargando el modelo…")
+def local_predictor(checkpoint: str, tta: bool):
+    from demo_export import predictor_local
+    return predictor_local(checkpoint, tta=tta)
+
+
+def torch_available() -> bool:
+    try:
+        import torch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def choose_predictor(tta: bool):
+    """Modelo local si hay torch y checkpoint; si no, la API de AWS. Devuelve (info, predecir, dónde)."""
+    if torch_available() and MODEL_CHECKPOINT.exists():
+        info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta)
+        return info, predecir, f"modelo local ({info['device']})"
+    url = setting("INFERENCE_URL")
+    if url:
+        from inferencia_remota import predictor_remoto
+        info, predecir = predictor_remoto(url, setting("INFERENCE_KEY"))
+        return info, predecir, "API de AWS Lambda"
+    raise RuntimeError("No hay dónde correr el modelo: falta torch con el checkpoint en "
+                       f"`{MODEL_CHECKPOINT.relative_to(ROOT)}` o el servicio de inferencia (`INFERENCE_URL`).")
+
+
+def upload_page() -> Path | None:
+    """Carga de un CT propio. Devuelve la carpeta del caso procesado, o None si todavía no hay uno."""
+    st.subheader("Subir un CT propio")
+    st.caption("Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o la carpeta "
+               "con los cortes DICOM de una serie. Se orienta con los metadatos, se endereza el giro del "
+               "paciente si es claro, y pasa por el mismo pipeline que los casos de ejemplo. No hay ground "
+               "truth, así que no se calculan métricas. Una carpeta de PNG o JPG no sirve: no guarda las "
+               "unidades Hounsfield ni el tamaño del vóxel.")
+    modo = st.radio("Qué vas a subir", ["Archivo de volumen", "Carpeta DICOM"], horizontal=True)
+    if modo == "Archivo de volumen":
+        files = st.file_uploader("Volumen", type=["mha", "mhd", "raw", "zraw", "nii", "gz", "nrrd", "nhdr"],
+                                 accept_multiple_files=True, max_upload_size=MAX_UPLOAD_MB,
+                                 help="Un .mhd o .nhdr se sube junto con su archivo de datos.")
+    else:
+        files = st.file_uploader("Carpeta con los cortes DICOM", accept_multiple_files="directory",
+                                 max_upload_size=MAX_UPLOAD_MB)
+    c1, c2 = st.columns(2)
+    tta = c1.checkbox("TTA de espejo", False, help="Predice también la imagen en espejo y promedia: un poco "
+                      "más preciso y el doble de tiempo. Solo aplica con el modelo local.")
+    enderezar = c2.checkbox("Enderezar el giro axial del paciente", True,
+                            help="Estima el giro con la simetría de la pelvis y lo corrige si es de 10° o más.")
+    if not st.button("Procesar", type="primary", disabled=not files):
+        return None
+    from demo_export import exportar_volumen
+    from volumen_entrada import huella, leer_subida
+    archivos = [(f.name, f.getvalue()) for f in files]
+    with st.status("Procesando el CT…", expanded=True) as status:
+        try:
+            info, predecir, where = choose_predictor(tta)
+            out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
+                f"{huella(archivos)}{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
+            if (out_dir / "meta.json").exists():
+                status.update(label="Este CT ya se había procesado", state="complete")
+                return out_dir
+            status.write(f"Modelo: {info['checkpoint']} · {where}")
+            volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
+            del archivos
+            status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "
+                         f"{volume.image.shape[1]}×{volume.image.shape[2]} · vóxel "
+                         f"{'×'.join(f'{v:.2f}' for v in volume.spacing_xyz)} mm · orientación: "
+                         f"{volume.orientacion['accion']}")
+            started = time.perf_counter()
+            exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
+                             enderezar=enderezar, log=status.write,
+                             extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
+                                                    "donde": where}})
+            status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
+        except Exception as error:
+            status.update(label="No se pudo procesar", state="error")
+            st.error(str(error))
+            return None
+    return out_dir
+
+
 # ----------------------------------------------------------------------------- encabezado
 st.title("Fracturas pélvicas en CT")
 st.caption("Detección, segmentación por fragmentos y distancia de separación en milímetros · dataset PENGWIN")
 st.error(NON_CLINICAL, icon="⚠️")
 
-cases = discover_cases()
-if not cases:
-    st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
-            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth --tta`")
-    st.stop()
-
 with st.sidebar:
     st.header("Caso")
-    choice = st.selectbox("Modelo y caso exportado", list(cases))
-    data = load_case(str(cases[choice]))
+    source = st.radio("Origen", ["Casos de ejemplo", "Subir un CT"], horizontal=True, key="source")
+
+if source == "Subir un CT":
+    uploaded = st.session_state.get("uploaded_case")
+    if uploaded and Path(uploaded, "meta.json").exists():
+        with st.sidebar:
+            if st.button("Subir otro CT"):
+                st.session_state.pop("uploaded_case")
+                st.rerun()
+        case_path = Path(uploaded)
+    else:
+        case_path = upload_page()
+        if case_path is None:
+            st.stop()
+        st.session_state["uploaded_case"] = str(case_path)
+        st.rerun()
+else:
+    cases = discover_cases()
+    if not cases:
+        st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
+                "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
+        st.stop()
+    with st.sidebar:
+        choice = st.selectbox("Modelo y caso exportado", list(cases))
+    case_path = cases[choice]
+
+with st.sidebar:
+    data = load_case(str(case_path))
     meta = data["meta"]
+    subido = meta.get("subido")
+    if subido:
+        st.caption(f"CT subido: {subido['fuente']} · orientación con los metadatos: "
+                   f"{subido['orientacion']['accion']} · inferencia: {subido['donde']}")
     st.caption(f"{meta['n_slices']} cortes · {meta['size']}×{meta['size']} px · spacing del header "
                f"{meta['spacing_native_xyz'][0]:.2f}×{meta['spacing_native_xyz'][1]:.2f}×"
                f"{meta['spacing_native_xyz'][2]:.2f} mm")
     st.caption(f"Modelo {meta['model']['checkpoint']} · {meta['model']['parameters'] / 1e6:.2f} M parámetros "
                f"· TTA {'sí' if meta['tta'] else 'no'}")
-    if meta.get("canonical"):
+    if meta.get("canonical") and not subido:
         st.caption("Orientación canónica (sacro abajo): " + (
             "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
             "las tres vistas y el ground truth están enderezados." if meta.get("flipped")
             else "este volumen ya venía en esa orientación."))
+    giro = meta.get("enderezado")
+    if giro:
+        st.caption(f"Giro axial del paciente: {giro['angulo']:+.1f}° estimado; " + (
+            "se enderezó antes de predecir (las tres vistas y el ground truth están enderezados)."
+            if giro["corregido"] else f"no se corrigió (solo se corrigen giros claros de {giro['giro_minimo']:.0f}° o más)."))
     st.markdown(legend_html(meta["fragments_pred"]), unsafe_allow_html=True)
 
 all_fragments = meta["fragments_pred"]
@@ -259,7 +402,16 @@ with tab1:
             col.image(raw[key], caption=f"MIP {name}", use_container_width=True)
         if st.toggle("Mostrar isosuperficie 3D del hueso", value=False,
                      help="Malla rotable de la misma máscara ósea; pesa más que la MIP."):
-            st.plotly_chart(bone_figure(raw["bone_verts_zyx"], raw["bone_faces"]), use_container_width=True)
+            verts, faces = raw["bone_verts_zyx"], raw["bone_faces"]
+            if "bone_verts_zyx_pulido" in raw and "bone_faces_pulido" in raw:
+                version = st.radio("Hueso", ["Pulido", "Crudo"], horizontal=True,
+                                   help="Pulido: además del umbral de 250 HU recupera el hueso tenue "
+                                        "(150-250 HU conectado al esqueleto) y rellena las cavidades. "
+                                        "Crudo: solo el umbral y la limpieza, como la MIP.")
+                if version == "Pulido":
+                    verts, faces = raw["bone_verts_zyx_pulido"], raw["bone_faces_pulido"]
+            st.plotly_chart(bone_figure(verts, faces), use_container_width=True)
+    st.caption("El pulido 3D es solo visual; el modelo, las métricas y las distancias usan los datos sin modificar.")
 
 # ----------------------------------------------------------------------------- visualizador 2
 with tab2:
@@ -338,6 +490,7 @@ with tab3:
     fig = mesh_figure(data["meshes"], fragments, spacing, show_main=show_main, main_opacity=main_opacity,
                       show_gt=show_gt3, gt_fragments=meta["fragments_gt"], label_contacts=label_contacts)
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("El pulido 3D es solo visual; el modelo, las métricas y las distancias usan los datos sin modificar.")
 
 # ----------------------------------------------------------------------------- métricas
 with tab4:

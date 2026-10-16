@@ -1,0 +1,7 @@
+cortes_conservados,grosor_aprox_mm,umbrales,secundarios_con_distancia,error_distancia_medio_mm,correlacion_distancia,dice3d_principal,dice3d_secundario,secundarios_perdidos_3d,cobertura,cobertura_iou_0.5,hd95_mediana_mm,assd_mediana_mm,predichos_sin_pareja
+1 de 1,0.8,vóxeles,38,0.312,0.956,0.918,0.722,0.05,0.965,0.849,4.05,0.86,297
+1 de 1,0.8,mm³,38,0.312,0.956,0.918,0.722,0.05,0.965,0.849,4.05,0.86,278
+1 de 2,1.6,vóxeles,38,0.328,0.945,0.918,0.721,0.05,0.965,0.849,4.23,0.83,257
+1 de 2,1.6,mm³,38,0.328,0.945,0.918,0.721,0.05,0.965,0.849,4.23,0.83,278
+1 de 3,2.4,vóxeles,38,0.319,0.945,0.917,0.726,0.039,0.965,0.837,4.25,0.75,238
+1 de 3,2.4,mm³,38,0.319,0.945,0.917,0.726,0.039,0.965,0.837,4.25,0.75,284

@@ -1,0 +1,56 @@
+{
+  "checkpoint": "/kaggle/input/datasets/jacobodm/pengwin-h8-test/h8_aumm_noise01_noema_w32_e60_s42.pth",
+  "canonical": true,
+  "split": "val",
+  "stride": 3,
+  "cortes": 1308,
+  "ms_sam_por_corte": 450.3,
+  "regiones": {
+    "sacro": {
+      "sam": {
+        "dice": 0.7812,
+        "iou": 0.6756,
+        "n": 878
+      },
+      "nuestro": {
+        "dice": 0.8721,
+        "iou": 0.8041,
+        "n": 878
+      }
+    },
+    "coxal_izquierdo": {
+      "sam": {
+        "dice": 0.8885,
+        "iou": 0.8232,
+        "n": 1252
+      },
+      "nuestro": {
+        "dice": 0.9311,
+        "iou": 0.8835,
+        "n": 1252
+      }
+    },
+    "coxal_derecho": {
+      "sam": {
+        "dice": 0.9021,
+        "iou": 0.8387,
+        "n": 1263
+      },
+      "nuestro": {
+        "dice": 0.939,
+        "iou": 0.892,
+        "n": 1263
+      }
+    }
+  },
+  "global_sam": {
+    "dice": 0.8658,
+    "iou": 0.7908,
+    "n": 3393
+  },
+  "global_nuestro": {
+    "dice": 0.9188,
+    "iou": 0.8661,
+    "n": 3393
+  }
+}

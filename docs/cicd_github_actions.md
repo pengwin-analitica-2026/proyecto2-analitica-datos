@@ -51,9 +51,9 @@ Lo que NO va en GitHub:
 
 ## El checkpoint
 
-La imagen copia `outputs/s10/h6_auggeo_rot35_canon_ema_w32_e60_s42.pth` (11 MB), así que tiene que
-estar en el repositorio. `.gitignore` ignora `*.pth` y tiene excepciones solo para las tres semillas
-de H6 y para D5 (la primera evaluación en test).
+La imagen copia `outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth` (11 MB), así que tiene que
+estar en el repositorio. `.gitignore` ignora `*.pth` y tiene excepciones solo para H8, las tres semillas
+de H6 y D5 (la primera evaluación en test).
 
 ## Problemas que aparecieron al desplegar de verdad
 
