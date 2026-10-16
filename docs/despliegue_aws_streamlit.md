@@ -58,19 +58,17 @@ aparte, solo con la app y los casos, si algún día el repo principal no puede c
 ### Casos PENGWIN desde S3
 
 El origen «Casos PENGWIN (100)» lee el bucket privado `pengwin-ct-050752608083` (ver
-`docs/semana11_dashboard.md`). En Streamlit Cloud necesita, en los Secrets:
+`docs/semana11_dashboard.md`). **No hace falta agregar credenciales de AWS a Streamlit Cloud**: con los
+mismos Secrets de siempre (`INFERENCE_URL` e `INFERENCE_KEY`), el dashboard le pide a la API la lista
+de casos (`GET /s3/listar`) y un enlace firmado de 15 minutos para cada archivo (`GET /s3/url`). La
+Lambda lee el bucket con su propio rol, que tiene solo lectura de `crudos/` y `exportados/`
+(`deploy/aws/lambda-lectura-s3-policy.json`). Los dos endpoints exigen la `X-API-Key` y rechazan
+cualquier clave fuera de esos prefijos.
 
-```toml
-AWS_ACCESS_KEY_ID = "<clave del usuario pengwin-streamlit-lectura>"
-AWS_SECRET_ACCESS_KEY = "<su secreto>"
-AWS_DEFAULT_REGION = "us-east-2"
-```
-
-`pengwin-streamlit-lectura` es un usuario IAM que solo puede listar el bucket y leer `crudos/` y
-`exportados/` (`deploy/aws/streamlit-lectura-policy.json`); no puede escribir ni ver nada más de la
-cuenta. Su clave se crea una vez a mano (`aws iam create-access-key --user-name
-pengwin-streamlit-lectura`) y va directo a los Secrets de Streamlit Cloud, no al repositorio. En local
-basta un perfil con acceso (`AWS_PROFILE=almia`).
+`src/almacen_s3.py` decide solo: si boto3 encuentra credenciales (en el Mac, `AWS_PROFILE=almia`) va
+directo al bucket; si no, pasa por la API. Opcionalmente, el usuario IAM `pengwin-streamlit-lectura`
+(solo lectura, `deploy/aws/streamlit-lectura-policy.json`) permite el acceso directo si se crea su clave
+y se pone en los Secrets como `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`; no es necesario.
 
 ## 2. API de inferencia en AWS Lambda
 

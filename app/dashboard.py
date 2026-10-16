@@ -45,8 +45,8 @@ S3_CACHE = Path(os.environ.get("S3_CACHE", Path(tempfile.gettempdir()) / "pengwi
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
 
-# En Streamlit Cloud las credenciales de S3 (usuario de solo lectura) vienen de los Secrets; boto3 las
-# lee del entorno. En local se usa el perfil de AWS de siempre (AWS_PROFILE).
+# Credenciales de S3 opcionales: si están en los Secrets (usuario de solo lectura), boto3 las lee del
+# entorno. Sin ellas, «Casos PENGWIN» lee el bucket a través de la API (INFERENCE_URL e INFERENCE_KEY).
 for _name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION", "PENGWIN_BUCKET"):
     try:
         if _name not in os.environ and _name in st.secrets:
@@ -332,13 +332,14 @@ def s3_cases(model: str) -> list[dict]:
 def pengwin_page() -> Path | None:
     """Los 100 casos de PENGWIN desde S3: el precalculado o procesarlo en este momento."""
     import almacen_s3
+    almacen_s3.configurar_api(setting("INFERENCE_URL"), setting("INFERENCE_KEY"))
     model = MODEL_CHECKPOINT.stem
     try:
         cases = s3_cases(model)
     except Exception as error:
-        st.error(f"No pude leer el bucket `{almacen_s3.BUCKET}`: {error}. En local hace falta un perfil de AWS "
-                 "con acceso (por ejemplo `AWS_PROFILE=almia`); en Streamlit Cloud, las credenciales de solo "
-                 "lectura en los Secrets.")
+        st.error(f"No pude leer el bucket `{almacen_s3.BUCKET}`: {error}. Hace falta un perfil de AWS con acceso "
+                 "(por ejemplo `AWS_PROFILE=almia` en local) o la API de inferencia (`INFERENCE_URL` e "
+                 "`INFERENCE_KEY`), que lee el bucket por su cuenta.")
         return None
     if not cases:
         st.info(f"El bucket `{almacen_s3.BUCKET}` todavía no tiene casos.")
