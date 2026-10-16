@@ -36,7 +36,12 @@ def subir(origen: Path, bucket: str, clave: str, ya: dict[str, int], carpeta: Pa
     if ya.get(Path(clave).name) == tam:
         destino.unlink()
         return "ya estaba"
-    subprocess.run(["aws", "s3", "cp", "--only-show-errors", str(destino), f"s3://{bucket}/{clave}"], check=True)
+    for intento in range(4):                  # la conexión de la casa a veces se corta a mitad de un archivo
+        if subprocess.run(["aws", "s3", "cp", "--only-show-errors", str(destino), f"s3://{bucket}/{clave}"]).returncode == 0:
+            break
+        if intento == 3:
+            raise RuntimeError(f"No se pudo subir {clave} después de 4 intentos")
+        time.sleep(15 * (intento + 1))
     destino.unlink()
     return f"{tam / 1e6:.0f} MB"
 
