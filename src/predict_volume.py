@@ -25,31 +25,13 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_case_cache import from_uint8, to_uint8
-from pengwin_io import GAMMA, resize_slice, window_hu
+from build_case_cache import from_uint8
+# Sin torch, para que también corran en Streamlit Cloud; se reexportan aquí por compatibilidad.
+from volumen_entrada import cache_spacing_xyz, preprocess_volume  # noqa: F401
 from pengwin_metrics import refine_boxes_with_semantic
 from week9_detection import decode_predictions
 
 REGION_NAMES = ("sacro", "coxal_izquierdo", "coxal_derecho")
-
-
-def preprocess_volume(image_hu: np.ndarray, size: int = 384, gamma: float = GAMMA) -> np.ndarray:
-    """Volumen HU crudo [z,y,x] → uint8 [z,size,size], igual que ``build_case_cache`` (modo stretch)."""
-    out = np.empty((len(image_hu), size, size), dtype=np.uint8)
-    for z in range(len(image_hu)):
-        out[z] = to_uint8(resize_slice(window_hu(image_hu[z], gamma=gamma), size))
-    return out
-
-
-def cache_spacing_xyz(spacing_xyz: tuple[float, float, float], shape_zyx: tuple[int, int, int],
-                      size: int) -> tuple[float, float, float]:
-    """Spacing (x,y,z) en mm del volumen estirado a size×size por corte.
-
-    Cada píxel del caché cubre más o menos milímetros que el original según la forma del corte.
-    Misma fórmula que ``volume_postprocess.cache_spacing_xyz``, pero desde el header.
-    """
-    sx, sy, sz = (float(v) for v in spacing_xyz)
-    return (sx * shape_zyx[2] / size, sy * shape_zyx[1] / size, sz)
 
 
 def _box_list(rows: list[dict]) -> list[dict]:

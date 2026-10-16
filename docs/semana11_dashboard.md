@@ -39,6 +39,52 @@ Casos versionados en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`, todos co
 | 099 | validación | sí | Comprobar el enderezado |
 | 039 | test | no | Uno de los dos casos que hundían test con D5; se exporta porque el modelo ya está congelado |
 
+## Subir un CT propio
+
+Pedido del profesor: cargar un CT que no es de los casos de ejemplo y ver al instante la predicción
+en los tres visualizadores. En la barra lateral, **Origen → Subir un CT**:
+
+| Qué se sube | Cómo se lee |
+|---|---|
+| Un archivo `.mha`, `.nii`, `.nii.gz` o `.nrrd` (o un `.mhd`/`.nhdr` junto con su archivo de datos) | SimpleITK, con su cabecera |
+| Una carpeta con los cortes DICOM de una serie (botón «Upload directories») | GDCM arma la serie: ordena los cortes por posición y aplica `RescaleSlope`/`RescaleIntercept`, así queda en HU. Si hay varias series, usa la de más cortes |
+
+Una carpeta de PNG o JPG se rechaza con un mensaje: esas imágenes no guardan las unidades Hounsfield
+ni el tamaño del vóxel, y el modelo (ventana ósea en HU) y la distancia en mm los necesitan.
+
+Qué pasa al pulsar **Procesar** (el mismo pipeline de los casos de ejemplo, `demo_export.exportar_volumen`):
+
+1. `volumen_entrada.leer_subida` lee el volumen y lo lleva a la orientación estándar con la matriz de
+   dirección de la cabecera (`normalizacion.a_orientacion_estandar`, productos punto y cruz). Es la
+   orientación canónica de H8; en los 100 casos de PENGWIN da lo mismo que `orientacion.to_canonical`.
+2. Enderezado del giro axial del paciente si es claro (opcional, activado por defecto).
+3. Modelo sobre todos los cortes: **local** si hay torch y el checkpoint (en el Mac); si no
+   (Streamlit Cloud), la **API de AWS** con `POST /predict_batch`, en lotes de 8 cortes y 4 pedidos en
+   paralelo (`src/inferencia_remota.py`). TTA opcional, solo con el modelo local.
+4. Post-proceso 3D, distancias en mm, mallas por fragmento y vista cruda. Sin ground truth: no hay
+   métricas ni contorno del GT.
+
+El caso queda en `UPLOAD_ROOT` (por defecto una carpeta temporal), identificado por un hash del
+contenido: si se vuelve a subir el mismo CT con las mismas opciones, se abre sin recalcular. Límite de
+1 GB por archivo.
+
+Comprobado:
+
+- `044.mha` subido por el navegador (55 MB, guardado girado 180°): se orientó con la cabecera y la
+  entrada al modelo quedó idéntica, byte a byte, a la del caso 044 de la demo. Tardó unos 6 minutos en
+  la CPU del Mac sin TTA (349 ms por corte). Dice por hueso contra el ground truth: 0.955 / 0.969 /
+  0.966 (la demo con TTA: 0.955 / 0.970 / 0.966).
+- El caso 024 convertido a 350 archivos DICOM se reconstruye idéntico al `.mha` original, con el mismo
+  spacing.
+- En un contenedor con Python 3.14 y sin torch (como Streamlit Cloud) el dashboard abre la página de
+  subida y el pipeline corre sin importar torch.
+- `tests/test_volumen_entrada.py` (lectura de `.mha`, NIfTI y DICOM desordenado, errores) y
+  `tests/test_api_server.py` (el cliente remoto contra la API da lo mismo que el modelo local).
+
+Límites: en Streamlit Cloud la memoria es limitada (del orden de 2-3 GB), así que un volumen muy
+grande (por ejemplo 512×512×800) puede no caber. La primera llamada a la API después de un rato sin
+uso tarda hasta ~90 s por el arranque en frío de Lambda.
+
 ## Orientación
 
 H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están

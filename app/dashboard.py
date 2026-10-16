@@ -9,6 +9,13 @@ desde la raíz del repo:
 
 Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferencia en vivo del
 visualizador 2 necesita ``torch`` y el checkpoint; el resto solo lee archivos.
+
+SUBIR UN CT. En la barra lateral, «Subir un CT» deja cargar un volumen propio (``.mha``, ``.nii``,
+``.nii.gz``, ``.nrrd``) o una carpeta de cortes DICOM. El dashboard lo lee y lo orienta con los
+metadatos (``volumen_entrada.py``), corre el mismo pipeline de ``demo_export`` (enderezado, modelo,
+post-proceso 3D, distancias y mallas) y lo muestra en los tres visualizadores, sin ground truth. El
+modelo corre en local si hay ``torch`` y el checkpoint; si no (Streamlit Cloud), en la API de AWS
+(``INFERENCE_URL``). Los casos procesados quedan en ``UPLOAD_ROOT`` (por defecto, una carpeta temporal).
 """
 
 from __future__ import annotations
@@ -16,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -30,6 +38,9 @@ from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, RE
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
 CHECKPOINT_DIR = ROOT / "outputs" / "s10"
 RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en test
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
+MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
+MAX_UPLOAD_MB = 1024
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
 
@@ -216,28 +227,134 @@ def latency_section() -> None:
                "corte suelto en el servicio de AWS Lambda.")
 
 
+@st.cache_resource(show_spinner="Cargando el modelo…")
+def local_predictor(checkpoint: str, tta: bool):
+    from demo_export import predictor_local
+    return predictor_local(checkpoint, tta=tta)
+
+
+def torch_available() -> bool:
+    try:
+        import torch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def choose_predictor(tta: bool):
+    """Modelo local si hay torch y checkpoint; si no, la API de AWS. Devuelve (info, predecir, dónde)."""
+    if torch_available() and MODEL_CHECKPOINT.exists():
+        info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta)
+        return info, predecir, f"modelo local ({info['device']})"
+    url = setting("INFERENCE_URL")
+    if url:
+        from inferencia_remota import predictor_remoto
+        info, predecir = predictor_remoto(url, setting("INFERENCE_KEY"))
+        return info, predecir, "API de AWS Lambda"
+    raise RuntimeError("No hay dónde correr el modelo: falta torch con el checkpoint en "
+                       f"`{MODEL_CHECKPOINT.relative_to(ROOT)}` o el servicio de inferencia (`INFERENCE_URL`).")
+
+
+def upload_page() -> Path | None:
+    """Carga de un CT propio. Devuelve la carpeta del caso procesado, o None si todavía no hay uno."""
+    st.subheader("Subir un CT propio")
+    st.caption("Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o la carpeta "
+               "con los cortes DICOM de una serie. Se orienta con los metadatos, se endereza el giro del "
+               "paciente si es claro, y pasa por el mismo pipeline que los casos de ejemplo. No hay ground "
+               "truth, así que no se calculan métricas. Una carpeta de PNG o JPG no sirve: no guarda las "
+               "unidades Hounsfield ni el tamaño del vóxel.")
+    modo = st.radio("Qué vas a subir", ["Archivo de volumen", "Carpeta DICOM"], horizontal=True)
+    if modo == "Archivo de volumen":
+        files = st.file_uploader("Volumen", type=["mha", "mhd", "raw", "zraw", "nii", "gz", "nrrd", "nhdr"],
+                                 accept_multiple_files=True, max_upload_size=MAX_UPLOAD_MB,
+                                 help="Un .mhd o .nhdr se sube junto con su archivo de datos.")
+    else:
+        files = st.file_uploader("Carpeta con los cortes DICOM", accept_multiple_files="directory",
+                                 max_upload_size=MAX_UPLOAD_MB)
+    c1, c2 = st.columns(2)
+    tta = c1.checkbox("TTA de espejo", False, help="Predice también la imagen en espejo y promedia: un poco "
+                      "más preciso y el doble de tiempo. Solo aplica con el modelo local.")
+    enderezar = c2.checkbox("Enderezar el giro axial del paciente", True,
+                            help="Estima el giro con la simetría de la pelvis y lo corrige si es de 10° o más.")
+    if not st.button("Procesar", type="primary", disabled=not files):
+        return None
+    from demo_export import exportar_volumen
+    from volumen_entrada import huella, leer_subida
+    archivos = [(f.name, f.getvalue()) for f in files]
+    with st.status("Procesando el CT…", expanded=True) as status:
+        try:
+            info, predecir, where = choose_predictor(tta)
+            out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
+                f"{huella(archivos)}{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
+            if (out_dir / "meta.json").exists():
+                status.update(label="Este CT ya se había procesado", state="complete")
+                return out_dir
+            status.write(f"Modelo: {info['checkpoint']} · {where}")
+            volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
+            del archivos
+            status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "
+                         f"{volume.image.shape[1]}×{volume.image.shape[2]} · vóxel "
+                         f"{'×'.join(f'{v:.2f}' for v in volume.spacing_xyz)} mm · orientación: "
+                         f"{volume.orientacion['accion']}")
+            started = time.perf_counter()
+            exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
+                             enderezar=enderezar, log=status.write,
+                             extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
+                                                    "donde": where}})
+            status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
+        except Exception as error:
+            status.update(label="No se pudo procesar", state="error")
+            st.error(str(error))
+            return None
+    return out_dir
+
+
 # ----------------------------------------------------------------------------- encabezado
 st.title("Fracturas pélvicas en CT")
 st.caption("Detección, segmentación por fragmentos y distancia de separación en milímetros · dataset PENGWIN")
 st.error(NON_CLINICAL, icon="⚠️")
 
-cases = discover_cases()
-if not cases:
-    st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
-            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
-    st.stop()
-
 with st.sidebar:
     st.header("Caso")
-    choice = st.selectbox("Modelo y caso exportado", list(cases))
-    data = load_case(str(cases[choice]))
+    source = st.radio("Origen", ["Casos de ejemplo", "Subir un CT"], horizontal=True, key="source")
+
+if source == "Subir un CT":
+    uploaded = st.session_state.get("uploaded_case")
+    if uploaded and Path(uploaded, "meta.json").exists():
+        with st.sidebar:
+            if st.button("Subir otro CT"):
+                st.session_state.pop("uploaded_case")
+                st.rerun()
+        case_path = Path(uploaded)
+    else:
+        case_path = upload_page()
+        if case_path is None:
+            st.stop()
+        st.session_state["uploaded_case"] = str(case_path)
+        st.rerun()
+else:
+    cases = discover_cases()
+    if not cases:
+        st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
+                "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
+        st.stop()
+    with st.sidebar:
+        choice = st.selectbox("Modelo y caso exportado", list(cases))
+    case_path = cases[choice]
+
+with st.sidebar:
+    data = load_case(str(case_path))
     meta = data["meta"]
+    subido = meta.get("subido")
+    if subido:
+        st.caption(f"CT subido: {subido['fuente']} · orientación con los metadatos: "
+                   f"{subido['orientacion']['accion']} · inferencia: {subido['donde']}")
     st.caption(f"{meta['n_slices']} cortes · {meta['size']}×{meta['size']} px · spacing del header "
                f"{meta['spacing_native_xyz'][0]:.2f}×{meta['spacing_native_xyz'][1]:.2f}×"
                f"{meta['spacing_native_xyz'][2]:.2f} mm")
     st.caption(f"Modelo {meta['model']['checkpoint']} · {meta['model']['parameters'] / 1e6:.2f} M parámetros "
                f"· TTA {'sí' if meta['tta'] else 'no'}")
-    if meta.get("canonical"):
+    if meta.get("canonical") and not subido:
         st.caption("Orientación canónica (sacro abajo): " + (
             "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
             "las tres vistas y el ground truth están enderezados." if meta.get("flipped")
