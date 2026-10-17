@@ -8,8 +8,9 @@ FROM public.ecr.aws/docker/library/python:3.11-slim
 WORKDIR /app
 COPY api/requirements.txt api/requirements.txt
 # torch con CUDA 12.1 trae sus propias bibliotecas de CUDA; el driver de NVIDIA lo pone la instancia.
-RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121 \
-    && pip install --no-cache-dir -r api/requirements.txt
+# Son ~3 GB de descargas: más tiempo de espera y reintentos para que un corte no tumbe la construcción.
+RUN pip install --no-cache-dir --timeout 120 --retries 10 torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install --no-cache-dir --timeout 120 --retries 10 -r api/requirements.txt
 
 COPY src/ src/
 COPY api/server.py api/server.py
