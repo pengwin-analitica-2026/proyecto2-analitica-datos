@@ -1,0 +1,40 @@
+[{"stream_name":"stderr","time":0.924516626,"data":"/kaggle/src/script.py:13: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":0.924651482,"data":"  tarfile.open(fileobj=io.BytesIO(base64.b64decode(PAYLOAD))).extractall(REPO)\n"}
+,{"stream_name":"stdout","time":0.970179872,"data":"\u003e\u003e lscpu | head -20\n"}
+,{"stream_name":"stdout","time":0.987317863,"data":"Architecture:                            x86_64\n"}
+,{"stream_name":"stdout","time":0.987349049,"data":"CPU op-mode(s):                          32-bit, 64-bit\n"}
+,{"stream_name":"stdout","time":0.987352695,"data":"Address sizes:                           46 bits physical, 48 bits virtual\n"}
+,{"stream_name":"stdout","time":0.98735536,"data":"Byte Order:                              Little Endian\n"}
+,{"stream_name":"stdout","time":0.987357885,"data":"CPU(s):                                  4\n"}
+,{"stream_name":"stdout","time":0.987360579,"data":"On-line CPU(s) list:                     0-3\n"}
+,{"stream_name":"stdout","time":0.987363062,"data":"Vendor ID:                               GenuineIntel\n"}
+,{"stream_name":"stdout","time":0.987365406,"data":"Model name:                              Intel(R) Xeon(R) CPU @ 2.20GHz\n"}
+,{"stream_name":"stdout","time":0.987367828,"data":"CPU family:                              6\n"}
+,{"stream_name":"stdout","time":0.987370113,"data":"Model:                                   79\n"}
+,{"stream_name":"stdout","time":0.98737239,"data":"Thread(s) per core:                      2\n"}
+,{"stream_name":"stdout","time":0.987374661,"data":"Core(s) per socket:                      2\n"}
+,{"stream_name":"stdout","time":0.987377015,"data":"Socket(s):                               1\n"}
+,{"stream_name":"stdout","time":0.987379268,"data":"Stepping:                                0\n"}
+,{"stream_name":"stdout","time":0.987381893,"data":"BogoMIPS:                                4399.99\n"}
+,{"stream_name":"stdout","time":0.987385028,"data":"Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm rdseed adx smap xsaveopt arat md_clear arch_capabilities\n"}
+,{"stream_name":"stdout","time":0.987393403,"data":"Hypervisor vendor:                       KVM\n"}
+,{"stream_name":"stdout","time":0.987395748,"data":"Virtualization type:                     full\n"}
+,{"stream_name":"stdout","time":0.987398115,"data":"L1d cache:                               64 KiB (2 instances)\n"}
+,{"stream_name":"stdout","time":0.987400467,"data":"L1i cache:                               64 KiB (2 instances)\n"}
+,{"stream_name":"stdout","time":0.987665944,"data":"\u003e\u003e nvidia-smi -L\n"}
+,{"stream_name":"stderr","time":0.995395964,"data":"/bin/sh: 1: nvidia-smi: not found\n"}
+,{"stream_name":"stdout","time":0.99573721,"data":"\u003e\u003e pip -q install SimpleITK scikit-image\n"}
+,{"stream_name":"stdout","time":7.376891828,"data":"casos en el caché: 23 | checkpoint: h8_aumm_noise01_noema_w32_e60_s42.pth\n"}
+,{"stream_name":"stdout","time":11.739110285,"data":"\u003e\u003e /usr/bin/python3 -u src/cuantizar.py --checkpoint /kaggle/input/datasets/gustaveloper/pengwin-cuantizacion-h8-test/h8_aumm_noise01_noema_w32_e60_s42.pth --cache-dir data/cache/s10/cache_384 --split test --tta --threads 4 --variants int8 --device cpu --output /kaggle/working/test_h8_int8_cpu.json\n"}
+,{"stream_name":"stdout","time":15.584867741,"data":"AVISO: test se usa una sola vez, para reportar la variante ya elegida en validación.\n"}
+,{"stream_name":"stdout","time":20.781784726,"data":"Calibración int8: 128 cortes de entrenamiento\n"}
+,{"stream_name":"stdout","time":3413.831569482,"data":"int8            tamano_mb=4.959 mediana_ms=108.615 p90_ms=110.232 instance_dice_matched=0.874 instance_dice_primary=0.911 instance_dice_secondary=0.760 segmentation_dice_macro=0.968 classification_f1_macro=0.989 detection_map50=0.951 dice_todos=0.850 dice_principal=0.927 dice_secundario=0.776 error_distancia_mm_media=1.279 correlacion_distancia=0.819 segundos=3386.600\n"}
+,{"stream_name":"stdout","time":3413.836170991,"data":"Guardado: /kaggle/working/test_h8_int8_cpu.json\n"}
+,{"stream_name":"stdout","time":3415.097113041,"data":"torch 2.11.0+cpu | CPU x86_64 4 núcleos | listo: /kaggle/working/test_h8_int8_cpu.json\n"}
+,{"stream_name":"stderr","time":3418.734163004,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":3418.734203183,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":3419.141693916,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":3419.141727342,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":3420.08293835,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":3421.308114863,"data":"[NbConvertApp] Writing 504345 bytes to __results__.html\n"}
+]

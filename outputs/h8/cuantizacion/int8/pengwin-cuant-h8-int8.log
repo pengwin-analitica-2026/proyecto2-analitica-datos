@@ -1,0 +1,37 @@
+[{"stream_name":"stderr","time":0.870452559,"data":"/kaggle/src/script.py:10: DeprecationWarning: Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata. Use the filter argument to control this behavior.\n"}
+,{"stream_name":"stderr","time":0.87050354,"data":"  tarfile.open(fileobj=io.BytesIO(base64.b64decode(PAYLOAD))).extractall(REPO)\n"}
+,{"stream_name":"stdout","time":0.915692267,"data":"\u003e\u003e lscpu | head -20\n"}
+,{"stream_name":"stdout","time":0.93354442,"data":"Architecture:                            x86_64\n"}
+,{"stream_name":"stdout","time":0.933572489,"data":"CPU op-mode(s):                          32-bit, 64-bit\n"}
+,{"stream_name":"stdout","time":0.93357694,"data":"Address sizes:                           48 bits physical, 48 bits virtual\n"}
+,{"stream_name":"stdout","time":0.93358044,"data":"Byte Order:                              Little Endian\n"}
+,{"stream_name":"stdout","time":0.93358362,"data":"CPU(s):                                  4\n"}
+,{"stream_name":"stdout","time":0.933586629,"data":"On-line CPU(s) list:                     0-3\n"}
+,{"stream_name":"stdout","time":0.933589629,"data":"Vendor ID:                               AuthenticAMD\n"}
+,{"stream_name":"stdout","time":0.933592529,"data":"Model name:                              AMD EPYC 7B12\n"}
+,{"stream_name":"stdout","time":0.93359522,"data":"CPU family:                              23\n"}
+,{"stream_name":"stdout","time":0.93359808,"data":"Model:                                   49\n"}
+,{"stream_name":"stdout","time":0.93360088,"data":"Thread(s) per core:                      2\n"}
+,{"stream_name":"stdout","time":0.933604229,"data":"Core(s) per socket:                      2\n"}
+,{"stream_name":"stdout","time":0.93360732,"data":"Socket(s):                               1\n"}
+,{"stream_name":"stdout","time":0.933610289,"data":"Stepping:                                0\n"}
+,{"stream_name":"stdout","time":0.933613009,"data":"BogoMIPS:                                4499.99\n"}
+,{"stream_name":"stdout","time":0.93362312,"data":"Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ssbd ibrs ibpb stibp vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat umip rdpid\n"}
+,{"stream_name":"stdout","time":0.933628749,"data":"Hypervisor vendor:                       KVM\n"}
+,{"stream_name":"stdout","time":0.93363152,"data":"Virtualization type:                     full\n"}
+,{"stream_name":"stdout","time":0.93363416,"data":"L1d cache:                               64 KiB (2 instances)\n"}
+,{"stream_name":"stdout","time":0.9336368,"data":"L1i cache:                               64 KiB (2 instances)\n"}
+,{"stream_name":"stdout","time":0.93391446,"data":"\u003e\u003e pip -q install SimpleITK scikit-image\n"}
+,{"stream_name":"stdout","time":6.131225941,"data":"casos en el caché: 23 | checkpoint: h8_aumm_noise01_noema_w32_e60_s42.pth\n"}
+,{"stream_name":"stdout","time":9.640290352,"data":"\u003e\u003e /usr/bin/python3 -u src/cuantizar.py --checkpoint /kaggle/input/datasets/gustaveloper/pengwin-cuantizacion-h8/h8_aumm_noise01_noema_w32_e60_s42.pth --cache-dir data/cache/s10/cache_384 --split val --tta --threads 4 --variants int8 --output /kaggle/working/val_h8_int8.json\n"}
+,{"stream_name":"stdout","time":18.153059984,"data":"Calibración int8: 128 cortes de entrenamiento\n"}
+,{"stream_name":"stdout","time":2555.802462518,"data":"int8            tamano_mb=4.959 mediana_ms=80.804 p90_ms=84.267 instance_dice_matched=0.865 instance_dice_primary=0.898 instance_dice_secondary=0.769 segmentation_dice_macro=0.970 classification_f1_macro=0.990 detection_map50=0.969 dice_todos=0.824 dice_principal=0.917 dice_secundario=0.724 error_distancia_mm_media=0.312 correlacion_distancia=0.956 segundos=2528.700\n"}
+,{"stream_name":"stdout","time":2555.804532968,"data":"Guardado: /kaggle/working/val_h8_int8.json\n"}
+,{"stream_name":"stdout","time":2556.813014775,"data":"torch 2.11.0+cpu | CPU x86_64 4 núcleos | listo: /kaggle/working/val_h8_int8.json\n"}
+,{"stream_name":"stderr","time":2559.286623863,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2559.286658392,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2559.587586845,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2559.587628525,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2560.321141791,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2561.258663272,"data":"[NbConvertApp] Writing 502797 bytes to __results__.html\n"}
+]
