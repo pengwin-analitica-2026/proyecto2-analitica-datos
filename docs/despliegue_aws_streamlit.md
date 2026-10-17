@@ -55,6 +55,21 @@ Se habilitaron en la configuración de la organización y el despliegue pasó.
 `deploy/build_streamlit_cloud.py` sigue sirviendo para publicar el dashboard desde un repositorio
 aparte, solo con la app y los casos, si algún día el repo principal no puede conectarse.
 
+### Casos PENGWIN desde S3
+
+El origen «Casos PENGWIN (100)» lee el bucket privado `pengwin-ct-050752608083` (ver
+`docs/semana11_dashboard.md`). **No hace falta agregar credenciales de AWS a Streamlit Cloud**: con los
+mismos Secrets de siempre (`INFERENCE_URL` e `INFERENCE_KEY`), el dashboard le pide a la API la lista
+de casos (`GET /s3/listar`) y un enlace firmado de 15 minutos para cada archivo (`GET /s3/url`). La
+Lambda lee el bucket con su propio rol, que tiene solo lectura de `crudos/` y `exportados/`
+(`deploy/aws/lambda-lectura-s3-policy.json`). Los dos endpoints exigen la `X-API-Key` y rechazan
+cualquier clave fuera de esos prefijos.
+
+`src/almacen_s3.py` decide solo: si boto3 encuentra credenciales (en el Mac, `AWS_PROFILE=almia`) va
+directo al bucket; si no, pasa por la API. Opcionalmente, el usuario IAM `pengwin-streamlit-lectura`
+(solo lectura, `deploy/aws/streamlit-lectura-policy.json`) permite el acceso directo si se crea su clave
+y se pone en los Secrets como `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`; no es necesario.
+
 ## 2. API de inferencia en AWS Lambda
 
 | Recurso | Valor |
@@ -63,7 +78,23 @@ aparte, solo con la app y los casos, si algún día el repo principal no puede c
 | Repositorio ECR | `pelvis-api` (escaneo de vulnerabilidades al subir) |
 | Función Lambda | `pelvis-api`: imagen de contenedor, 3008 MB, tiempo máximo 120 s |
 | Rol de ejecución | `pelvis-api-lambda-exec` (solo `AWSLambdaBasicExecutionRole`, para los logs) |
-| URL | Function URL pública con autenticación `NONE`; `/predict_slice` exige la cabecera `X-API-Key` |
+| URL | Function URL pública con autenticación `NONE`; `/predict_slice` y `/predict_batch` exigen la cabecera `X-API-Key` |
+
+**Precisión.** La variable `PRECISION` (por defecto `auto`) elige cómo corre H8: en la Lambda (CPU)
+**int8 híbrido**, generado al construir la imagen (`python src/precision.py exportar`, con la
+calibración `outputs/s10/calibracion_int8_h8.npz`); en un servidor con GPU sería fp16; `fp32` fuerza el
+modelo original. Mismo Dice en los tres (`docs/cuantizacion.md`). `/health?deep=1` informa `precision`
+y `precision_origen`, y `/predict_slice` y `/predict_batch` devuelven `precision`.
+
+**GPU (opcional).** El dashboard ofrece «AWS · GPU» en «Procesamiento» si en los Secrets está
+`INFERENCE_URL_GPU` (y opcionalmente `INFERENCE_KEY_GPU`): la misma API en un servidor con GPU. No hay
+uno permanente por costo (un `ml.g4dn.xlarge` de SageMaker cuesta ~0.74 USD/hora); se levanta solo para
+pruebas o la presentación.
+
+Endpoints: `GET /health` (al instante), `GET /health?deep=1` (carga el modelo), `POST /predict_slice`
+(un corte, para la inferencia en vivo del visualizador 2) y `POST /predict_batch` (hasta 16 cortes
+uint8 de 384×384 en un `.npy`; lo usa el dashboard para inferir un CT subido completo, ver
+`docs/semana11_dashboard.md`). Lambda acepta hasta 6 MB por pedido; 16 cortes son ~2.4 MB.
 
 La función se creó una vez a mano (imagen `bootstrap`); desde entonces la actualiza
 `deploy-api.yml` en cada push a `main` (ver `docs/cicd_github_actions.md`).
@@ -111,5 +142,5 @@ Sin verificar todavía:
 
 ## Al terminar el curso
 
-Borrar la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
+Borrar el bucket `pengwin-ct-050752608083` y el usuario `pengwin-streamlit-lectura`, la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
 `github-actions-pelvis-api` y `pelvis-api-lambda-exec`, y la app de Streamlit Cloud.

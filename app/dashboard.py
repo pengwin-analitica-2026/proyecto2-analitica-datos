@@ -9,6 +9,13 @@ desde la raíz del repo:
 
 Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferencia en vivo del
 visualizador 2 necesita ``torch`` y el checkpoint; el resto solo lee archivos.
+
+SUBIR UN CT. En la barra lateral, «Subir un CT» deja cargar un volumen propio (``.mha``, ``.nii``,
+``.nii.gz``, ``.nrrd``) o una carpeta de cortes DICOM. El dashboard lo lee y lo orienta con los
+metadatos (``volumen_entrada.py``), corre el mismo pipeline de ``demo_export`` (enderezado, modelo,
+post-proceso 3D, distancias y mallas) y lo muestra en los tres visualizadores, sin ground truth. El
+modelo corre en local si hay ``torch`` y el checkpoint; si no (Streamlit Cloud), en la API de AWS
+(``INFERENCE_URL``). Los casos procesados quedan en ``UPLOAD_ROOT`` (por defecto, una carpeta temporal).
 """
 
 from __future__ import annotations
@@ -16,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -30,8 +38,21 @@ from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, RE
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
 CHECKPOINT_DIR = ROOT / "outputs" / "s10"
 RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en test
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
+MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
+MAX_UPLOAD_MB = 1024
+S3_CACHE = Path(os.environ.get("S3_CACHE", Path(tempfile.gettempdir()) / "pengwin_s3"))
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
+
+# Credenciales de S3 opcionales: si están en los Secrets (usuario de solo lectura), boto3 las lee del
+# entorno. Sin ellas, «Casos PENGWIN» lee el bucket a través de la API (INFERENCE_URL e INFERENCE_KEY).
+for _name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION", "PENGWIN_BUCKET"):
+    try:
+        if _name not in os.environ and _name in st.secrets:
+            os.environ[_name] = str(st.secrets[_name])
+    except Exception:                       # no hay archivo de secretos
+        break
 
 
 def discover_cases() -> dict[str, Path]:
@@ -53,6 +74,10 @@ def load_case(path: str) -> dict:
     if raw.exists():
         with np.load(raw) as view:
             data["raw"] = {key: view[key] for key in view.files}
+    steps = folder / "pasos.npz"
+    if steps.exists():
+        with np.load(steps) as arrays:
+            data["pasos"] = {key: arrays[key] for key in arrays.files}
     return data
 
 
@@ -88,13 +113,14 @@ def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeou
         semantic = packed["semantic"]
     return {"semantic": semantic[None], "boxes_refined": [payload["boxes_refined"]],
             "boxes_raw": [payload["boxes_raw"]], "latency_ms": payload["latency_ms"],
-            "device": payload["device"], "round_trip_ms": round_trip, "model": payload.get("model")}
+            "device": payload["device"], "round_trip_ms": round_trip, "model": payload.get("model"),
+            "precision": payload.get("precision", "fp32")}
 
 
 @st.cache_resource(show_spinner="Cargando el modelo…")
-def load_live_model(checkpoint: str, tta: bool):
+def load_live_model(checkpoint: str, tta: bool, precision: str = "fp32"):
     from predict_volume import load_pipeline
-    return load_pipeline(checkpoint, tta=tta)
+    return load_pipeline(checkpoint, tta=tta, precision=precision)
 
 
 def legend_html(fragments: list[dict]) -> str:
@@ -216,28 +242,281 @@ def latency_section() -> None:
                "corte suelto en el servicio de AWS Lambda.")
 
 
+@st.cache_resource(show_spinner="Cargando el modelo…")
+def local_predictor(checkpoint: str, tta: bool, precision: str = "fp32"):
+    from demo_export import predictor_local
+    return predictor_local(checkpoint, tta=tta, precision=precision)
+
+
+def torch_available() -> bool:
+    try:
+        import torch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+PRECISION_LABELS = {"auto": "Automática: int8 en CPU, fp16 en GPU", "fp32": "H8 normal (fp32)",
+                    "int8": "H8 cuantizado (int8, para CPU)", "fp16": "H8 fp16 (para GPU)"}
+
+
+def processing_targets() -> dict[str, dict]:
+    """Dónde puede correr el modelo: este equipo (torch + checkpoint), la API en CPU y, si está, en GPU."""
+    targets = {}
+    if torch_available() and MODEL_CHECKPOINT.exists():
+        targets["Este equipo"] = {"kind": "local", "slug": "local"}
+    if setting("INFERENCE_URL"):
+        targets["AWS · CPU (Lambda)"] = {"kind": "remote", "slug": "aws-cpu", "url": setting("INFERENCE_URL"),
+                                         "key": setting("INFERENCE_KEY")}
+    if setting("INFERENCE_URL_GPU"):
+        targets["AWS · GPU"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL_GPU"),
+                                "key": setting("INFERENCE_KEY_GPU") or setting("INFERENCE_KEY")}
+    return targets
+
+
+def processing_settings() -> dict | None:
+    """Bloque «Procesamiento» de la barra lateral: dónde corre el modelo y con qué precisión."""
+    targets = processing_targets()
+    if not targets:
+        return None
+    with st.sidebar:
+        st.subheader("Procesamiento")
+        name = st.selectbox("Dónde corre el modelo", list(targets), key="target",
+                            help="Para la inferencia en vivo, «Procesar ahora» y los CT subidos. Los casos ya "
+                                 "precalculados no se vuelven a procesar.")
+        target = dict(targets[name], name=name)
+        if target["kind"] == "local":
+            import torch
+            gpu = torch.cuda.is_available()
+            target["precision"] = st.selectbox(
+                "Precisión", list(PRECISION_LABELS), format_func=PRECISION_LABELS.get, key="precision",
+                help="El mismo H8 con el mismo Dice (docs/cuantizacion.md); cambia la velocidad. int8 solo corre "
+                     "en CPU y fp16 rinde en GPU." + ("" if gpu else " Este equipo no tiene GPU: fp16 será lento."))
+            if target["precision"] == "fp16" and not gpu:
+                st.caption("Sin GPU, fp16 es más lento que fp32: sirve solo para comparar.")
+        else:
+            target["precision"] = "servicio"
+            st.caption("La precisión la fija el servicio (`PRECISION`; con `auto`, int8 en CPU y fp16 en GPU) y "
+                       "se informa al procesar.")
+    return target
+
+
+def choose_predictor(tta: bool, target: dict | None):
+    """Devuelve (info, predecir, dónde) según el destino elegido en «Procesamiento»."""
+    if target is None:
+        raise RuntimeError("No hay dónde correr el modelo: falta torch con el checkpoint en "
+                           f"`{MODEL_CHECKPOINT.relative_to(ROOT)}` o el servicio de inferencia (`INFERENCE_URL`).")
+    if target["kind"] == "local":
+        info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta, target["precision"])
+        return info, predecir, f"este equipo ({info['device']}, {info['precision']})"
+    from inferencia_remota import predictor_remoto
+    info, predecir = predictor_remoto(target["url"], target["key"])
+    return info, predecir, f"{target['name']} ({info['precision']})"
+
+
+def upload_page() -> Path | None:
+    """Carga de un CT propio. Devuelve la carpeta del caso procesado, o None si todavía no hay uno."""
+    st.subheader("Subir un CT propio")
+    st.caption("Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o la carpeta "
+               "con los cortes DICOM de una serie. Se orienta con los metadatos, se endereza el giro del "
+               "paciente si es claro, y pasa por el mismo pipeline que los casos de ejemplo. No hay ground "
+               "truth, así que no se calculan métricas. Una carpeta de PNG o JPG no sirve: no guarda las "
+               "unidades Hounsfield ni el tamaño del vóxel.")
+    modo = st.radio("Qué vas a subir", ["Archivo de volumen", "Carpeta DICOM"], horizontal=True)
+    if modo == "Archivo de volumen":
+        files = st.file_uploader("Volumen", type=["mha", "mhd", "raw", "zraw", "nii", "gz", "nrrd", "nhdr"],
+                                 accept_multiple_files=True, max_upload_size=MAX_UPLOAD_MB,
+                                 help="Un .mhd o .nhdr se sube junto con su archivo de datos.")
+    else:
+        files = st.file_uploader("Carpeta con los cortes DICOM", accept_multiple_files="directory",
+                                 max_upload_size=MAX_UPLOAD_MB)
+    c1, c2 = st.columns(2)
+    tta = c1.checkbox("TTA de espejo", False, help="Predice también la imagen en espejo y promedia: un poco "
+                      "más preciso y el doble de tiempo. Solo aplica con el modelo local.")
+    enderezar = c2.checkbox("Enderezar el giro axial del paciente", True,
+                            help="Estima el giro con la simetría de la pelvis y lo corrige si es de 10° o más.")
+    if not st.button("Procesar", type="primary", disabled=not files):
+        return None
+    from demo_export import exportar_volumen
+    from volumen_entrada import huella, leer_subida
+    archivos = [(f.name, f.getvalue()) for f in files]
+    with st.status("Procesando el CT…", expanded=True) as status:
+        try:
+            info, predecir, where = choose_predictor(tta, PROCESSING)
+            out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
+                f"{huella(archivos)}-{PROCESSING['slug']}-{info.get('precision', 'fp32')}"
+                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
+            if (out_dir / "meta.json").exists():
+                status.update(label="Este CT ya se había procesado", state="complete")
+                return out_dir
+            status.write(f"Modelo: {info['checkpoint']} · {where}")
+            volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
+            del archivos
+            status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "
+                         f"{volume.image.shape[1]}×{volume.image.shape[2]} · vóxel "
+                         f"{'×'.join(f'{v:.2f}' for v in volume.spacing_xyz)} mm · orientación: "
+                         f"{volume.orientacion['accion']}")
+            started = time.perf_counter()
+            exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
+                             enderezar=enderezar, log=status.write, pasos=volume.pasos,
+                             extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
+                                                    "donde": where}})
+            status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
+        except Exception as error:
+            status.update(label="No se pudo procesar", state="error")
+            st.error(str(error))
+            return None
+    return out_dir
+
+
+@st.cache_data(ttl=300, show_spinner="Consultando los casos en S3…")
+def s3_cases(model: str) -> list[dict]:
+    import almacen_s3
+    return almacen_s3.listar_casos(model)
+
+
+def pengwin_page() -> Path | None:
+    """Los 100 casos de PENGWIN desde S3: el precalculado o procesarlo en este momento."""
+    import almacen_s3
+    almacen_s3.configurar_api(setting("INFERENCE_URL"), setting("INFERENCE_KEY"))
+    model = MODEL_CHECKPOINT.stem
+    try:
+        cases = s3_cases(model)
+    except Exception as error:
+        st.error(f"No pude leer el bucket `{almacen_s3.BUCKET}`: {error}. Hace falta un perfil de AWS con acceso "
+                 "(por ejemplo `AWS_PROFILE=almia` en local) o la API de inferencia (`INFERENCE_URL` e "
+                 "`INFERENCE_KEY`), que lee el bucket por su cuenta.")
+        return None
+    if not cases:
+        st.info(f"El bucket `{almacen_s3.BUCKET}` todavía no tiene casos.")
+        return None
+    ready = sum(c["precalculado"] for c in cases)
+    with st.sidebar:
+        case = st.selectbox(f"Caso ({len(cases)} de PENGWIN · {ready} precalculados)", cases, key="pengwin_case",
+                            format_func=lambda c: f"{c['caso']} · {c['split']}"
+                            + (" · girado 180°" if c["girado"] else "")
+                            + (" · precalculado" if c["precalculado"] else ""))
+        options = (["Precalculado", "Procesar ahora"] if case["precalculado"] and case["crudo"]
+                   else ["Precalculado"] if case["precalculado"] else ["Procesar ahora"])
+        mode = st.radio("Resultado", options, horizontal=True, key="pengwin_mode",
+                        help="Precalculado: se descarga de S3 en segundos. Procesar ahora: descarga el .mha "
+                             "original y corre el pipeline completo en vivo (unos minutos).")
+    case_id = case["caso"]
+    if mode == "Precalculado":
+        folder = S3_CACHE / "precalculados" / model / case_id
+        if not (folder / "meta.json").exists():
+            with st.spinner(f"Descargando el caso {case_id} de S3…"):
+                almacen_s3.descargar_exportado(model, case_id, folder)
+        return folder
+
+    st.subheader(f"Caso {case_id} de PENGWIN · procesar ahora")
+    st.caption(f"Split {case['split']}" + (" · la cabecera dice que está guardado girado 180°" if case["girado"]
+                                            else "") + ". Se descarga el .mha original de S3 (con su ground "
+               "truth) y pasa por todo el pipeline: orientación con los metadatos, giro axial, modelo, "
+               "post-proceso 3D, distancias y mallas.")
+    tta = st.checkbox("TTA de espejo", False, key="pengwin_tta",
+                      help="Más preciso y el doble de tiempo. Solo aplica con el modelo local.")
+    target = PROCESSING or {"slug": "ninguno", "precision": "fp32"}
+    folder = S3_CACHE / "en_vivo" / model / f"{case_id}-{target['slug']}-{target['precision']}{'-tta' if tta else ''}"
+    if (folder / "meta.json").exists():
+        return folder
+    if not st.button(f"Procesar el caso {case_id}", type="primary"):
+        return None
+    from demo_export import exportar_volumen, preparar_caso
+    with st.status(f"Procesando el caso {case_id}…", expanded=True) as status:
+        try:
+            info, predecir, where = choose_predictor(tta, PROCESSING)
+            status.write(f"Modelo: {info['checkpoint']} · {where}")
+            started = time.perf_counter()
+            with tempfile.TemporaryDirectory() as tmp:
+                status.write("Descargando el .mha original de S3…")
+                image_path, label_path = almacen_s3.descargar_crudo(case_id, Path(tmp))
+                image, label, spacing_xyz, flipped, steps = preparar_caso(
+                    image_path, label_path, case_id, bool(info.get("canonical")), log=status.write)
+            exportar_volumen(image, spacing_xyz, folder, info, predecir, label=label, nombre=case_id,
+                             flipped=flipped, pasos=steps, log=status.write,
+                             extra_meta={"en_vivo": {"donde": where}})
+            status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
+        except Exception as error:
+            status.update(label="No se pudo procesar", state="error")
+            st.error(str(error))
+            return None
+    st.rerun()
+
+
+def steps_tab(meta: dict, arrays: dict | None) -> None:
+    st.subheader("Preprocesamiento paso a paso")
+    if not meta.get("pasos") or not arrays:
+        st.info("Este caso se exportó antes de que existiera esta vista. Vuelve a exportarlo (o elige un caso "
+                "de PENGWIN o sube un CT) para verla.")
+        return
+    st.caption("Qué le pasa al volumen antes de entrar a la red. A la izquierda, el corte axial con más hueso "
+               "(el mismo en todas las etapas); a la derecha, la proyección de máxima intensidad (MIP) axial. "
+               "Las etapas 1 a 3 se ven con la ventana ósea y la proporción real del vóxel; la 4, tal cual entra "
+               "al modelo.")
+    for number, step in enumerate(meta["pasos"], 1):
+        st.markdown(f"**{number}. {step['titulo']}**")
+        text, cut, mip = st.columns([2, 2, 2])
+        text.write(step["texto"])
+        if step.get("forma"):
+            text.caption(f"{step['forma'][0]} cortes de {step['forma'][1]}×{step['forma'][2]} · corte mostrado: "
+                         f"{(step.get('z') or 0) + 1}")
+        cut.image(arrays[f"{step['clave']}_corte"], caption="Corte axial", use_container_width=True)
+        mip.image(arrays[f"{step['clave']}_mip"], caption="MIP axial", use_container_width=True)
+        st.divider()
+
+
 # ----------------------------------------------------------------------------- encabezado
 st.title("Fracturas pélvicas en CT")
 st.caption("Detección, segmentación por fragmentos y distancia de separación en milímetros · dataset PENGWIN")
 st.error(NON_CLINICAL, icon="⚠️")
 
-cases = discover_cases()
-if not cases:
-    st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
-            "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
-    st.stop()
-
 with st.sidebar:
     st.header("Caso")
-    choice = st.selectbox("Modelo y caso exportado", list(cases))
-    data = load_case(str(cases[choice]))
+    source = st.radio("Origen", ["Casos de ejemplo", "Casos PENGWIN (100)", "Subir un CT"], key="source")
+PROCESSING = processing_settings()
+
+if source == "Casos PENGWIN (100)":
+    case_path = pengwin_page()
+    if case_path is None:
+        st.stop()
+elif source == "Subir un CT":
+    uploaded = st.session_state.get("uploaded_case")
+    if uploaded and Path(uploaded, "meta.json").exists():
+        with st.sidebar:
+            if st.button("Subir otro CT"):
+                st.session_state.pop("uploaded_case")
+                st.rerun()
+        case_path = Path(uploaded)
+    else:
+        case_path = upload_page()
+        if case_path is None:
+            st.stop()
+        st.session_state["uploaded_case"] = str(case_path)
+        st.rerun()
+else:
+    cases = discover_cases()
+    if not cases:
+        st.info(f"No hay casos exportados en `{DEMO_ROOT}`. Genera uno con:\n\n"
+                "`python src/demo_export.py --case 024 --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth --tta`")
+        st.stop()
+    with st.sidebar:
+        choice = st.selectbox("Modelo y caso exportado", list(cases))
+    case_path = cases[choice]
+
+with st.sidebar:
+    data = load_case(str(case_path))
     meta = data["meta"]
+    subido = meta.get("subido")
+    if subido:
+        st.caption(f"CT subido: {subido['fuente']} · orientación con los metadatos: "
+                   f"{subido['orientacion']['accion']} · inferencia: {subido['donde']}")
     st.caption(f"{meta['n_slices']} cortes · {meta['size']}×{meta['size']} px · spacing del header "
                f"{meta['spacing_native_xyz'][0]:.2f}×{meta['spacing_native_xyz'][1]:.2f}×"
                f"{meta['spacing_native_xyz'][2]:.2f} mm")
     st.caption(f"Modelo {meta['model']['checkpoint']} · {meta['model']['parameters'] / 1e6:.2f} M parámetros "
-               f"· TTA {'sí' if meta['tta'] else 'no'}")
-    if meta.get("canonical"):
+               f"· precisión {meta['model'].get('precision', 'fp32')} · TTA {'sí' if meta['tta'] else 'no'}")
+    if meta.get("canonical") and not subido:
         st.caption("Orientación canónica (sacro abajo): " + (
             "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
             "las tres vistas y el ground truth están enderezados." if meta.get("flipped")
@@ -267,8 +546,11 @@ with st.sidebar:
         real = meta["fragments_gt"]
         st.caption(f"Ground truth: {len(real)} fragmentos ({sum(1 for r in real if not r['is_main'])} secundarios)")
 
-tab1, tab2, tab3, tab4 = st.tabs(["1 · Volumen crudo", "2 · Corte por corte", "3 · Reconstrucción 3D",
-                                  "Métricas y latencia"])
+tab0, tab1, tab2, tab3, tab4 = st.tabs(["Preprocesamiento", "1 · Volumen crudo", "2 · Corte por corte",
+                                        "3 · Reconstrucción 3D", "Métricas y latencia"])
+
+with tab0:
+    steps_tab(meta, data.get("pasos"))
 
 # ----------------------------------------------------------------------------- visualizador 1
 with tab1:
@@ -326,25 +608,25 @@ with tab2:
     st.dataframe(fragments_dataframe(fragments), use_container_width=True, hide_index=True)
 
     with st.expander("Inferir este corte en vivo (modelo real, con latencia)"):
-        remote_url = setting("INFERENCE_URL")
         checkpoint = CHECKPOINT_DIR / meta["model"]["checkpoint"]
-        if not remote_url and not checkpoint.exists():
+        if PROCESSING is None or (PROCESSING["kind"] == "local" and not checkpoint.exists()):
             st.info("La inferencia en vivo no está configurada en esta instalación: falta el servicio de "
                     "inferencia (`INFERENCE_URL`) o el checkpoint en `outputs/s10/`.")
-        elif st.button("Inferir el corte seleccionado"):
+        elif st.button(f"Inferir el corte seleccionado · {PROCESSING['name']}"):
             try:
-                if remote_url:
-                    live = remote_predict_slice(remote_url, setting("INFERENCE_KEY"), data["images"][z])
-                    where = f"{live['device']} del servicio remoto · ida y vuelta {live['round_trip_ms']:.0f} ms"
+                if PROCESSING["kind"] == "remote":
+                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z])
+                    where = (f"{live['device']} en {PROCESSING['name']} · precisión {live.get('precision', 'fp32')} · "
+                             f"ida y vuelta {live['round_trip_ms']:.0f} ms")
                     if live.get("model") and live["model"] != meta["model"]["checkpoint"]:
                         st.warning(f"El servicio usa {live['model']} y este caso se exportó con "
                                    f"{meta['model']['checkpoint']}.")
                 else:
                     from predict_volume import predict_slice
-                    model, device, info = load_live_model(str(checkpoint), False)
+                    model, device, info = load_live_model(str(checkpoint), False, PROCESSING["precision"])
                     predict_slice(model, device, data["images"][z])     # pasada de calentamiento
                     live = predict_slice(model, device, data["images"][z])
-                    where = f"{device} local"
+                    where = f"{device} de este equipo · precisión {info['precision']}"
                 semantic = live["semantic"][0]
                 starts = np.array([0] + [REGION_STARTS[r] for r in REGION_ORDER], dtype=np.uint8)
                 live_ids = starts[semantic]

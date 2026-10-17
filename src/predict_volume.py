@@ -25,31 +25,13 @@ import numpy as np
 import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_case_cache import from_uint8, to_uint8
-from pengwin_io import GAMMA, resize_slice, window_hu
+from build_case_cache import from_uint8
+# Sin torch, para que también corran en Streamlit Cloud; se reexportan aquí por compatibilidad.
+from volumen_entrada import cache_spacing_xyz, preprocess_volume  # noqa: F401
 from pengwin_metrics import refine_boxes_with_semantic
 from week9_detection import decode_predictions
 
 REGION_NAMES = ("sacro", "coxal_izquierdo", "coxal_derecho")
-
-
-def preprocess_volume(image_hu: np.ndarray, size: int = 384, gamma: float = GAMMA) -> np.ndarray:
-    """Volumen HU crudo [z,y,x] → uint8 [z,size,size], igual que ``build_case_cache`` (modo stretch)."""
-    out = np.empty((len(image_hu), size, size), dtype=np.uint8)
-    for z in range(len(image_hu)):
-        out[z] = to_uint8(resize_slice(window_hu(image_hu[z], gamma=gamma), size))
-    return out
-
-
-def cache_spacing_xyz(spacing_xyz: tuple[float, float, float], shape_zyx: tuple[int, int, int],
-                      size: int) -> tuple[float, float, float]:
-    """Spacing (x,y,z) en mm del volumen estirado a size×size por corte.
-
-    Cada píxel del caché cubre más o menos milímetros que el original según la forma del corte.
-    Misma fórmula que ``volume_postprocess.cache_spacing_xyz``, pero desde el header.
-    """
-    sx, sy, sz = (float(v) for v in spacing_xyz)
-    return (sx * shape_zyx[2] / size, sy * shape_zyx[1] / size, sz)
 
 
 def _box_list(rows: list[dict]) -> list[dict]:
@@ -116,18 +98,33 @@ def predict_volume(model: torch.nn.Module, images_u8: np.ndarray, device: torch.
             "boxes_refined": boxes_refined, "seconds": time.perf_counter() - started}
 
 
-def load_pipeline(checkpoint: str | Path, device: torch.device | None = None, tta: bool = False):
-    """Carga el checkpoint con el mismo código que la evaluación. Devuelve (modelo, device, info)."""
+def load_pipeline(checkpoint: str | Path, device: torch.device | None = None, tta: bool = False,
+                  precision: str = "fp32"):
+    """Carga el checkpoint con el mismo código que la evaluación. Devuelve (modelo, device, info).
+
+    ``precision``: ``fp32`` (como se entrenó), ``int8`` (CPU), ``fp16`` (GPU) o ``auto`` (fp16 en GPU,
+    int8 en CPU). Ver ``precision.py`` y ``docs/cuantizacion.md``; las tres dan el mismo Dice.
+    """
     from evaluate_volumes import load_model
+    from evaluate_week10 import EnsembleTTA
+    import precision as prec
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, _ = load_model([str(checkpoint)], device, tta)
+    elegida = prec.elegir(precision, device)
+    base, _ = load_model([str(checkpoint)], torch.device("cpu") if elegida == "int8" else device, False)
+    parameters = int(sum(p.numel() for p in base.parameters()))
+    canonical = bool(getattr(base, "canonical", False))
+    model, origen = prec.aplicar(base, elegida, device, checkpoint)
+    if tta:
+        model = EnsembleTTA([model], True).to(device)
+    model.canonical = canonical
     raw = torch.load(checkpoint, map_location="cpu")
     info = {"checkpoint": Path(checkpoint).name, "base_channels": int(raw["base_channels"]),
             "input_size": int(raw.get("input_size", 384)), "ema": raw.get("ema"),
-            "parameters": int(sum(p.numel() for p in model.parameters())), "tta": bool(tta),
+            "parameters": parameters, "tta": bool(tta),
+            "precision": elegida, "precision_origen": origen,
             # True: el modelo espera cortes en orientación canónica (orientacion.py); quien lo llama
             # endereza el volumen antes. predict_volume no gira nada.
-            "canonical": bool(getattr(model, "canonical", False))}
+            "canonical": canonical}
     return model, device, info
 
 

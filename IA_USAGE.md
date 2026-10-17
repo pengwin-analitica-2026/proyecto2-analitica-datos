@@ -690,6 +690,97 @@ pedido de Gustavo con los prompts copiados tal cual.
   - Apagar CBAM al predecir (F1 de 0.992 a 0.444) mide dependencia, no aporte; la IA lo aclaró antes
     de reportarlo para no confundirlo con la ablación entrenada.
 
+
+### 35. Subir un CT propio al dashboard (.mha, NIfTI o carpeta DICOM)
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  15 de octubre de 2026, rama `feat/subir-ct` sobre `modelo_h8`.
+- **Prompt exacto:**
+  > Listo. Algo importante es que queremos también poder nosotros subir un punto de MHA o subir una carpeta con todos los cortes. Eso fue lo que el profe nos dijo que quería: él quiere poder subir un punto de MHA y, pum, que se vean las cosas, se genere la predicción, todo eso, y se puede empezar a trabajar con eso. Sí, y también una  carpeta con los cortes
+- **Qué produjo la IA:** `src/volumen_entrada.py` (lectura de `.mha`/NIfTI/NRRD y de series DICOM,
+  orientación con `normalizacion.a_orientacion_estandar`, sin torch); la separación de
+  `demo_export.export_case` en `exportar_volumen` (volumen ya cargado + función que predice);
+  `src/inferencia_remota.py` y el endpoint `POST /predict_batch` de la API para inferir el volumen
+  en AWS cuando el dashboard corre en Streamlit Cloud; la página «Subir un CT» del dashboard; y las
+  pruebas `tests/test_volumen_entrada.py` y las nuevas de `tests/test_api_server.py`.
+- **Qué se hizo a mano:** la decisión de soportar `.mha` y carpeta de cortes, pedida por el profesor.
+- **Análisis crítico:** se interpretó «carpeta con los cortes» como una serie DICOM; una carpeta de
+  PNG/JPG se rechaza con explicación porque pierde las HU y el spacing. Para comprobar que el refactor
+  no cambió nada se reexportó el caso 024 con H8 y salió idéntico al versionado (meta y arreglos).
+  En Streamlit Cloud un volumen muy grande puede no caber en memoria; no se probó ahí todavía porque
+  el endpoint nuevo llega a la Lambda solo al integrar a `main`.
+
+### 36. Los 100 casos desde S3 y el preprocesamiento paso a paso
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  15 de octubre de 2026, rama `feat/subir-ct`.
+- **Prompts exactos (fragmentos):**
+  > algo que el profe pues, dijo que sería chévere es como poner todos los puntos de MHA, que creo que serían 100 […] que haya una sección o haya una parte donde yo pueda escoger cuál de los 100 […] primero nosotros queremos mostrar la imagen como viene, raw, como viene, ¿sí? Luego, pues la imagen de cómo se le, se le agrega pues el giro de 180 grados […] Me imagino que será mejor poner todo esto en un S3 para que los pueda leer de ahí Streamlit, ¿no?
+
+  > me gustan los dos, la verdad. Sería bueno, pues, lo, tener los dos, tanto los precalculados como el procesar al elegir. […] crear el bucket en la cuenta de Almia, sí, créalo.
+- **Qué produjo la IA:** el bucket privado en la cuenta de Almia, `deploy/aws/subir_crudos_s3.py`
+  (los 100 casos comprimidos sin pérdida), `src/almacen_s3.py`, `deploy/precalcular_casos.py` (4
+  procesos en paralelo, reanudable), `src/pasos_preproceso.py` y la pestaña «Preprocesamiento», el
+  origen «Casos PENGWIN (100)» con los modos precalculado y procesar ahora, el usuario IAM de solo
+  lectura para Streamlit Cloud, y las pruebas `tests/test_almacen_s3.py`.
+- **Qué se hizo a mano:** Gustavo eligió tener los dos modos y autorizó el bucket. La clave del
+  usuario de solo lectura la crea él y la pone en los Secrets de Streamlit Cloud.
+- **Análisis crítico:** Gustavo prefería precalcular en Colab por la GPU; la IA midió que casi la
+  mitad del tiempo por caso es CPU (distancias, mallas, vista cruda) y propuso el Mac con 4 procesos,
+  con los datos ya en disco. La IA también creyó caídos los procesos de subida por una consulta mal
+  hecha y lanzó duplicados; los detectó enseguida y los detuvo sin pérdida.
+
+### 37. Cuantización de H8 en Kaggle
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  16 y 17 de octubre de 2026, rama `feat/cuantizacion-h8`.
+- **Prompts exactos (fragmentos):**
+  > También me gustaría cuantizar el modelo final que tenemos, Alcir, si se puede hacer. Quisiera primero entender todos los tipos de cuantizaciones que hay, qué es recomendable en ese tipo de casos y cuál sería la mejor a escoger y demás.
+
+  > No, pero si vamos a cuantizar, quisiera que lo hagamos en Kaggle , no en local, por favor.
+
+  > pero usemos la GPU de Kaggle no ? pa eso la tenemos ,    y si lanza con GPU los test que consideres
+
+  > dale mandemos a test o kaggle todas las que sean necesarios
+- **Qué produjo la IA:** la explicación de los tipos de cuantización (fp16, bf16, int8 dinámico y
+  estático, QAT, int4); la recuperación de `src/cuantizar.py` de la rama `experimentos/pedidos-profesor`
+  (hecho para H6) con soporte de GPU; los datasets privados de Kaggle (validación y test) y los kernels
+  (`kaggle/h8/armar_cuantizacion.py`): fp32, int8, int8_todo, bf16 y fp16 en validación, en CPU y GPU, y
+  en test solo las variantes elegidas (int8 para CPU, fp16 para GPU) más fp32 de referencia. Resultado:
+  ninguna pierde Dice; int8 es 2.3 veces más rápido en CPU y fp16 1.8 veces en GPU.
+- **Qué se hizo a mano:** Gustavo pidió correrlo en Kaggle y con GPU, generó el token de Kaggle y
+  decidió mandar fp16 a test además de int8.
+- **Análisis crítico:** la IA empezó a correrlo en el Mac antes de preguntar dónde; se detuvo al pedir
+  Gustavo Kaggle. También afirmó que cuantizar las convoluciones transpuestas «rompía la segmentación»,
+  que era cierto con H6 pero no con H8: al medirlo con H8 (Kaggle y Mac) el Dice no cambia, y la razón
+  para dejarlas en fp32 es solo la velocidad. Se corrigió en `docs/cuantizacion.md`. Se mantuvo el
+  protocolo: test una vez y solo con las variantes elegidas en validación (int8_todo y bf16 no fueron).
+
+### 38. H8 en dos precisiones: int8 en CPU (Lambda) y fp16 en GPU
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  17 de octubre de 2026, rama `feat/precision-h8`.
+- **Prompts exactos (fragmentos):**
+  > tambien me gustaria  tener el H8 normal como lo tenemos normal y otro con el H8 cuantizado ... el modelo cuantizado no se puede tener listo de cuantizado?
+
+  > ¿Qué nos recomiendas: dejar int8 híbrido para cuando escogamos CPU y FP16 cuando escogamos GPU, o qué hacemos?
+
+  > Listo, sí, empecemos entonces con el PR1. Algo muy importante es seguir actualizando con las diferentes documentaciones que hay, sobre todo el IA usage y las demás. Sí, la Lambda quería en 8
+- **Qué produjo la IA:** `src/precision.py` (fp32, int8 híbrido exportable ya cuantizado en TorchScript
+  de 4.9 MB, fp16, y `auto` según el hardware), la calibración versionada
+  (`outputs/s10/calibracion_int8_h8.npz`, 128 cortes de entrenamiento), `load_pipeline(precision=...)`,
+  `PRECISION` en la API (la imagen genera el int8 al construirse), el bloque «Procesamiento» del dashboard
+  (dónde corre el modelo y con qué precisión, con opción de GPU por `INFERENCE_URL_GPU`) y
+  `tests/test_precision.py`.
+- **Qué se hizo a mano:** Gustavo decidió que la Lambda use int8 y que la GPU quede como opción.
+- **Análisis crítico:** el int8 exportado depende de la versión de torch con que se hizo; por eso no se
+  versiona: la imagen de la API lo genera con su propio torch y, si no coincide, se vuelve a cuantizar
+  al cargar. La GPU en SageMaker no quedó encendida por costo (~0.74 USD/hora). A pedido de Gustavo («arreglemos los
+  tests, por favor, para que pasen todos») se corrigieron las dos pruebas que fallaban en el Mac: no
+  eran código viejo sino una incompatibilidad de `train_s10.py` con torch 2.2 (`torch.amp.GradScaler`
+  existe desde 2.3; se usa `torch.cuda.amp.GradScaler` si no está) y un caché de prueba en
+  `tests/test_cuantizar.py` sin los campos (`spacing_xyz`, `orig_shape`) que el aumento en milímetros
+  necesita. Con eso pasa toda la suite también en el Mac.
 ---
 
 # Parte 2. Análisis crítico

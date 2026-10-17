@@ -39,6 +39,110 @@ Casos versionados en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`, todos co
 | 099 | validación | sí | Comprobar el enderezado |
 | 039 | test | no | Uno de los dos casos que hundían test con D5; se exporta porque el modelo ya está congelado |
 
+## Los 100 casos de PENGWIN (desde S3)
+
+En la barra lateral, **Origen → Casos PENGWIN (100)**: un selector con los 100 casos, su split
+(train/val/test) y si la cabecera dice que vienen girados 180°. Cada caso tiene dos modos:
+
+- **Precalculado**: el resultado completo (con ground truth y métricas) ya está en S3; se descarga en
+  segundos y queda en caché local (`S3_CACHE`).
+- **Procesar ahora**: descarga el `.mha` original de S3 (con su etiqueta) y corre el pipeline en vivo
+  (`demo_export.preparar_caso` + `exportar_volumen`), con el modelo local o la API de AWS. Tarda unos
+  minutos.
+
+Los archivos están en el bucket privado `pengwin-ct-050752608083` (cuenta de Almia, us-east-2):
+
+| Prefijo | Qué hay | Cómo se llena |
+|---|---|---|
+| `crudos/imagenes/<caso>.mha`, `crudos/etiquetas/<caso>.mha` | Los 100 casos originales, comprimidos sin pérdida (18.5 GB → ~12 GB; etiquetas 13 GB → unos MB). Vóxeles, dirección, spacing y `TransformMatrix` idénticos | `deploy/aws/subir_crudos_s3.py` |
+| `exportados/<modelo>/<caso>/` | `meta.json`, `volume.npz`, `meshes.npz`, `raw_view.npz` y `pasos.npz` de cada caso | `deploy/precalcular_casos.py` |
+
+El precálculo corre en el Mac con 4 procesos en paralelo (2 hilos de torch cada uno), con H8 y TTA,
+unos 6 minutos de CPU por caso. Se hizo en el Mac y no en Colab porque casi la mitad del tiempo de
+cada caso es CPU (distancias, mallas, vista cruda), que una GPU no acelera, y los datos ya estaban en
+disco. Los dos scripts saltan lo que ya está en S3, así que se pueden cortar y volver a correr.
+
+Comprobado: el caso 044 precalculado da exactamente lo mismo que el versionado en `outputs/demo/`
+(solo se agregan los pasos), y el caso 014 bajado de S3 (comprimido) se prepara idéntico al `.mha`
+original de `data/raw`.
+
+## Preprocesamiento paso a paso
+
+Pestaña **Preprocesamiento** (la primera). Muestra, para el corte axial con más hueso y para la MIP
+axial, qué le pasa al volumen antes de la red (`src/pasos_preproceso.py`, guardado en `pasos.npz`):
+
+1. **Crudo, como viene en el archivo**, con la matriz de dirección de la cabecera y lo que significa
+   (identidad = orientación estándar; `-1 0 0 0 -1 0 0 0 1` = guardado girado 180°, el sacro arriba).
+2. **Orientado con los metadatos**: «El metadato dice que viene girado 180°: se giró» o «El metadato no
+   indica ningún giro: no se cambió nada».
+3. **Giro axial del paciente**: el ángulo estimado con la simetría de la pelvis y si se corrigió
+   (solo giros claros de 10° o más).
+4. **Entrada al modelo**: ventana ósea, gamma 1.5 y 384×384, tal cual la recibe la red.
+
+Las etapas 1 a 3 se muestran con la ventana ósea sin gamma y con la proporción real del vóxel, para que
+solo cambie lo que hace cada etapa. Está en los casos de PENGWIN y en los CT subidos; los casos de
+ejemplo versionados se exportaron antes y no la tienen.
+
+## Subir un CT propio
+
+Pedido del profesor: cargar un CT que no es de los casos de ejemplo y ver al instante la predicción
+en los tres visualizadores. En la barra lateral, **Origen → Subir un CT**:
+
+| Qué se sube | Cómo se lee |
+|---|---|
+| Un archivo `.mha`, `.nii`, `.nii.gz` o `.nrrd` (o un `.mhd`/`.nhdr` junto con su archivo de datos) | SimpleITK, con su cabecera |
+| Una carpeta con los cortes DICOM de una serie (botón «Upload directories») | GDCM arma la serie: ordena los cortes por posición y aplica `RescaleSlope`/`RescaleIntercept`, así queda en HU. Si hay varias series, usa la de más cortes |
+
+Una carpeta de PNG o JPG se rechaza con un mensaje: esas imágenes no guardan las unidades Hounsfield
+ni el tamaño del vóxel, y el modelo (ventana ósea en HU) y la distancia en mm los necesitan.
+
+Qué pasa al pulsar **Procesar** (el mismo pipeline de los casos de ejemplo, `demo_export.exportar_volumen`):
+
+1. `volumen_entrada.leer_subida` lee el volumen y lo lleva a la orientación estándar con la matriz de
+   dirección de la cabecera (`normalizacion.a_orientacion_estandar`, productos punto y cruz). Es la
+   orientación canónica de H8; en los 100 casos de PENGWIN da lo mismo que `orientacion.to_canonical`.
+2. Enderezado del giro axial del paciente si es claro (opcional, activado por defecto).
+3. Modelo sobre todos los cortes: **local** si hay torch y el checkpoint (en el Mac); si no
+   (Streamlit Cloud), la **API de AWS** con `POST /predict_batch`, en lotes de 8 cortes y 4 pedidos en
+   paralelo (`src/inferencia_remota.py`). TTA opcional, solo con el modelo local.
+4. Post-proceso 3D, distancias en mm, mallas por fragmento y vista cruda. Sin ground truth: no hay
+   métricas ni contorno del GT.
+
+El caso queda en `UPLOAD_ROOT` (por defecto una carpeta temporal), identificado por un hash del
+contenido: si se vuelve a subir el mismo CT con las mismas opciones, se abre sin recalcular. Límite de
+1 GB por archivo.
+
+Comprobado:
+
+- `044.mha` subido por el navegador (55 MB, guardado girado 180°): se orientó con la cabecera y la
+  entrada al modelo quedó idéntica, byte a byte, a la del caso 044 de la demo. Tardó unos 6 minutos en
+  la CPU del Mac sin TTA (349 ms por corte). Dice por hueso contra el ground truth: 0.955 / 0.969 /
+  0.966 (la demo con TTA: 0.955 / 0.970 / 0.966).
+- El caso 024 convertido a 350 archivos DICOM se reconstruye idéntico al `.mha` original, con el mismo
+  spacing.
+- En un contenedor con Python 3.14 y sin torch (como Streamlit Cloud) el dashboard abre la página de
+  subida y el pipeline corre sin importar torch.
+- `tests/test_volumen_entrada.py` (lectura de `.mha`, NIfTI y DICOM desordenado, errores) y
+  `tests/test_api_server.py` (el cliente remoto contra la API da lo mismo que el modelo local).
+
+Límites: en Streamlit Cloud la memoria es limitada (del orden de 2-3 GB), así que un volumen muy
+grande (por ejemplo 512×512×800) puede no caber. La primera llamada a la API después de un rato sin
+uso tarda hasta ~90 s por el arranque en frío de Lambda.
+
+## Procesamiento: dónde corre el modelo y con qué precisión
+
+Bloque **Procesamiento** de la barra lateral. Aplica a la inferencia en vivo del visualizador 2, a
+«Procesar ahora» (casos de PENGWIN) y a los CT subidos; los casos precalculados no se vuelven a procesar.
+
+- **Dónde corre el modelo**: «Este equipo» (si hay torch y el checkpoint), «AWS · CPU (Lambda)» (si
+  está `INFERENCE_URL`) y «AWS · GPU» (si está `INFERENCE_URL_GPU`). Solo aparecen los disponibles.
+- **Precisión** (en este equipo): H8 normal (fp32), H8 cuantizado int8 (CPU), fp16 (GPU) o automática
+  (int8 en CPU, fp16 en GPU). En AWS la fija el servicio (`PRECISION`) y se informa al procesar.
+
+Es el mismo H8 con el mismo Dice; cambia la velocidad (`docs/cuantizacion.md`). Cada combinación de
+destino y precisión se guarda aparte, para comparar las dos versiones del mismo caso; la barra lateral
+dice con qué precisión se predijo el caso abierto.
+
 ## Orientación
 
 H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están
@@ -75,7 +179,8 @@ No se devuelve el resultado a la orientación original: en la canónica todos lo
 | `src/raw_view.py` | Visualizador 1: MIP en tres ejes e isosuperficie del hueso, sobre el volumen sin procesar |
 | `src/measure_latency.py` | Latencia por imagen en CPU y GPU (mediana y p90); escribe `outputs/demo/latency.json` |
 | `app/dashboard.py` | Dashboard Streamlit con tres pestañas, métricas y latencia, y la advertencia de uso no clínico siempre visible |
-| `api/server.py` | API de inferencia por corte (AWS Lambda) |
+| `api/server.py` | API de inferencia por corte (AWS Lambda); precisión con `PRECISION` |
+| `src/precision.py` | Precisión de H8: fp32, int8 híbrido (CPU, exportable ya cuantizado) o fp16 (GPU); `auto` según el hardware |
 
 ## Lo que se ve en cada visualizador
 

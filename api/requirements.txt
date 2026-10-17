@@ -5,3 +5,4 @@ scipy
 scikit-image
 SimpleITK
 pillow
+boto3

@@ -1,0 +1,48 @@
+{
+  "checkpoint": "/kaggle/input/datasets/gustaveloper/pengwin-cuantizacion-h8/h8_aumm_noise01_noema_w32_e60_s42.pth",
+  "split": "val",
+  "casos": [
+    "014",
+    "019",
+    "024",
+    "027",
+    "033",
+    "044",
+    "050",
+    "057",
+    "060",
+    "067",
+    "077",
+    "078",
+    "087",
+    "095",
+    "099"
+  ],
+  "tta": true,
+  "hilos_cpu": 4,
+  "cpu": "x86_64",
+  "torch": "2.11.0+cpu",
+  "calibracion": {
+    "casos_train": 8,
+    "cortes_por_caso": 16
+  },
+  "variantes": {
+    "int8": {
+      "tamano_mb": 4.958791,
+      "mediana_ms": 80.80427549998603,
+      "p90_ms": 84.2674120000197,
+      "instance_dice_matched": 0.8653472824082705,
+      "instance_dice_primary": 0.8975911079094995,
+      "instance_dice_secondary": 0.7691170052647063,
+      "segmentation_dice_macro": 0.9697731568044873,
+      "classification_f1_macro": 0.9896411943903907,
+      "detection_map50": 0.9688985674153248,
+      "dice_todos": 0.8237259478581734,
+      "dice_principal": 0.9173830591283828,
+      "dice_secundario": 0.7235883206456427,
+      "error_distancia_mm_media": 0.3122595567188053,
+      "correlacion_distancia": 0.9563913432106717,
+      "segundos": 2528.7
+    }
+  }
+}
