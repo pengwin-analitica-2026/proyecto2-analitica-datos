@@ -376,6 +376,40 @@ corrige giros claros de 10° o más. En los cuatro casos exportados el giro esti
 a propósito, estimó 28.5° para 30° y 58.8° para 60° y los corrigió. La evaluación oficial no aplica
 este paso.
 
+### 5.10 Variación entre semillas
+
+H8 se volvió a entrenar con las semillas 43 y 44, con la receta exacta de la 42, y cada semilla se
+evaluó igual. La regla se escribió antes de mirar (`outputs/h8/semillas/REGLA_SEMILLAS_H8.md`): las
+semillas nuevas miden la variación y no sirven para elegir modelo; el entregado sigue siendo la 42.
+Dice por fragmento:
+
+| Prueba | s42 (entregada) | s43 | s44 | Media ± desviación |
+|---|---|---|---|---|
+| Validación sin daño | 0.865 | 0.870 | 0.869 | 0.868 ± 0.003 |
+| Ruido σ = 10 | 0.860 | 0.864 | 0.861 | 0.862 ± 0.002 |
+| Ruido σ = 25 | 0.835 | 0.836 | 0.834 | 0.835 ± 0.001 |
+| Giro de 60° sin enderezar | 0.612 | 0.621 | 0.658 | 0.631 ± 0.024 |
+| Giro de 60° enderezado | 0.849 | 0.850 | 0.851 | 0.850 ± 0.001 |
+| **Test sin daño** | **0.874** | **0.875** | **0.877** | **0.875 ± 0.001** |
+
+- **El resultado no depende de la semilla.** En test las tres dan 0.874 a 0.877, y las tres cumplen
+  los nueve objetivos en validación y en test. Las demás métricas varían todavía menos (F1 0.987 a
+  0.989, Dice semántico 0.968 a 0.970 en test).
+- **La semilla entregada es la más baja en validación** (0.865 contra 0.870 y 0.869). Las cifras que
+  se reportan de H8 no son las de una semilla afortunada.
+- **La robustez al ruido es propia de la receta, no de la semilla.** Con σ = 10 y 25 las tres quedan
+  dentro de ±0.002. Lo que sí varía es la detección con ruido fuerte (mAP50 de 0.927 a 0.957).
+- **El giro grande sin enderezar es lo más inestable** (0.612 a 0.658, ±0.024): el modelo no aprendió
+  de forma fiable a tolerar 60°. Con el enderezado previo las tres quedan en 0.849 a 0.851.
+- **Frente a H7**, de una sola semilla (0.873), la media de H8 en validación es 0.868: el costo del
+  aumento de ruido en imágenes limpias es de unos 0.005, menor que el 0.008 que se veía con una sola
+  semilla. En test la media de H8 (0.875) es igual a la de H6 (0.875).
+- **Peores casos de test:** 039 es el peor en las tres semillas (0.787 a 0.797); 054, 061 y 007 se
+  repiten entre los cinco peores. Son dificultades de los casos, no de una semilla.
+
+Los resultados por semilla están en `outputs/h8/semillas/` (tabla en `tabla_semillas_h8.csv`) y los
+pesos en `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth`.
+
 ## 6. Protocolo de evaluación
 
 - H8 se eligió **solo con validación**, comparándolo con H6, H6 sin EMA, H7 y H7 con EMA.
@@ -389,9 +423,11 @@ este paso.
 
 ## 7. Limitaciones
 
-1. **Una sola semilla.** H8 se entrenó solo con la semilla 42. El ruido entre semillas medido en el
-   proyecto es de ±0.004 en Dice por fragmento; no se conoce la variación propia de H8.
-2. **Costo en imágenes limpias.** 0.008 menos que H7 en validación y 0.005 menos en test.
+1. **Variación entre semillas.** Medida con tres semillas: ±0.003 en validación y ±0.001 en test en
+   Dice por fragmento (sección 5.10). El giro de 60° sin enderezar varía más (±0.024).
+2. **Costo en imágenes limpias.** Frente a H7 (una sola semilla), la semilla entregada pierde 0.008 en
+   validación y 0.005 en test; con la media de las tres semillas de H8 el costo es de 0.005 en
+   validación y 0.004 en test.
 3. **El ruido probado es sintético.** Gaussiano, el mismo tipo con que se entrenó, y solo en
    validación. No se midió con artefactos reales de CT (metal, movimiento, dosis baja).
 4. **Pacientes girados.** Un giro grande necesita el enderezado previo, que la demo ya aplica
@@ -434,6 +470,7 @@ este paso.
 | Distancia de separación | `outputs/h8/{validacion,test}/distancias_*_h8.json` |
 | Prueba de grosor de corte | `outputs/h8/validacion/grosor_corte/` (`tabla_grosor_corte.csv`) |
 | Comparación con SAM | `outputs/h8/{validacion,test}/sam_baseline_*_h8.json` |
+| Semillas 43 y 44 | `outputs/h8/semillas/` y `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth` |
 | Modelo sin CBAM y CBAM apagado | `outputs/h8/cbam/` |
 | Comparación con los otros cuatro modelos | `outputs/h8/comparacion/` y `docs/experimentos_ema_rotacion_ruido.md` |
 | Figuras | `outputs/h8/figuras/` (las genera el notebook 11) |
