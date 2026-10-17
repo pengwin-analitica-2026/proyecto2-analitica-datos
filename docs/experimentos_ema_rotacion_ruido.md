@@ -199,8 +199,11 @@ porque 0.008 en limpio vale menos que no colapsar cuando la imagen llega con rui
 
 ### Limitaciones
 
-- **Una sola semilla por modelo.** Las diferencias pequeñas en imágenes limpias (±0.004) no son
-  concluyentes. Las de ruido y giro son mucho mayores que ese margen.
+- **Una sola semilla por modelo en la comparación.** Las diferencias pequeñas en imágenes limpias
+  (±0.004) no son concluyentes. Las de ruido y giro son mucho mayores que ese margen. Después se
+  entrenó H8 con dos semillas más: en validación da 0.865, 0.870 y 0.869, así que su costo frente a H7
+  en imágenes limpias es de unos 0.005 y no 0.008, y su robustez al ruido se repite en las tres
+  semillas (detalle en `docs/modelo_h8.md`, sección 5.10).
 - **Ruido y giro se midieron solo en validación.** En test se evaluó H8 una vez, sin pruebas de
   estrés (sección 5). Fue la sexta consulta a test del proyecto.
 - **El ruido es sintético.** Se probó ruido gaussiano, el mismo tipo con que se entrenó. No se midió
@@ -398,7 +401,8 @@ de las dos particiones se detectan.
 
 ## 8. Siguientes pasos
 
-1. Entrenar H8 con las semillas 43 y 44 para medir su variación (unas 2.3 horas de GPU cada una).
+1. ~~Entrenar H8 con las semillas 43 y 44 para medir su variación.~~ Hecho: `docs/modelo_h8.md`,
+   sección 5.10.
 2. Probar H8 con desenfoque y baja resolución, las otras dos pruebas de robustez de la rama.
 3. Conectar la normalización de orientación y el enderezado a la demo y a la API, que hoy siguen con
    la regla anterior.
