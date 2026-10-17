@@ -86,10 +86,33 @@ calibración `outputs/s10/calibracion_int8_h8.npz`); en un servidor con GPU ser�
 modelo original. Mismo Dice en los tres (`docs/cuantizacion.md`). `/health?deep=1` informa `precision`
 y `precision_origen`, y `/predict_slice` y `/predict_batch` devuelven `precision`.
 
-**GPU (opcional).** El dashboard ofrece «AWS · GPU» en «Procesamiento» si en los Secrets está
-`INFERENCE_URL_GPU` (y opcionalmente `INFERENCE_KEY_GPU`): la misma API en un servidor con GPU. No hay
-uno permanente por costo (un `ml.g4dn.xlarge` de SageMaker cuesta ~0.74 USD/hora); se levanta solo para
-pruebas o la presentación.
+### GPU bajo demanda (SageMaker)
+
+La misma API en una imagen con CUDA (`api/Dockerfile.gpu`, torch 2.5.1 + CUDA 12.1), servida por un
+endpoint de SageMaker en **`ml.g4dn.xlarge`** (NVIDIA T4, 16 GB, ~0.74 USD/hora en us-east-2). Con
+`PRECISION=auto` usa fp16, 5-6 ms por corte en una T4 (medido en Kaggle). Se eligió la T4 porque H8 pesa
+11 MB y con un modelo tan pequeño una L4 (`ml.g6.xlarge`, 1.13 USD/h) o una A10G (`ml.g5.xlarge`,
+1.41 USD/h) casi no ganan: el tiempo lo pone la sobrecarga, no el cálculo.
+
+**Sin credenciales nuevas en Streamlit.** Un endpoint de SageMaker no tiene URL pública. El dashboard le
+pide a la Lambda con la cabecera `X-Destino: gpu`, y la Lambda (con su rol: `sagemaker:InvokeEndpoint` y
+`DescribeEndpoint` sobre ese endpoint) se lo reenvía y devuelve la respuesta. `/health` informa el estado
+del endpoint (`gpu`); el dashboard muestra «AWS · GPU (SageMaker)» en «Procesamiento» solo cuando está
+`InService`. El contenedor atiende las rutas que exige SageMaker: `/ping` y `/invocations` (la ruta
+interna va en `CustomAttributes`).
+
+**Cobra por hora mientras el endpoint exista**, así que se enciende para probar o presentar y se borra:
+
+```bash
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh imagen   # GitHub Actions construye y sube la imagen (~15 min)
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh crear    # endpoint + puente en la Lambda (~8 min)
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh borrar   # apaga lo que cobra (imagen y roles se quedan)
+```
+
+La imagen (~3 GB) la construye el workflow `build-gpu.yml`, a mano: desde una conexión de casa la capa
+de PyTorch con CUDA (3.1 GB) se cortaba a mitad de la subida y Docker la reintentaba desde cero. Construir
+no cuesta en SageMaker. El repositorio ECR `pelvis-api-gpu` conserva las 3 imágenes más recientes.
+`INFERENCE_URL_GPU` sigue disponible para apuntar a otro servidor con GPU sin pasar por la Lambda.
 
 Endpoints: `GET /health` (al instante), `GET /health?deep=1` (carga el modelo), `POST /predict_slice`
 (un corte, para la inferencia en vivo del visualizador 2) y `POST /predict_batch` (hasta 16 cortes

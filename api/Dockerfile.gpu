@@ -1,13 +1,15 @@
 # Imagen de la API con GPU (CUDA) para un endpoint de SageMaker (ml.g4dn.xlarge, NVIDIA T4).
 # Misma API que la Lambda (api/server.py), con PRECISION=auto → fp16 en GPU.
-# Se construye desde la RAÍZ del repo:
+# La construye GitHub Actions (.github/workflows/build-gpu.yml, a mano); también en local:
 #   docker build --platform linux/amd64 -f api/Dockerfile.gpu -t pelvis-api-gpu .
 # SageMaker la llama en /ping (salud) y /invocations (la ruta va en CustomAttributes, ver server.py).
-FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 WORKDIR /app
 COPY api/requirements.txt api/requirements.txt
-RUN pip install --no-cache-dir -r api/requirements.txt
+# torch con CUDA 12.1 trae sus propias bibliotecas de CUDA; el driver de NVIDIA lo pone la instancia.
+RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install --no-cache-dir -r api/requirements.txt
 
 COPY src/ src/
 COPY api/server.py api/server.py

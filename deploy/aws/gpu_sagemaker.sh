@@ -3,10 +3,13 @@
 # NVIDIA T4 (ml.g4dn.xlarge, ~0.74 USD/hora en us-east-2). Cobra por hora MIENTRAS EXISTA: se crea para
 # probar o presentar y se borra después.
 #
-#   AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh imagen    # construye y sube api/Dockerfile.gpu a ECR
+#   AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh imagen    # GitHub Actions construye y sube la imagen (~15 min)
 #   AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh crear     # modelo + configuración + endpoint (~8 min)
 #   AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh estado
 #   AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh borrar    # borra el endpoint, su configuración y el modelo
+#
+# La imagen (~3 GB) la construye GitHub Actions (.github/workflows/build-gpu.yml): desde una conexión de casa
+# la subida a ECR se corta. «imagen-local» la construye y sube desde este computador.
 #
 # La Lambda de la API hace de puente (cabecera X-Destino: gpu): «crear» le pone SAGEMAKER_ENDPOINT y el
 # permiso de invocar el endpoint. Con el endpoint borrado, el dashboard deja de ofrecer la GPU solo.
@@ -18,7 +21,7 @@ cd "$(dirname "$0")/../.."
 REGION="${AWS_REGION:-us-east-2}"
 CUENTA="$(aws sts get-caller-identity --query Account --output text)"
 REPO=pelvis-api-gpu
-ETIQUETA="${ETIQUETA:-v1}"
+ETIQUETA="${ETIQUETA:-latest}"
 IMAGEN="$CUENTA.dkr.ecr.$REGION.amazonaws.com/$REPO:$ETIQUETA"
 NOMBRE=pelvis-h8-gpu
 INSTANCIA="${INSTANCIA:-ml.g4dn.xlarge}"
@@ -28,6 +31,18 @@ ROL_LAMBDA=pelvis-api-lambda-exec
 export AWS_DEFAULT_REGION="$REGION"
 
 imagen() {
+  # Lanza el workflow de GitHub Actions y espera a que termine (requiere gh con sesión iniciada).
+  local repo="${REPO_GITHUB:-pengwin-analitica-2026/proyecto2-analitica-datos}"
+  gh workflow run build-gpu.yml --repo "$repo" --ref "${RAMA:-main}"
+  sleep 15
+  local id
+  id="$(gh run list --repo "$repo" --workflow build-gpu.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+  echo "Construyendo en GitHub Actions (run $id)…"
+  gh run watch "$id" --repo "$repo" --exit-status --interval 30 > /dev/null
+  echo "Imagen: $IMAGEN"
+}
+
+imagen_local() {
   aws ecr describe-repositories --repository-names "$REPO" >/dev/null 2>&1 \
     || aws ecr create-repository --repository-name "$REPO" --image-scanning-configuration scanOnPush=true >/dev/null
   aws ecr get-login-password | docker login --username AWS --password-stdin "$CUENTA.dkr.ecr.$REGION.amazonaws.com" >/dev/null
@@ -107,8 +122,9 @@ borrar() {
 
 case "${1:-}" in
   imagen) imagen ;;
+  imagen-local) imagen_local ;;
   crear) crear ;;
   estado) estado ;;
   borrar) borrar "${2:-}" ;;
-  *) echo "Uso: $0 imagen|crear|estado|borrar [--todo]"; exit 1 ;;
+  *) echo "Uso: $0 imagen|imagen-local|crear|estado|borrar [--todo]"; exit 1 ;;
 esac

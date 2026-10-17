@@ -781,6 +781,25 @@ pedido de Gustavo con los prompts copiados tal cual.
   existe desde 2.3; se usa `torch.cuda.amp.GradScaler` si no está) y un caché de prueba en
   `tests/test_cuantizar.py` sin los campos (`spacing_xyz`, `orig_shape`) que el aumento en milímetros
   necesita. Con eso pasa toda la suite también en el Mac.
+
+### 40. GPU bajo demanda en SageMaker
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  17 de octubre de 2026, rama `feat/gpu-sagemaker`.
+- **Prompts exactos (fragmentos):**
+  > en lo de poder procesar en GPU, creo que con SageMaker, aparte del endpoint. Mira si ese es el mejor, si el XLarge G4 DN es el mejor, o si hay uno mejor para esos momentos.
+
+  > Pues no entiendo por qué no se puede subir desde acá el de locales. ¿Cuál sería el problema? Bueno, sí, hagamos lo necesario para que todo funcione. Porfa, hagamos un PR.
+- **Qué produjo la IA:** la comparación de instancias con el cupo y el precio reales de la cuenta
+  (T4 elegida); `api/Dockerfile.gpu`, `/ping` e `/invocations` en la API, el puente desde la Lambda
+  (`X-Destino: gpu`) para no poner credenciales en Streamlit, la opción GPU del dashboard,
+  `deploy/aws/gpu_sagemaker.sh` (imagen, crear, estado, borrar) y el workflow `build-gpu.yml`; pruebas
+  del puente con SageMaker simulado.
+- **Qué se hizo a mano:** Gustavo eligió SageMaker y autorizó crear los recursos; decidió PR separados.
+- **Análisis crítico:** la IA intentó subir la imagen de ~3 GB desde la conexión de la casa y falló en
+  cinco intentos (la capa de 3.1 GB se reiniciaba con cada corte); se pasó la construcción a GitHub
+  Actions. Como un workflow manual solo corre desde `main`, la imagen y la medición en la T4 real quedan
+  para después de integrar el PR. El endpoint no se dejó encendido por su costo por hora.
 ---
 
 # Parte 2. Análisis crítico
