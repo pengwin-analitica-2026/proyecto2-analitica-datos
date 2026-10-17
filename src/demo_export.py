@@ -165,6 +165,29 @@ def fragment_meshes(volume: np.ndarray, spacing_xyz: tuple[float, float, float],
     return meshes
 
 
+def _caja_hueso(*volumenes, margen: int = 2) -> tuple[slice, slice, slice]:
+    """Caja (z, y, x) que contiene todo lo distinto de cero de los volúmenes dados, con un margen."""
+    lo, hi = None, None
+    for volumen in volumenes:
+        if volumen is None or not volumen.any():
+            continue
+        ejes = [np.flatnonzero(volumen.any(axis=tuple(j for j in range(3) if j != i))) for i in range(3)]
+        a = np.array([e[0] for e in ejes]); b = np.array([e[-1] + 1 for e in ejes])
+        lo, hi = (a, b) if lo is None else (np.minimum(lo, a), np.maximum(hi, b))
+    forma = next(v.shape for v in volumenes if v is not None)
+    if lo is None:
+        return tuple(slice(0, n) for n in forma)
+    return tuple(slice(max(int(a) - margen, 0), min(int(b) + margen, n)) for a, b, n in zip(lo, hi, forma))
+
+
+def _desplazar(rows: list[dict], origen: np.ndarray) -> list[dict]:
+    """Lleva centroides y rangos de cortes de la caja a coordenadas del volumen completo."""
+    for row in rows:
+        row["centroid_zyx_vox"] = [float(c + o) for c, o in zip(row["centroid_zyx_vox"], origen)]
+        row["z_range"] = [int(z + origen[0]) for z in row["z_range"]]
+    return rows
+
+
 def checkpoint_is_canonical(checkpoint: str | Path) -> bool:
     """Lo mismo que deja ``evaluate_volumes.load_model`` en ``model.canonical``, sin cargar el modelo."""
     import torch
@@ -186,12 +209,29 @@ def predictor_local(checkpoint: str | Path, tta: bool = True, batch_size: int = 
     return info, predecir
 
 
-def _vista_cruda(image: np.ndarray, spacing_xyz, out_dir: Path, log, tag: str) -> None:
-    """Visualizador 1: MIP en tres ejes e isosuperficies del hueso, sin modelo."""
+def _vista_cruda(image: np.ndarray, spacing_xyz, out_dir: Path, log, tag: str,
+                 max_voxeles: int | None = None) -> None:
+    """Visualizador 1: MIP en tres ejes e isosuperficies del hueso, sin modelo.
+
+    Con ``max_voxeles`` (el dashboard publicado, con poca memoria) un volumen más grande se reduce en el
+    plano (cada 2 o más píxeles) solo para esta vista: la limpieza de la máscara ósea trabaja sobre el
+    volumen completo y con 58 millones de vóxeles pasaba de 1.6 GB. Es solo visual: las MIP ya se
+    llevan a 1 mm y la malla ya se reduce; el modelo, las distancias y las métricas no usan esta vista.
+    """
+    import gc
     from raw_view import bone_mask_for, bone_mesh, compute_mips
+    factor = 1
+    while max_voxeles and image[:, ::factor, ::factor].size > max_voxeles and factor < 8:
+        factor += 1
+    if factor > 1:
+        image = image[:, ::factor, ::factor]
+        spacing_xyz = (float(spacing_xyz[0]) * factor, float(spacing_xyz[1]) * factor, float(spacing_xyz[2]))
+        log(f"{tag} vista cruda reducida ×{factor} en el plano (volumen grande, solo visual)")
     mask = bone_mask_for(image, spacing_xyz)
     mips = compute_mips(image, mask, spacing_xyz)          # las MIP usan la máscara cruda
     mesh = bone_mesh(mask, spacing_xyz)
+    del mask
+    gc.collect()
     # Malla pulida: misma limpieza más la recuperación de hueso tenue. Solo visual.
     mesh_p = bone_mesh(bone_mask_for(image, spacing_xyz, pulido=True), spacing_xyz)
     np.savez_compressed(out_dir / "raw_view.npz", mip_axial=mips["axial"], mip_coronal=mips["coronal"],
@@ -207,7 +247,8 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
                      label: np.ndarray | None = None, nombre: str = "caso", size: int = 384,
                      min_voxels: int = 30, raw_view: bool = True, enderezar: bool = True,
                      umbral_mm: bool = True, flipped: bool = False, extra_meta: dict | None = None,
-                     pred_guardada: dict | None = None, pasos=None, log=print) -> Path:
+                     pred_guardada: dict | None = None, pasos=None, log=print,
+                     max_voxeles_vista: int | None = None) -> Path:
     """Pipeline completo sobre un volumen ya cargado y en la orientación que espera el modelo.
 
     ``image`` (z,y,x) en HU y ``label`` opcional, ya orientados. ``info`` describe el modelo
@@ -263,21 +304,31 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
         np.savez_compressed(out_dir / "predictions.npz", semantic=pred["semantic"],
                             primary_secondary=pred["primary_secondary"])
 
-    ids, method = build_id_volume(pred["semantic"], pred["primary_secondary"], min_voxels,
-                                  spacing_xyz=spacing if umbral_mm else None)
+    gt_ids = None
+    if label is not None:
+        gt_ids = np.stack([resize_label_slice(label[z].astype(np.uint8), size)
+                           for z in range(len(images))])
+    # Memoria: el post-proceso 3D, las distancias y las mallas se calculan dentro de la caja que contiene
+    # el hueso (predicho y real), no sobre todo el volumen a 384 px. El resultado es idéntico (fuera de la
+    # caja todo es fondo) y en un CT grande la memoria baja a la mitad: el dashboard publicado tiene ~2.7 GB.
+    caja = _caja_hueso(pred["semantic"], pred["primary_secondary"], gt_ids)
+    origen = np.array([c.start for c in caja])
+    ids_caja, method = build_id_volume(pred["semantic"][caja], pred["primary_secondary"][caja], min_voxels,
+                                       spacing_xyz=spacing if umbral_mm else None)
+    ids = np.zeros(pred["semantic"].shape, dtype=np.uint8)
+    ids[caja] = ids_caja
     umbrales = {"modo": "mm3" if umbral_mm else "voxeles",
                 "min_voxels": umbrales_en_voxeles(spacing)[0] if umbral_mm else min_voxels,
                 "min_region_voxels": umbrales_en_voxeles(spacing)[1] if umbral_mm else 200}
     t = time.perf_counter()
-    rows = fragment_table(ids, spacing)
+    rows = _desplazar(fragment_table(ids_caja, spacing), origen)
     log(f"{tag} distancias predichas ({len(rows)} fragmentos) en {time.perf_counter() - t:.1f} s")
 
-    gt_ids = gt_rows = comparison = None
-    if label is not None:
-        gt_ids = np.stack([resize_label_slice(label[z].astype(np.uint8), size)
-                           for z in range(len(images))])
-        gt_rows = fragment_table(gt_ids, spacing)
-        comparison = compare_tables(rows, gt_rows, ids, gt_ids)
+    gt_rows = comparison = None
+    if gt_ids is not None:
+        gt_caja = gt_ids[caja]
+        gt_rows = _desplazar(fragment_table(gt_caja, spacing), origen)
+        comparison = compare_tables(rows, gt_rows, ids_caja, gt_caja)
         log(f"{tag} ground truth: {len(gt_rows)} fragmentos, {len(comparison)} secundarios")
 
     arrays = {"images": images, "semantic": pred["semantic"], "ids": ids}
@@ -285,19 +336,22 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
         arrays["gt_ids"] = gt_ids
     np.savez_compressed(out_dir / "volume.npz", **arrays)
 
+    desplazamiento_mm = (origen * np.array([spacing[2], spacing[1], spacing[0]])).astype(np.float32)
     mesh_arrays = {}
-    for prefix, volume in (("p", ids), ("g", gt_ids)):
+    for prefix, volume in (("p", ids_caja), ("g", gt_caja if gt_ids is not None else None)):
         if volume is None:
             continue
         for fragment_id, (verts, faces) in fragment_meshes(volume, spacing).items():
-            mesh_arrays[f"{prefix}_{fragment_id}_v"] = verts
+            mesh_arrays[f"{prefix}_{fragment_id}_v"] = verts + desplazamiento_mm
             mesh_arrays[f"{prefix}_{fragment_id}_f"] = faces
     np.savez_compressed(out_dir / "meshes.npz", **mesh_arrays)
     log(f"{tag} mallas: {sum(len(v) for k, v in mesh_arrays.items() if k.endswith('_f')):,} triángulos")
 
     if raw_view:
+        import gc
+        gc.collect()                       # suelta lo intermedio antes de la parte que más memoria pide
         try:
-            _vista_cruda(image, spacing_xyz, out_dir, log, tag)
+            _vista_cruda(image, spacing_xyz, out_dir, log, tag, max_voxeles_vista)
         except ValueError as error:          # p. ej. sin hueso por encima del umbral: solo falta el V1
             log(f"{tag} sin vista cruda (visualizador 1): {error}")
 

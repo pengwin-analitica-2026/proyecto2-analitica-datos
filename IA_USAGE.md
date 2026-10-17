@@ -781,6 +781,23 @@ pedido de Gustavo con los prompts copiados tal cual.
   existe desde 2.3; se usa `torch.cuda.amp.GradScaler` si no está) y un caché de prueba en
   `tests/test_cuantizar.py` sin los campos (`spacing_xyz`, `orig_shape`) que el aumento en milímetros
   necesita. Con eso pasa toda la suite también en el Mac.
+
+### 39. El dashboard publicado se caía al procesar un .mha: memoria
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  17 de octubre de 2026, rama `fix/memoria-subida`.
+- **Prompt exacto:**
+  > tambi';en despues de eso , mrevisa y mira que en produccion subi un .mha y procesarlo se me rompió producción  , sabes porque?
+- **Qué produjo la IA:** el diagnóstico a partir del log de Streamlit Cloud (sin error de Python: el
+  sistema mató la app por memoria) y la medición del pico de RAM paso a paso con el `.mha` que se subió
+  (050, 3.43 GB frente a ~2.7 GB disponibles). Los arreglos: post-proceso, distancias y mallas en la caja
+  del hueso, lectura directa en int16 sin copias, vista cruda con menos resolución en volúmenes grandes y
+  un tope con mensaje claro. El pico bajó a 1.73 GB (050) y 2.55 GB (001, el más grande).
+- **Qué se hizo a mano:** Gustavo encontró el fallo en producción y bajó el log.
+- **Análisis crítico:** la subida de CT se había probado en el Mac, que tiene 68 GB de RAM, y en un
+  contenedor sin límite de memoria, así que el problema no apareció; faltó medir la memoria contra el
+  límite de Streamlit Cloud antes de publicar. La regresión con el caso 024 confirmó que el recorte no
+  cambia ningún resultado.
 ---
 
 # Parte 2. Análisis crítico
