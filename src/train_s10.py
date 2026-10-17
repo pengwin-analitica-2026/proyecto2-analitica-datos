@@ -311,7 +311,10 @@ def main() -> None:
     scheduler = (torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(args.epochs, 1),
                                                             eta_min=args.lr / 50) if args.cosine else None)
     amp = device.type == "cuda"
-    scaler = torch.amp.GradScaler("cuda", enabled=amp)
+    # torch.amp.GradScaler existe desde torch 2.3; antes es torch.cuda.amp.GradScaler (mismo comportamiento).
+    # Así el entrenamiento (y sus pruebas) corre también con torch 2.2, la versión del Mac x86.
+    scaler = (torch.amp.GradScaler("cuda", enabled=amp) if hasattr(torch.amp, "GradScaler")
+              else torch.cuda.amp.GradScaler(enabled=amp))
     weights = MultiTaskLossWeights(
         detection=args.detection_weight, classification=args.classification_weight,
         semantic=args.semantic_weight, instance=args.instance_weight,
