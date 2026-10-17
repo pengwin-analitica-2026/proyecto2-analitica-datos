@@ -13,10 +13,7 @@ Equipo: Gustavo Adolfo Chipantiza (2222022), Federico Gonzales Cárdenas (222565
 Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 
 > **Pendientes del equipo antes de entregar (borrar este bloque al cerrar):**
-> - Federico: sus entradas (no hay ninguna todavía).
 > - Gustavo: revisar el análisis crítico de las entradas 21 a 24 y 31 a 33, que redactó la IA.
-> - Jacobo: el modelo de Claude que usó (entradas 1–7), los prompts exactos si los tiene, y una
->   entrada para su versión del notebook 03 (Semana 9).
 > - Gustavo: entrada de la cuantización, si se hizo con IA.
 > - Informe técnico y mini-paper: citar el overfit de la Semana 9 como 1454× (ya unificado en la
 >   entrada 9).
@@ -25,10 +22,11 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 
 | Integrante | Herramienta | Modelo | Entradas |
 |---|---|---|---|
-| Jacobo | Claude (claude.ai) | *(completar)* | 1–7 |
+| Jacobo | Claude (claude.ai) | Claude Opus 5 | 1–7, 35 |
+| Jacobo | Claude Code (extensión de VS Code) | `claude-sonnet-5-5` y, desde el 12 de octubre, `claude-opus-5-5` | 36 |
 | María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28, 34 |
 | Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–33 |
-| Federico | *(completar)* | *(completar)* | 29 |
+| Federico | GitHub Copilot (Visual Studio Code) | Claude Haiku 4.5 | 29 |
 
 Algunas entradas citan documentos que ya no están en el repositorio (`docs/plan_semana10.md`,
 `docs/plan_semana11.md`, `docs/resumen_semana10.md` y `notebooks/05_casos_dificiles_ejecutado.ipynb`).
@@ -47,9 +45,14 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 1. Verificación de reproducibilidad de los datos
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** confirmar que los datos descargados de Zenodo y colocados en
   `data/raw/` son idénticos a los que usó María, antes de empezar a modificar código.
+- **Prompts exactos:**
+  > listo ya cree la rama y esta caopaida en lcoal, que continua? lo primreo es ver si hace parte del mimso hash o que es lo primero?
+
+  > no ya no tengo los .zip, los borro solo deje lo descrimpimido
 - **Qué produjo la IA:** el procedimiento: correr `build_manifest.py` sobre los datos locales,
   comparar el CSV contra el original (ignorando las columnas de ruta absoluta, que cambian entre
   sistemas operativos) y regenerar `splits.json` para verificar que `git diff` no mostrara cambios.
@@ -58,10 +61,13 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 2. Módulo `pengwin_io.py`
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** centralizar la carga y el preprocesamiento, antes duplicados en
   `build_manifest.py`, `mip_visualizer.py` y `hu_windowing_check.py`, en un solo módulo, con las
   constantes que ya usaba el repo (clip −1024/3000, ventana C400/W1800).
+- **Prompts exactos:**
+  > empezemos con lo que veas mas conveniente, la idea es cuando se haga ya el commit de esta ram quede complegtamente hecha y repoducible lo que se pide para semana 08
 - **Qué produjo la IA:** el módulo completo, incluidas las funciones de redimensionamiento para la
   imagen (bilineal) y para la máscara (vecino más cercano), que no existían y se agregaron pensando
   en la Semana 9.
@@ -70,9 +76,16 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 3. Visualizador 1 — reconstrucción 3D (varios intentos)
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** reemplazar los PNG estáticos de `mip_visualizer.py` por una
   isosuperficie 3D interactiva que muestre solo hueso, sin camilla ni cables.
+- **Prompts exactos:**
+  > asi se mira revisa, si te refieres a eso si esta bien o no?
+
+  > asi salieron los tres casos, analizalos y revisalos vea que unos salieron muy incompletos
+
+  > listo mejoro, dime que te parece ahora si podriamos mejorarlo o con eso es suficiente, por que en el caso 025 hay ciertos huecos en la pelvis, puede que esta imagen sea ruidosa pero no se si para tratar de arreglar esto dañemos lo demas
 - **Qué produjo la IA y qué se decidió en cada intento:**
   1. *Rechazado.* Apertura morfológica más filtro de componentes por tamaño relativo. Los rieles
      de la camilla resultaron más grandes que los fragmentos fracturados, así que el filtro conservó
@@ -92,9 +105,12 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 4. EDA de fragmento principal y tamaño
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** validar si la etiqueta 1/11/21 es siempre el fragmento de mayor
   volumen de su región, y medir el tamaño de cada fragmento en mm³ y en cortes axiales.
+- **Prompts exactos:**
+  > bien sigamos, tu mira con cual empezamos, igual hay que hacerlos todos
 - **Qué produjo la IA:** el script completo, probado primero con un caso sintético que viola la
   convención a propósito (un "11" más chico que un "12") para confirmar que detecta excepciones.
 - **Qué se hizo a mano:** se corrió sobre los 100 casos. La convención se cumple en 300 de 300
@@ -102,9 +118,14 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 5. `requirements.txt`
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** el archivo original era un `pip freeze` de macOS (~200 líneas,
   versiones fijas) que no instalaba en Windows.
+- **Prompts exactos:**
+  > no mi pc no tiene GPU NVIDIA, para qur hago estos utlimos dos comandos que me hiciste hacer para requirements?
+
+  > pero porque mi requiaremnets.txt esta asi bien simple como tu me lo diste, y no esta con todas la lienas que se saben crear?
 - **Qué produjo la IA:** un archivo curado con solo las librerías que importa el código, sin
   versiones fijas.
 - **Qué se hizo a mano:** en un equipo sin GPU NVIDIA, `pip install torch` instaló la build con
@@ -113,8 +134,13 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 6. Corrección de `docs/resumen_semana8.md`
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Prompt (resumen del pedido):** revisar el documento de María en busca de imprecisiones.
+- **Prompts exactos:**
+  > lo del .mha el profe nos dijo que si que trabajemos con esos que nos quita un problema, esa era la duda?
+
+  > listo ya lo hice falta algo mas para la semana 8?
 - **Qué produjo la IA:** tres correcciones: una afirmación de que "se notificó al profesor por
   escrito" cuando no se había enviado nada; rutas de ejemplo (`~/Downloads/...`) que no coinciden
   con `data/raw/`; y la explicación del clip de HU, que no neutraliza el metal por sí solo (lo aplana
@@ -124,12 +150,19 @@ pedido de Gustavo con los prompts copiados tal cual.
 
 ### 7. Caso 025: normalización tras la asesoría con el profesor
 
-- **Integrante y herramienta:** Jacobo · Claude (claude.ai).
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). Septiembre de 2026.
+- **Fuente:** [chat "continuacion_semana08"](https://claude.ai/chat/7eb9a270-3b07-4151-9109-0b997bb9c1c3)
 - **Contexto:** en asesoría, el profesor corrigió la hipótesis del fijador externo de la entrada 3:
   si fuera metal, no se vería la parte superior de la cresta ilíaca. Según él, es mala distribución
   de HU y hay que normalizar con gamma o ecualización, evaluando cuál conviene.
 - **Prompt (resumen del pedido):** diagnosticar el caso 025 contra los 100 casos y comparar métodos
   de normalización con evidencia.
+- **Prompts exactos:**
+  > tuve una asesoria con el profesor sobre esto que hicimos, hice un breve resumen para que veas el panorama, pero antes te debo comentar que un amigo ya adelanto la semana 09 en esta rama https://github.com/mariavalencia30/proyecto2-analitica-datos/tree/continuacion_semana09. Entonces antes de que te diga el resumen de la asesoria porque no va a tocar retroceder a algunas cosas de la semana 08 quiero analices como esta la rama ahora ver como se realizaron los cambios o que se modificaria, y que tanto cambiaria
+
+  > no importa de todas manera hay que volverlo a reentrenar, asi que cambio lo que se debe, no dejes cosas que a la final no van a servir o sera codigo viejo
+
+  > listo pero entonces quiero ver como aparece este nuevo caso 025 y los otros dos casso para revisar si funciono
 - **Qué produjo la IA:** la comparación de percentiles con `data/eda_intensidades_detalle.csv`, sin
   reprocesar volúmenes. El HU máximo y el volumen de metal del 025 no son atípicos (z 1.47 y 1.13);
   lo atípico es la mediana del hueso (z ≈ −2.1), corrida ~150–250 HU hacia abajo. Además, una
@@ -196,6 +229,39 @@ pedido de Gustavo con los prompts copiados tal cual.
   la asesoría; la revisión de los resultados y su integración en `continuacion_semana09` y
   `continuacion_semana10_fixed`. El Dice por fragmento subió de 0.667 a ~0.82; el segundo pase por
   región y el 2.5D se descartaron porque no lo movieron.
+
+### 35. Semana 9 de Jacobo: revisión del detector, gamma 1.5, notebook 03 y pedidos del avance
+
+- **Integrante y herramienta:** Jacobo · Claude Opus 5 (claude.ai). 28 de septiembre a 2 de
+  octubre de 2026.
+- **Fuente:** [chat "este"](https://claude.ai/chat/a1d72462-fd7a-4181-ae09-90c1c4adb69a)
+- **Prompts exactos (los que abrieron cada parte del trabajo):**
+  > no pero solo necesito que no enfoquemos en la semana 9, la 10 no me importa, entonces volvamos a empezar, que cambios hacer para la semana 09 dejarla full lo que se pide en el proyecto
+
+  > Ya que con esto que el profe nos recimiendo todo lo demás se descarta y no habría islas flotantes ni nada de esto. Verifica si tiene razón el profe y si es correcto entocnes hagamos de una vez lo que nos dice y descartemos esos filtros demás que hicimos que lo que mas hizo fue granular y suavizar las imagen y luego el modelo no va a poder clasificar.
+
+  > si crea el script y me dices donde ponerlo y como ejcutarlo, dime si en este script ya entraria todo lo que hablas, todos esos cambios.
+
+  > si entonces utilicemos gamma = 1.5 pero no se porque no aaprece en la png o cual es la columna para ver cual es el de gamma 1.5
+
+  > No, no, no. No importa que se sobrescriban los outputs. Simplemente quiero subir este notebook con mi nombre. O sea, aparte. No cambiándole el que María ya había subido. Entonces, lo único que quiero es subir este notebook a GitHub al repositorio. Y ya.
+
+  > ya tuvimos el avance y esto fue lo que nos dijo, te paso la transcripcion, por ahora solo entra en contexto, de que fue lo que pide el profe, porque una amiga supiestamnete ya hizo esto en el notebook y me lo mando actulizado con los cambios que dijo el profe, pero hay que revisar si esta todo correcto
+
+  > no los tengo, si quieres podemos continuar con la ultima version que teniemoa del notebook 03 y aplicar esto que dijo el profe o puedes tomar de base este notebook de mi amiga pero arreglado estos puntos malos, tu mira cual es el mejor escenario
+
+  > seria buereno hacer una comparacion de las predicciones de bbox tanto para ventaneo con gamma=1.5 para asi dar mejor justificaciones de que esta dando mejores predicciones el gamma=1.5 dime si esto crees que sea necesario o con lo que tenemos es una justificacion bien basta
+
+  > pues midamos si da mejores predicciones gamma, edita el notebook y mnadamelo para ejecutarlo para ver esta comparacion
+- **Qué produjo la IA:** revisó la Semana 9 contra el enunciado; ajustó el detector, el uso de CBAM,
+  NMS y las métricas; apoyó la justificación de gamma 1.5 y organizó el notebook 03 con análisis,
+  cajas predichas y resultados.
+- **Qué se hizo a mano:** Jacobo ejecutó las pruebas, barridos, entrenamientos y notebook con datos
+  reales; revisó las salidas y decidió conservar una rama separada para su versión del notebook.
+- **Análisis crítico:** algunas primeras interpretaciones de la IA no coincidieron con las salidas
+  reales; Jacobo las corrigió comparándolas con la ejecución. También encontró que varios casos que
+  se habían tratado como validación eran de entrenamiento, por lo que esas pruebas exploratorias no
+  medían generalización.
 
 ### 10. Auditoría del repositorio frente al enunciado
 
@@ -691,7 +757,45 @@ pedido de Gustavo con los prompts copiados tal cual.
     de reportarlo para no confundirlo con la ablación entrenada.
 
 
-### 35. Subir un CT propio al dashboard (.mha, NIfTI o carpeta DICOM)
+### 36. Modelo final H8: experimentos, robustez, métricas finales y visualizadores
+
+- **Integrante y herramienta:** Jacobo · Claude Code, extensión de VS Code. `claude-sonnet-5-5`
+  para la revisión inicial del repositorio y de la rama de María (11 y 12 de octubre de 2026) y
+  `claude-opus-5-5` desde los experimentos (12 al 16 de octubre). Ramas `feat/normalizacion-orientacion`
+  y `modelo_h8`.
+- **Prompts exactos** (copiados tal cual; `[…]` marca texto omitido por largo):
+  > ahora lo que quiero es hacer unos experimentos. primero este que corrio maria en la rama tengo entendido que es sin EMA pero con el cambio de rotacion, entonces seriaa el primer experimento ya hecho […] Luego el segundo es hacer esa rotacion pero con EMA […] pero antes de ejcutar y hacerlo verifica que todo lo que te digo es cierto y si concuerda cada cosa para asi hacer una buena comparacion de las metricas de cada uno
+
+  > si realiza todo eso tu solo, que no dependas de mi, continua hasta que tengas las respuestas de todos estros experimentos […] 3, Si realiza el H6 sin EMA tambien quisiera hacer este experimento dime como lo ves: Crea y lanza en Kaggle el experimento H8 = receta de H7 + aumento de ruido gaussiano. Solo validación, no tocar test. […] Por ultimo crea una tabla compartiva con todos estos experimentos.
+
+  > quiero que despues ya se haya ejecutado todo, crees un .md donde expliques y documentes cada experimento que es y que hace, luego hagas conlusone sy analissid e la comparacfcion y una conclusion del mejor modelo elegido y su justificacion
+
+  > bien como el H8 fue el ganador ahora quiero que corras igualmente en kaggle este modelo para ver las metricas en test […] **Punto 8 – Aportación de CBAM por Cabeza** […] **Punto 9 – Métricas HD95 y ASSD** […]
+
+  > bueno ya verifique con mi grupo de equipo y damos como mejor modelo definitivo este H8, entonces quiero que añades este modelo ya en el repositorio con el notebook con las salidas, los outputs, el .pth y demas cosas relacionadas. crea una rama que se llame modelo_h8, pero solo quiero que hagas los cambios en local […] que pueda correr en el demo stremlit y dashboard
+
+  > Estamos en la rama modelo_h8. Quiero mejorar los visualizadores 3D del dashboard solo a nivel visual, sin tocar el modelo, el preprocesamiento de entrada (window_hu), las métricas ni las distancias en mm. […]
+
+  > una pregunta la comparacion de SAM zero shot vs H8 esta? — si realizalo
+
+  > si realiza de 1 a 4, que todo se ejecute bien y quede guardado estas salidas, añade estas interpretaciones nuevas que se realicen despues de los resultados en los docs correspondientes
+
+  > bien ahora quiero que ejecutes el modelo h8 con dos semillas más para probar si varía el resultado con esto […]
+- **Qué produjo la IA:** la comparación de H6, H6 sin EMA, H7, H7 con EMA y H8 en validación;
+  el aumento de ruido de H8; las evaluaciones finales, ablaciones, SAM zero-shot, HD95/ASSD,
+  distancias, notebook y documentación; la integración del modelo H8, sus salidas y los kernels de
+  Kaggle; y las pruebas de semillas 43 y 44 con una regla previa que impide usarlas para elegir el
+  modelo.
+- **Qué se hizo a mano:** Jacobo definió las pruebas, autorizó los entrenamientos de Kaggle y las
+  subidas de datos; el equipo eligió H8 con resultados de validación. Jacobo revisó los resultados,
+  resolvió conflictos al integrar y realizó los commits, push y PR.
+- **Análisis crítico:** la IA exageró inicialmente la robustez de H8; el equipo pidió precisar que
+  ante ruido σ=25 y giro de 60° sin enderezar no alcanza el objetivo. También se detectaron y
+  corrigieron problemas de ejecución de kernels, pruebas heredadas, redondeos de SAM y una prueba de
+  relleno 3D que pasaba incluso sin el relleno. Los resultados desfavorables —por ejemplo el error
+  de distancia de H8 frente a H6— se mantuvieron reportados.
+
+### 37. Subir un CT propio al dashboard (.mha, NIfTI o carpeta DICOM)
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
   15 de octubre de 2026, rama `feat/subir-ct` sobre `modelo_h8`.
@@ -710,7 +814,7 @@ pedido de Gustavo con los prompts copiados tal cual.
   En Streamlit Cloud un volumen muy grande puede no caber en memoria; no se probó ahí todavía porque
   el endpoint nuevo llega a la Lambda solo al integrar a `main`.
 
-### 36. Los 100 casos desde S3 y el preprocesamiento paso a paso
+### 38. Los 100 casos desde S3 y el preprocesamiento paso a paso
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
   15 de octubre de 2026, rama `feat/subir-ct`.
@@ -730,7 +834,7 @@ pedido de Gustavo con los prompts copiados tal cual.
   con los datos ya en disco. La IA también creyó caídos los procesos de subida por una consulta mal
   hecha y lanzó duplicados; los detectó enseguida y los detuvo sin pérdida.
 
-### 37. Cuantización de H8 en Kaggle
+### 39. Cuantización de H8 en Kaggle
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
   16 y 17 de octubre de 2026, rama `feat/cuantizacion-h8`.
@@ -756,7 +860,7 @@ pedido de Gustavo con los prompts copiados tal cual.
   para dejarlas en fp32 es solo la velocidad. Se corrigió en `docs/cuantizacion.md`. Se mantuvo el
   protocolo: test una vez y solo con las variantes elegidas en validación (int8_todo y bf16 no fueron).
 
-### 38. H8 en dos precisiones: int8 en CPU (Lambda) y fp16 en GPU
+### 40. H8 en dos precisiones: int8 en CPU (Lambda) y fp16 en GPU
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
   17 de octubre de 2026, rama `feat/precision-h8`.
@@ -782,7 +886,24 @@ pedido de Gustavo con los prompts copiados tal cual.
   `tests/test_cuantizar.py` sin los campos (`spacing_xyz`, `orig_shape`) que el aumento en milímetros
   necesita. Con eso pasa toda la suite también en el Mac.
 
-### 40. GPU bajo demanda en SageMaker
+### 41. El dashboard publicado se caía al procesar un .mha: memoria
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  17 de octubre de 2026, rama `fix/memoria-subida`.
+- **Prompt exacto:**
+  > tambi';en despues de eso , mrevisa y mira que en produccion subi un .mha y procesarlo se me rompió producción  , sabes porque?
+- **Qué produjo la IA:** el diagnóstico a partir del log de Streamlit Cloud (sin error de Python: el
+  sistema mató la app por memoria) y la medición del pico de RAM paso a paso con el `.mha` que se subió
+  (050, 3.43 GB frente a ~2.7 GB disponibles). Los arreglos: post-proceso, distancias y mallas en la caja
+  del hueso, lectura directa en int16 sin copias, vista cruda con menos resolución en volúmenes grandes y
+  un tope con mensaje claro. El pico bajó a 1.73 GB (050) y 2.55 GB (001, el más grande).
+- **Qué se hizo a mano:** Gustavo encontró el fallo en producción y bajó el log.
+- **Análisis crítico:** la subida de CT se había probado en el Mac, que tiene 68 GB de RAM, y en un
+  contenedor sin límite de memoria, así que el problema no apareció; faltó medir la memoria contra el
+  límite de Streamlit Cloud antes de publicar. La regresión con el caso 024 confirmó que el recorte no
+  cambia ningún resultado.
+
+### 42. GPU bajo demanda en SageMaker
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
   17 de octubre de 2026, rama `feat/gpu-sagemaker`.
@@ -800,6 +921,7 @@ pedido de Gustavo con los prompts copiados tal cual.
   cinco intentos (la capa de 3.1 GB se reiniciaba con cada corte); se pasó la construcción a GitHub
   Actions. Como un workflow manual solo corre desde `main`, la imagen y la medición en la T4 real quedan
   para después de integrar el PR. El endpoint no se dejó encendido por su costo por hora.
+
 ---
 
 # Parte 2. Análisis crítico
@@ -821,7 +943,8 @@ pedido de Gustavo con los prompts copiados tal cual.
   separar exportación y dashboard (25, 26) y documentar cada semana (8, 9, 24, 28).
 - **El hallazgo decisivo.** El análisis caso por caso de la entrada 23 encontró que un tercio de los
   volúmenes estaba guardado girado 180°; corregirlo con la cabecera y entrenar con aumento
-  geométrico llevó la validación de 0.851 a 0.869 (H6).
+  geométrico llevó la validación de 0.851 a 0.869. Después, H8 agregó aumento de ruido y obtuvo
+  0.835 de Dice por fragmento con ruido σ=25, frente a 0.135 de H6 y 0.228 de H7 (entrada 36).
 
 ## 2.2 Errores de la IA y cómo se detectaron
 
@@ -849,6 +972,12 @@ pedido de Gustavo con los prompts copiados tal cual.
 | Prueba de giro en píxeles que deformaba la pelvis | 34 | El enderezado estimaba +2.8° para 30° en el caso 044 |
 | Mezclar cifras de dos experimentos de CBAM en el resumen | 34 | Revisión de Jacobo contra el model card |
 | Dejar un `index.lock` en `.git` | 10 | La propia IA lo reportó |
+| Presentar la robustez de H8 como absoluta | 36 | El equipo comprobó que σ=25 y el giro de 60° sin enderezar quedan bajo el objetivo |
+| Lanzar el kernel de test antes de que existiera el dataset | 36 | Falló a los 7 s en la comprobación inicial, sin tocar test |
+| JSON de latencia con codificación de Windows | 36 | La lectura en Streamlit Cloud habría fallado en Linux |
+| Rama `modelo_h8` siguiendo otra rama | 36 | Se detectó antes del primer push y se corrigió |
+| Prueba del relleno del visualizador 3D que pasaba sin el relleno | 36 | Se corrigió y se verificó el caso negativo |
+| Redondeo distinto en cifras de SAM entre documentos y dashboard | 36 | Contraste con los JSON guardados |
 
 Patrón común: casi todos los errores eran hipótesis o heurísticas **plausibles** que fallaron al
 contrastarlas con los datos, con el código real o con el entorno. Ninguno se detectó por la
@@ -884,22 +1013,22 @@ su versión final:
 | Caso 025 | Fijador externo, limitación conocida | Histograma óseo corrido; se corrige con normalización | 3 → 7 |
 | Visualizador 1 | MIP estático → isosuperficie 3D | MIP en tres ejes + isosuperficie | 3 → 26, 28 |
 | Post-proceso | `min_size=1` y CASR mejoraban validación | `min_size=12`, sin CASR (no cumplieron la regla) | 18 → 20 |
-| Modelo principal | c2 → D5 → H6 s42 | H7 s42 (sin EMA, giro en mm), por pedido del profesor | 18, 21 → 23 → 34 |
-| Pesos | EMA 0.999 (D5, H6) | Sin EMA (H7). El EMA no era la causa de la fragilidad al ruido | 21 → 34 |
+| Modelo principal | c2 → D5 → H6 s42 → H7 s42 | H8 s42: H7 más aumento de ruido; el más robusto al ruido de cinco modelos comparados, 0.874 en test y 0.875 ± 0.001 con tres semillas | 18, 21 → 23 → 34 → 36 |
+| Pesos | EMA 0.999 (D5, H6) | Sin EMA (H7, H8). El aumento de ruido de H8 mejora la robustez; se conservan los resultados de las tres semillas | 21 → 34 → 36 |
+| Post-proceso 3D | Tamaños mínimos en vóxeles (30 y 200) | En mm³ en la demo; la evaluación oficial sigue en vóxeles | 36 |
+| Enderezado del giro axial | Solo en la evaluación, con `--normalizar` | También en la demo, para giros de 10° o más | 34 → 36 |
 | Orientación | Lista de casos LPI / `TransformMatrix` | Productos punto y cruz sobre la cabecera (`normalizacion.py`), mismo resultado en los 100 casos | 23, 31 → 34 |
 | Despliegue | Túnel de Cloudflare desde el Mac | Streamlit Community Cloud + API en AWS Lambda, publicados y probados desde computador y celular. El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado | 25, 27 → 30, 31 |
 | Detector de giro | Detectar el giro con geometría (`estimate_angle`) | Descartado en la Semana 10; retomado como enderezado por simetría en milímetros, opcional al predecir | 23 → 34 |
 
 **Consultas a test.** Por la regla de la entrada 19, test debía consultarse una sola vez. Se
-consultó cinco veces y se declara: receta c2 (0.848), EMA + CASR (0.847), D5 (0.845, la cifra
-oficial de la primera evaluación), H6 (0.875, segunda evaluación) y H7 (0.879, tercera evaluación y
-modelo entregado; en la misma consulta se corrió también la variante con enderezado, 0.874). En la evaluación de D5 también
-se pasaron por test los demás checkpoints que superaban el umbral de validación, con la regla
-escrita de antemano de que solo medían la variación y no servían para elegir modelo (entrada 22).
-No se ajustó nada mirando esos resultados. El 0.875 de H6 es una segunda evaluación, posterior al
-análisis de fallos de los casos 012 y 039 de test (entrada 23): no es una estimación limpia. Lo que
-la respalda es que H6 se eligió con validación (0.869 / 0.868 / 0.872 en las tres semillas) y con
-la configuración escrita antes de correrla.
+consultó seis veces para comparar modelos y se declara: receta c2 (0.848), EMA + CASR (0.847), D5
+(0.845, la cifra oficial de la primera evaluación), H6 (0.875), H7 (0.879) y H8 (0.874). En la
+evaluación de D5 también se pasaron por test los demás checkpoints que superaban el umbral de
+validación, con la regla previa de que solo medían la variación y no servían para elegir modelo
+(entrada 22). Después, las semillas 43 y 44 de H8 se midieron con la regla escrita antes de
+entrenarlas: estimar variación, no elegir modelo. No se ajustó nada con esos resultados. El 0.875 de
+H6 es una evaluación posterior al análisis de los casos 012 y 039, y no es una estimación limpia.
 
 ## 2.5 Lecciones del equipo
 
