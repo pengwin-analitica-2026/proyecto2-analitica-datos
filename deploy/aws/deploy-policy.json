@@ -28,6 +28,14 @@
         "lambda:GetFunctionUrlConfig"
       ],
       "Resource": "arn:aws:lambda:us-east-2:050752608083:function:pelvis-api"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr-public:GetAuthorizationToken",
+        "sts:GetServiceBearerToken"
+      ],
+      "Resource": "*"
     }
   ]
 }
