@@ -117,3 +117,38 @@ async def predict_batch_endpoint(request: Request, x_api_key: str | None = Heade
             "boxes_refined": result["boxes_refined"], "boxes_raw": result["boxes_raw"],
             "seconds": result["seconds"], "device": str(state["device"]),
             "model": state["info"]["checkpoint"], "tta": state["info"]["tta"]}
+
+
+# --------------------------------------------------------------------------- casos de PENGWIN en S3
+# El dashboard (Streamlit Cloud) no tiene credenciales de AWS: le pide a la API la lista de casos y un
+# enlace temporal para descargar cada archivo. La Lambda lee el bucket con su propio rol (solo lectura
+# de crudos/ y exportados/), y estos endpoints exigen la misma X-API-Key que la inferencia.
+PREFIJOS_S3 = ("crudos/", "exportados/")
+
+
+def _clave_valida(clave: str) -> str:
+    if not clave.startswith(PREFIJOS_S3) or ".." in clave or "//" in clave:
+        raise HTTPException(status_code=422, detail="solo se puede leer crudos/ y exportados/")
+    return clave
+
+
+@app.get("/s3/listar")
+def s3_listar(prefijo: str, x_api_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    import almacen_s3
+    return {"nombres": almacen_s3.prefijos_directo(_clave_valida(prefijo))}
+
+
+@app.get("/s3/url")
+def s3_url(clave: str, x_api_key: str | None = Header(default=None)) -> dict:
+    """Enlace firmado de 15 minutos para descargar ``clave`` del bucket (404 si no existe)."""
+    _check_key(x_api_key)
+    clave = _clave_valida(clave)
+    import almacen_s3
+    cliente = almacen_s3.cliente()
+    try:
+        cliente.head_object(Bucket=almacen_s3.BUCKET, Key=clave)
+    except Exception as error:
+        raise HTTPException(status_code=404, detail=f"no existe {clave}") from error
+    return {"url": cliente.generate_presigned_url("get_object", Params={"Bucket": almacen_s3.BUCKET, "Key": clave},
+                                                  ExpiresIn=900)}

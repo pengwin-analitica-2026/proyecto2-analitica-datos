@@ -204,15 +204,18 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
                      label: np.ndarray | None = None, nombre: str = "caso", size: int = 384,
                      min_voxels: int = 30, raw_view: bool = True, enderezar: bool = True,
                      umbral_mm: bool = True, flipped: bool = False, extra_meta: dict | None = None,
-                     pred_guardada: dict | None = None, log=print) -> Path:
+                     pred_guardada: dict | None = None, pasos=None, log=print) -> Path:
     """Pipeline completo sobre un volumen ya cargado y en la orientación que espera el modelo.
 
     ``image`` (z,y,x) en HU y ``label`` opcional, ya orientados. ``info`` describe el modelo
     (``checkpoint``, ``parameters``, ``tta``, ``device``, ``canonical``) y ``predecir(images_u8,
     progress)`` devuelve lo mismo que ``predict_volume``: así el modelo puede ser local o la API de
     AWS. Con ``pred_guardada`` (y ``info`` de la exportación anterior) no se vuelve a predecir.
+    ``pasos`` (``pasos_preproceso.Pasos``) trae las vistas de las etapas previas (crudo y orientado);
+    aquí se agregan el giro axial y la entrada al modelo, y se guardan en ``pasos.npz``.
     Escribe en ``out_dir`` los archivos que lee el dashboard y devuelve esa carpeta.
     """
+    from pasos_preproceso import Pasos
     from volumen_entrada import cache_spacing_xyz, preprocess_volume
     from pengwin_io import resize_label_slice
 
@@ -220,6 +223,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = f"[{nombre}]"
+    pasos = pasos or Pasos()
     giro = None
     if enderezar:
         from normalizacion import normalizar
@@ -229,10 +233,21 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
                 "simetria_despues": round(float(est.simetria), 3)}
         log(f"{tag} giro axial estimado {est.angulo:+.1f}°: "
             + ("enderezado" if est.corregir else "sin corregir (menor al umbral o no es claro)"))
+        texto_giro = (f"Giro del paciente dentro del escáner estimado en {est.angulo:+.1f}° con la simetría "
+                      "izquierda-derecha de la pelvis (no está en los metadatos). "
+                      + (f"Es claro (≥ {GIRO_MINIMO_DEMO:.0f}°): se enderezó girando el volumen {-est.angulo:+.1f}°."
+                         if est.corregir else f"Menor a {GIRO_MINIMO_DEMO:.0f}° o no es claro: no se corrigió, "
+                         "la imagen queda igual que en el paso anterior."))
+    else:
+        texto_giro = "El enderezado del giro axial está desactivado: la imagen queda igual que en el paso anterior."
+    pasos.agregar_hu("giro_axial", "Giro axial del paciente", texto_giro, image, spacing_xyz, giro=giro)
     spacing = cache_spacing_xyz(spacing_xyz, image.shape, size)
     log(f"{tag} volumen {image.shape} spacing nativo {tuple(round(float(s), 3) for s in spacing_xyz)} mm")
 
     images = preprocess_volume(image, size)
+    pasos.agregar_entrada("Entrada al modelo", f"Ventana ósea (−500 a 1300 HU), gamma 1.5 y cada corte estirado "
+                          f"a {size}×{size} píxeles: exactamente lo que recibe la red, corte por corte.", images)
+    np.savez_compressed(out_dir / "pasos.npz", **pasos.arreglos)
     if pred_guardada is not None:
         pred = pred_guardada
         log(f"{tag} predicciones reutilizadas (el modelo no se vuelve a correr)")
@@ -291,7 +306,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
             "device": str(info.get("device")), "seconds_model": pred["seconds"],
             "ms_per_slice": 1000 * pred["seconds"] / len(images), "min_voxels": min_voxels,
             "distance_method": method, "canonical": bool(info.get("canonical")), "flipped": flipped,
-            "enderezado": giro, "umbrales_postproceso": umbrales,
+            "enderezado": giro, "umbrales_postproceso": umbrales, "pasos": pasos.textos,
             "bone_z_range": [int(bone_z[0]), int(bone_z[-1])] if len(bone_z) else None,
             "fragments_pred": rows, "fragments_gt": gt_rows, "comparison": comparison,
             "slices": [{"z": z, "classification": [round(float(p), 4) for p in pred["classification"][z]],
@@ -301,6 +316,47 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     (out_dir / "meta.json").write_text(json.dumps(meta))
     log(f"{tag} listo en {time.perf_counter() - started:.0f} s → {out_dir}")
     return out_dir
+
+
+def preparar_caso(ruta_imagen: str | Path, ruta_etiqueta: str | Path | None, case_id: str, canonical: bool,
+                  log=print) -> tuple:
+    """Lee un caso de PENGWIN, registra el paso «crudo», lo endereza si la cabecera lo pide y registra
+    el paso «orientado». Devuelve (imagen, etiqueta o None, spacing_xyz, flipped, pasos).
+
+    Sirve igual con los archivos de ``data/raw`` que con los descargados de S3 (comprimidos).
+    """
+    import SimpleITK as sitk
+    from orientacion import flip_inplane, header_is_rotated, is_rotated
+    from pasos_preproceso import Pasos, texto_matriz
+
+    imagen_itk = sitk.ReadImage(str(ruta_imagen))
+    image = sitk.GetArrayFromImage(imagen_itk)
+    spacing = imagen_itk.GetSpacing()
+    label = sitk.GetArrayFromImage(sitk.ReadImage(str(ruta_etiqueta))) if ruta_etiqueta else None
+    matriz = texto_matriz(imagen_itk.GetDirection())
+    from_header = header_is_rotated(ruta_imagen)
+    girado = is_rotated(case_id) if from_header is None else from_header
+    pasos = Pasos()
+    pasos.agregar_hu("crudo", "Crudo, como viene en el archivo", f"Matriz de dirección de la cabecera: {matriz}. " + (
+        "Dice que el volumen está guardado girado 180° en el plano (orientación LPI): sin corregir, el sacro "
+        "queda arriba y los lados al revés." if girado else
+        "Es la identidad: el volumen ya viene en la orientación estándar."), image, spacing, matriz=matriz)
+    flipped = False
+    if canonical:
+        flipped = girado
+        if flipped:
+            image = flip_inplane(image)
+            if label is not None:
+                label = flip_inplane(label)
+            log(f"[{case_id}] guardado girado 180° (cabecera LPI): enderezado a la orientación canónica")
+        pasos.agregar_hu("orientado", "Orientado con los metadatos", (
+            "El metadato dice que viene girado 180°: se giró (filas y columnas invertidas). Ahora el sacro "
+            "queda abajo, como en el resto de los casos." if flipped else
+            "El metadato no indica ningún giro: no se cambió nada."), image, spacing)
+    else:
+        pasos.agregar_hu("orientado", "Orientado con los metadatos", "Este modelo se entrenó sin orientación "
+                         "canónica: no se aplica.", image, spacing)
+    return image, label, spacing, flipped, pasos
 
 
 def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", size: int = 384,
@@ -313,22 +369,13 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     ``predictions.npz`` y rehace solo el post-proceso, las distancias y las mallas. Es lo que se usa
     cuando cambia el post-proceso 3D.
     """
-    from orientacion import flip_inplane, header_is_rotated, is_rotated
-    from pengwin_io import find_image_path, load_case
+    from pengwin_io import find_image_path, find_label_path
 
     case_id = str(case_id).zfill(3)
     log = progress or (lambda message: print(message, flush=True))
-    case = load_case(case_id, load_label=True)
     canonical = checkpoint_is_canonical(checkpoint)
-    flipped = False
-    if canonical:
-        from_header = header_is_rotated(find_image_path(case_id))
-        flipped = is_rotated(case_id) if from_header is None else from_header
-        if flipped:
-            case.image = flip_inplane(case.image)
-            if case.label is not None:
-                case.label = flip_inplane(case.label)
-            log(f"[{case_id}] guardado girado 180° (cabecera LPI): enderezado a la orientación canónica")
+    image, label, spacing_xyz, flipped, pasos = preparar_caso(find_image_path(case_id), find_label_path(case_id),
+                                                               case_id, canonical, log)
 
     out_dir = Path(out_root) / Path(checkpoint).stem / case_id
     saved = out_dir / "predictions.npz"
@@ -351,10 +398,10 @@ def export_case(case_id: str, checkpoint: str, out_root: str = "outputs/demo", s
     if pred_guardada is None:
         info, predecir = predictor_local(checkpoint, tta=tta, batch_size=batch_size, log=log)
         assert info["canonical"] == canonical, "el checkpoint y el modelo cargado no coinciden en orientación"
-    return exportar_volumen(case.image, case.spacing_xyz, out_dir, info, predecir, label=case.label,
+    return exportar_volumen(image, spacing_xyz, out_dir, info, predecir, label=label,
                             nombre=case_id, size=size, min_voxels=min_voxels, raw_view=raw_view,
                             enderezar=enderezar, umbral_mm=umbral_mm, flipped=flipped,
-                            pred_guardada=pred_guardada, log=log)
+                            pred_guardada=pred_guardada, pasos=pasos, log=log)
 
 
 def main() -> None:
