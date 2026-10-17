@@ -775,7 +775,12 @@ pedido de Gustavo con los prompts copiados tal cual.
 - **Qué se hizo a mano:** Gustavo decidió que la Lambda use int8 y que la GPU quede como opción.
 - **Análisis crítico:** el int8 exportado depende de la versión de torch con que se hizo; por eso no se
   versiona: la imagen de la API lo genera con su propio torch y, si no coincide, se vuelve a cuantizar
-  al cargar. La GPU en SageMaker no quedó encendida por costo (~0.74 USD/hora).
+  al cargar. La GPU en SageMaker no quedó encendida por costo (~0.74 USD/hora). A pedido de Gustavo («arreglemos los
+  tests, por favor, para que pasen todos») se corrigieron las dos pruebas que fallaban en el Mac: no
+  eran código viejo sino una incompatibilidad de `train_s10.py` con torch 2.2 (`torch.amp.GradScaler`
+  existe desde 2.3; se usa `torch.cuda.amp.GradScaler` si no está) y un caché de prueba en
+  `tests/test_cuantizar.py` sin los campos (`spacing_xyz`, `orig_shape`) que el aumento en milímetros
+  necesita. Con eso pasa toda la suite también en el Mac.
 ---
 
 # Parte 2. Análisis crítico

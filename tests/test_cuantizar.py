@@ -26,7 +26,10 @@ def make_cache(root: Path, size: int = 64) -> Path:
     rows = []
     for number, split in enumerate(("train", "train", "val"), 1):
         images, labels = synthetic_case(depth=12, size=size, seed=number)
-        np.savez(cache / f"{number:03d}.npz", images=images, labels=labels)
+        # Mismos campos que build_case_cache: train_s10 los usa para el aumento en milímetros.
+        np.savez(cache / f"{number:03d}.npz", images=images, labels=labels,
+                 spacing_xyz=np.array([1.0, 1.0, 2.0]), orig_shape=np.asarray(images.shape),
+                 size=np.array(size), mode=np.array("stretch"))
         rows.append({"case_id": f"{number:03d}", "split": split, "shape_x": size, "shape_y": size,
                      "spacing_x_mm": 1.0, "spacing_y_mm": 1.0, "spacing_z_mm": 2.0})
     with open(root / "index.csv", "w", newline="") as stream:
