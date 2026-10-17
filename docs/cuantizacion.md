@@ -22,19 +22,50 @@ mismo modelo con otra representación numérica.
 int8 se calibra con 128 cortes con hueso de **8 casos de entrenamiento** (16 por caso), nunca de
 validación ni de test. Los pesos se cuantizan por canal (FX de PyTorch, backend x86).
 
-## Por qué las convoluciones transpuestas quedan en fp32
+## Las capas de H8 y por qué las transpuestas quedan en fp32
 
-H8 tiene 25 convoluciones normales (backbone, CBAM y cabezas) y **4 convoluciones transpuestas** en el
-decodificador de segmentación: son las que agrandan la imagen de 24×24 a 384×384 (cada una la
-duplica), estampando cada valor en un parche de 4×4. Llevan el 26 % de los parámetros (704 mil de
-2.7 millones).
+Una capa es un paso de cálculo con sus propios pesos aprendidos. H8 tiene 31 capas con pesos (más
+normalizaciones y activaciones, que no tienen pesos que cuantizar):
 
-La variante elegida, **int8**, cuantiza todo menos esas 4 capas: al llegar a una transpuesta el valor
-pasa a fp32, la capa calcula como antes y vuelve a int8. Se probó también cuantizarlas (`int8_todo`):
+| Parte | Capas | Qué hace |
+|---|---|---|
+| Encoder (backbone) | 8 convoluciones, en 4 etapas | Extrae rasgos; cada etapa reduce la imagen a la mitad (384 → 24) |
+| CBAM | 3 convoluciones pequeñas | Atención: qué canales y qué zonas importan |
+| Cabeza de clasificación | 2 capas lineales | Qué regiones hay en el corte |
+| Cabeza de detección | 2 convoluciones | Cajas |
+| Decoder de segmentación | **4 convoluciones transpuestas** + 4 convoluciones + 3 de conexión | Vuelve a agrandar la imagen (24 → 48 → 96 → 192 → 384) para pintar la máscara |
+| Salidas de segmentación | 5 convoluciones 1×1 | Hueso, fragmento, bordes, centros y desplazamientos |
 
-- con H6 y torch 2.2 la segmentación se rompía (Dice 0.03);
-- con H8 y torch 2.11 (Kaggle) ya no pierde Dice, pero es **más lenta que fp32** (197 frente a 183 ms
-  por corte), porque PyTorch no tiene una implementación rápida de transpuestas int8 en CPU.
+Una **convolución transpuesta** hace lo contrario de una convolución con paso 2: cada valor de entrada
+se «estampa» en un parche de 4×4 de la salida, que queda del doble de tamaño. Las 4 transpuestas
+(`segmentation_head.decoder.0` a `decoder.3`) llevan el 26 % de los parámetros (704 mil de 2.7
+millones) y trabajan con las imágenes más grandes del decoder.
+
+La variante elegida, **int8 híbrido**, cuantiza las otras 27 capas y deja esas 4 en fp32: al llegar a
+una transpuesta el valor pasa a fp32, la capa calcula como antes y vuelve a int8.
+
+**Con H8 el motivo es solo la velocidad, no la precisión.** Cuantizándolas también (`int8_todo`), el
+Dice es el mismo: 0.8654 en validación en Kaggle (torch 2.11), y la misma segmentación que el híbrido
+en el torch 2.2 del Mac (Dice frente a fp32 de 0.993 / 0.998 / 0.998 en el caso 024). Lo que pasa es
+que PyTorch tiene código int8 muy optimizado para las convoluciones normales pero no para las
+transpuestas en CPU: cuantizadas, esas 4 capas van por una ruta lenta y el modelo completo termina
+**más lento que el original** en la CPU de Kaggle (197 frente a 183 ms por corte), mientras que el
+híbrido es 2.3 veces más rápido (81 ms). `int8_todo` pesa menos (2.8 frente a 5.0 MB): sería la opción
+si importara la memoria y no el tiempo.
+
+(Con **H6** y torch 2.2 cuantizar las transpuestas sí rompía la segmentación, Dice 0.03; por eso se
+excluyeron al principio. Con H8 eso ya no ocurre.)
+
+### Por qué la ganancia depende de la CPU
+
+| | CPU | Instrucciones int8 (VNNI) | fp32 | int8 híbrido | int8 todo |
+|---|---|---|---|---|---|
+| Kaggle | Xeon de servidor | Sí (AVX-512 VNNI) | 183 ms | **81 ms** | 197 ms |
+| Mac de Gustavo | i9-9980HK de portátil (2019) | No (AVX2) | 205 ms | 130 ms | 149 ms |
+
+Los Xeon de servidor multiplican enteros de 8 bits con instrucciones dedicadas; un portátil sin ellas
+gana menos. Las Lambda x86 de AWS corren en Xeon, así que se espera un comportamiento como el de Kaggle.
+(La medición del Mac es corta, 16 cortes, e indicativa.)
 
 ## Resultados en validación (15 casos, con TTA)
 
@@ -91,8 +122,36 @@ Para un volumen de unos 400 cortes, solo la red:
 | fp32 en GPU | ~4.4 s |
 | fp16 en GPU | ~2.4 s |
 
-La precisión es la misma en todos. Para la demo, que corre en CPU, int8 reduce a menos de la mitad la
-espera sin costo en Dice. Usarla en la Lambda es un cambio aparte (`api/`), a decidir en grupo.
+La precisión es la misma en todos. En GPU la red deja de ser lo lento del pipeline: las distancias en
+mm, las mallas y la vista cruda (CPU) tardan más que todos los cortes juntos.
+
+## Cómo se usa
+
+`src/precision.py` aplica la precisión al cargar el modelo (`predict_volume.load_pipeline(...,
+precision=...)`):
+
+| Precisión | Dónde | Cómo se obtiene |
+|---|---|---|
+| `fp32` | Cualquiera | El checkpoint tal cual (`h8_…_s42.pth`, 11 MB) |
+| `int8` | Solo CPU | `h8_…_s42_int8.pt` (TorchScript, 4.9 MB), ya cuantizado: se carga sin calibrar. Si no existe o es de otra versión de torch, se cuantiza al cargar (unos segundos) con `outputs/s10/calibracion_int8_h8.npz`: los 128 cortes de entrenamiento con que se calibró en Kaggle |
+| `fp16` | GPU | Conversión directa al cargar |
+| `auto` | — | fp16 si hay GPU, int8 si no |
+
+```bash
+python src/precision.py exportar --checkpoint outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth   # crea el _int8.pt
+```
+
+El `_int8.pt` no se versiona (depende de la versión de torch); la imagen de la API lo genera al
+construirse (`api/Dockerfile`).
+
+- **API**: variable `PRECISION` (por defecto `auto`): en la Lambda (CPU) usa int8; en un servidor con
+  GPU, fp16. `/health?deep=1` informa `precision` y si salió del archivo o se cuantizó al cargar.
+- **Dashboard**: bloque «Procesamiento» de la barra lateral: dónde corre el modelo (este equipo, AWS
+  CPU o AWS GPU si se configura `INFERENCE_URL_GPU`) y, en este equipo, la precisión (H8 normal fp32,
+  int8, fp16 o automática). Aplica a la inferencia en vivo, «Procesar ahora» y los CT subidos; cada
+  combinación se guarda aparte para comparar.
+- **Casos precalculados y exportaciones oficiales** (`demo_export.py`, `deploy/precalcular_casos.py`):
+  siguen en fp32, como las métricas oficiales.
 
 ## Cómo reproducirlo
 

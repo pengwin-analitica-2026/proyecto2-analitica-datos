@@ -233,6 +233,20 @@ La columna del equipo del grupo se midió con H8 (`src/measure_latency.py`,
 `outputs/demo/latency.json`). Las de Colab se midieron con H6; H8 tiene exactamente la misma
 arquitectura, así que su latencia es la misma.
 
+### 4.8.1 Cuantización
+
+El mismo H8 en menos bits, sin reentrenar (detalle en `docs/cuantizacion.md`). Validación con TTA y
+test una vez por variante elegida, en Kaggle:
+
+| Precisión | Para | Tamaño | Latencia por corte | Dice por fragmento (val / test) |
+|---|---|---|---|---|
+| fp32 (entrenado) | Referencia | 11.0 MB | 183 ms CPU · 11 ms GPU T4 | 0.8652 / 0.8739 |
+| **int8 híbrido** (4 transpuestas en fp32) | **CPU (la Lambda)** | 5.0 MB | **81 ms** CPU | 0.8653 / 0.8745 |
+| **fp16** | GPU | 5.5 MB | **6 ms** GPU T4 | 0.8651 / 0.8740 |
+
+Ninguna pierde Dice. La API usa int8 en CPU y fp16 en GPU (`PRECISION=auto`); las métricas oficiales
+de este documento son las de fp32.
+
 ### 4.9 Distancia de separación y métricas de superficie (41 secundarios)
 
 Distancia mínima borde a borde en 3D entre cada fragmento secundario y el principal de su hueso, con
@@ -391,9 +405,9 @@ este paso.
 
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda en CPU; los dos se vuelven a desplegar en cada push a `main`
-(ver `docs/despliegue_aws_streamlit.md`). La imagen de la API copia el checkpoint de H8; hasta que
-esta versión llegue a `main`, la Lambda publicada sigue sirviendo H6 y el dashboard lo avisa al
-inferir en vivo. El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
+(ver `docs/despliegue_aws_streamlit.md`). La imagen de la API copia el checkpoint de H8 y al
+construirse genera su versión int8, que es la que sirve la Lambda (CPU); con GPU usaría fp16 (sección
+4.8.1). El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
 enunciado. La advertencia de uso no clínico está siempre visible en el dashboard.
 
 ## 9. Modelos entrenados y pesos en el repositorio

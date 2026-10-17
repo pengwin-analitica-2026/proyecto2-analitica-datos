@@ -37,8 +37,9 @@ def info_remota(url: str, key: str | None = None) -> dict:
     """Carga el modelo en el servicio (si estaba frío) y devuelve su descripción."""
     data = _pedir(url, key, "/health?deep=1", timeout=180.0)
     return {"checkpoint": data["model"], "parameters": data["parameters"], "tta": data["tta"],
-            "canonical": data["canonical"], "device": f"{data['device']} (AWS Lambda)",
-            "input_size": data.get("input_size", 384)}
+            "canonical": data["canonical"], "device": f"{data['device']} (servicio remoto)",
+            "input_size": data.get("input_size", 384), "precision": data.get("precision", "fp32"),
+            "precision_origen": data.get("precision_origen", "")}
 
 
 def _lote(url: str, key: str | None, images: np.ndarray, intentos: int = 3) -> dict:

@@ -50,6 +50,7 @@ limitaciones están en el [model card](MODEL_CARD.md) y en [`docs/modelo_h8.md`]
 | [`docs/semana11_dashboard.md`](docs/semana11_dashboard.md) | Semana 11: dashboard con los tres visualizadores, orientación y distancia |
 | [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) | Semana 11: despliegue en Streamlit Cloud y AWS Lambda |
 | [`docs/cicd_github_actions.md`](docs/cicd_github_actions.md) | Semana 11: pruebas y despliegue automáticos |
+| [`docs/cuantizacion.md`](docs/cuantizacion.md) | Cuantización de H8: qué es, int8 para CPU y fp16 para GPU, resultados en validación y test, y cómo se elige la precisión en la API y el dashboard |
 | [`docs/video/demo_computador.mp4`](docs/video/demo_computador.mp4) | Semana 11: recorrido completo del dashboard publicado, grabado en el computador (110 s, con audio): inferencia corte a corte, tres visualizadores, métricas, latencia y tabla de distancias |
 | [`docs/video/demo_celular.mp4`](docs/video/demo_celular.mp4) | Semana 11: video del dashboard publicado, grabado desde un celular |
 | `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles (el 05 se hizo con D5) |
@@ -280,10 +281,14 @@ Mide un corte a la vez y reporta la mediana y el percentil 90. Escribe en
 `outputs/demo/latency.json`, que el dashboard muestra. Si no hay GPU, omite `cuda` y lo avisa. Los
 resultados están en el [model card](MODEL_CARD.md), sección 4.8.
 
+**Cuantización.** El mismo H8 corre en int8 en CPU (2.3 veces más rápido) y en fp16 en GPU (1.8 veces),
+sin perder Dice ([`docs/cuantizacion.md`](docs/cuantizacion.md)). La API elige sola con
+`PRECISION=auto` y el dashboard deja escoger dónde corre el modelo y con qué precisión.
+
 ### Despliegue
 
 El dashboard está publicado en **Streamlit Community Cloud** (app `app/dashboard.py`, rama `main`) y
-la inferencia en vivo corre en una **API en AWS Lambda**, cuya imagen copia el checkpoint de H8. Cada push a `main` corre las
+la inferencia en vivo corre en una **API en AWS Lambda**, cuya imagen copia el checkpoint de H8 y lo sirve en int8. Cada push a `main` corre las
 pruebas y vuelve a desplegar los dos (GitHub Actions para la API, con OIDC y sin claves guardadas;
 Streamlit Cloud para el dashboard). Detalle en
 [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) y

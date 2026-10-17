@@ -10,6 +10,10 @@ nada: los cortes que manda el dashboard salen de ``demo_export``, que ya enderez
 volumen completo; por eso se corrige al exportar el caso y no aquí.
 ``/health?deep=1`` informa ``canonical`` para que el cliente lo compruebe.
 
+Precisión (``PRECISION``, por defecto ``auto``): ``auto`` usa int8 en CPU (la Lambda) y fp16 en GPU;
+también ``fp32``, ``int8`` o ``fp16``. Es el mismo H8 con el mismo Dice; solo cambia la velocidad (ver
+``src/precision.py`` y ``docs/cuantizacion.md``). ``/health?deep=1`` informa cuál se está usando.
+
     MODEL_PATH=outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth API_KEY=<clave> uvicorn api.server:app --port 8080
 """
 from __future__ import annotations
@@ -30,6 +34,7 @@ sys.path.insert(0, str(ROOT / "src"))
 MODEL_PATH = os.environ.get("MODEL_PATH", str(ROOT / "outputs" / "s10" / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 API_KEY = os.environ.get("API_KEY", "")
 TTA = os.environ.get("TTA", "0") == "1"
+PRECISION = os.environ.get("PRECISION", "auto")
 MAX_BYTES = 2_000_000          # un corte 384x384 uint8 pesa ~150 kB
 MAX_LOTE = 16                  # /predict_batch: 16 cortes son ~2.4 MB; Lambda acepta hasta 6 MB por pedido
 
@@ -40,7 +45,7 @@ _state: dict = {}
 def _load() -> dict:
     if not _state:
         from predict_volume import load_pipeline, predict_slice
-        model, device, info = load_pipeline(MODEL_PATH, tta=TTA)
+        model, device, info = load_pipeline(MODEL_PATH, tta=TTA, precision=PRECISION)
         _state.update(model=model, device=device, info=info)
         warm = np.zeros((info["input_size"], info["input_size"]), np.uint8)
         predict_slice(model, device, warm)                       # calentamiento
@@ -61,7 +66,8 @@ def health(deep: int = 0) -> dict:
     state = _load()
     return {"ok": True, "model": state["info"]["checkpoint"], "device": str(state["device"]),
             "parameters": state["info"]["parameters"], "tta": state["info"]["tta"],
-            "canonical": state["info"]["canonical"], "input_size": state["info"]["input_size"]}
+            "canonical": state["info"]["canonical"], "input_size": state["info"]["input_size"],
+            "precision": state["info"]["precision"], "precision_origen": state["info"]["precision_origen"]}
 
 
 @app.post("/predict_slice")
@@ -85,7 +91,8 @@ async def predict_slice_endpoint(request: Request, x_api_key: str | None = Heade
     return {"semantic_npz_b64": base64.b64encode(buffer.getvalue()).decode("ascii"),
             "boxes_refined": result["boxes_refined"][0], "boxes_raw": result["boxes_raw"][0],
             "latency_ms": result["latency_ms"], "device": str(state["device"]),
-            "model": state["info"]["checkpoint"], "tta": state["info"]["tta"]}
+            "model": state["info"]["checkpoint"], "tta": state["info"]["tta"],
+            "precision": state["info"]["precision"]}
 
 
 @app.post("/predict_batch")
@@ -116,7 +123,8 @@ async def predict_batch_endpoint(request: Request, x_api_key: str | None = Heade
     return {"arrays_npz_b64": base64.b64encode(buffer.getvalue()).decode("ascii"),
             "boxes_refined": result["boxes_refined"], "boxes_raw": result["boxes_raw"],
             "seconds": result["seconds"], "device": str(state["device"]),
-            "model": state["info"]["checkpoint"], "tta": state["info"]["tta"]}
+            "model": state["info"]["checkpoint"], "tta": state["info"]["tta"],
+            "precision": state["info"]["precision"]}
 
 
 # --------------------------------------------------------------------------- casos de PENGWIN en S3
