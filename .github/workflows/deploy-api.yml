@@ -51,6 +51,16 @@ jobs:
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # Las imágenes base (python, adaptador de Lambda) vienen del registro público de AWS. Sin iniciar
+      # sesión, los runners de GitHub comparten IP y caen en el límite de descargas anónimas
+      # (429 Too Many Requests); con sesión el límite es mucho mayor. ECR Public vive en us-east-1.
+      - name: Iniciar sesión en ECR Public (evita el 429 al bajar las imágenes base)
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+        env:
+          AWS_REGION: us-east-1
+
       - name: Construir y subir la imagen
         id: image
         run: |

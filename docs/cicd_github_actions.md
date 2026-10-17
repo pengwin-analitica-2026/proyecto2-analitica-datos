@@ -63,6 +63,7 @@ de H6 y D5 (la primera evaluación en test).
 | El arranque en frío se cortaba a los 10 s | El adaptador de Lambda espera a que `/health` responda, y cargar torch y el modelo tarda más | `/health` responde al instante; `/health?deep=1` carga el modelo (lo usa la prueba de humo) |
 | `ci.yml` fallaba con `No module named 'pytest'` | `tests/test_orientacion.py` usa `pytest` | Se instala `pytest` en los dos workflows |
 | `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Formato inmutable del `sub` (ver arriba) | Política de confianza con el `sub` inmutable |
+| El despliegue falla al construir con `429 Too Many Requests` desde `public.ecr.aws` | Las imágenes base vienen del registro público de AWS y los runners de GitHub comparten IP: caen en el límite de descargas anónimas | El workflow inicia sesión en ECR Public antes de construir (`amazon-ecr-login` con `registry-type: public`); el rol tiene `ecr-public:GetAuthorizationToken` y `sts:GetServiceBearerToken` |
 
 ## Cuidados
 
