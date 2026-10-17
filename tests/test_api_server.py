@@ -112,6 +112,55 @@ class ApiServer(unittest.TestCase):
         np.testing.assert_allclose(remote["classification"], local["classification"], atol=1e-5)
         self.assertEqual(len(remote["boxes_refined"]), 11)
 
+    def test_sagemaker_ping_and_invocations(self):
+        """Rutas que exige SageMaker: /ping y /invocations con la ruta en CustomAttributes."""
+        import base64
+        self.assertEqual(self.client.get("/ping").status_code, 200)
+        health = self.client.post("/invocations", content=b"{}",
+                                  headers={"X-Amzn-SageMaker-Custom-Attributes": "ruta=health"}).json()
+        self.assertEqual(health["model"], CHECKPOINT.name)
+        r = self.client.post("/invocations", content=self.npy(np.zeros((384, 384), np.uint8)),
+                             headers={"X-Amzn-SageMaker-Custom-Attributes": "ruta=predict_slice"})
+        self.assertEqual(r.status_code, 200)
+        with np.load(io.BytesIO(base64.b64decode(r.json()["semantic_npz_b64"]))) as packed:
+            self.assertEqual(packed["semantic"].shape, (384, 384))
+        r = self.client.post("/invocations", content=b"x", headers={"X-Amzn-SageMaker-Custom-Attributes": "ruta=otra"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_gpu_proxy(self):
+        """La Lambda reenvía «X-Destino: gpu» al endpoint de SageMaker (simulado con esta misma API)."""
+        import json as _json
+        from unittest import mock
+        from api import server
+        headers = {"X-API-Key": "clave-de-prueba", "X-Destino": "gpu"}
+        corte = self.npy(np.zeros((384, 384), np.uint8))
+        # Sin endpoint configurado: 503 y la salud ligera no ofrece GPU.
+        self.assertIsNone(self.client.get("/health").json()["gpu"])
+        self.assertEqual(self.client.post("/predict_slice", content=corte, headers=headers).status_code, 503)
+
+        client = self.client
+
+        class Runtime:
+            def invoke_endpoint(self, EndpointName, ContentType, CustomAttributes, Body):
+                r = client.post("/invocations", content=Body,
+                                headers={"X-Amzn-SageMaker-Custom-Attributes": CustomAttributes})
+                return {"Body": io.BytesIO(_json.dumps(r.json()).encode())}
+
+        boto3 = mock.MagicMock()
+        boto3.client.return_value = Runtime()
+        with mock.patch.object(server, "SAGEMAKER_ENDPOINT", "pelvis-h8-gpu"), \
+                mock.patch.object(server, "_gpu_estado", lambda: "InService"), \
+                mock.patch.dict(sys.modules, {"boto3": boto3}):
+            self.assertEqual(self.client.get("/health").json()["gpu"], "InService")
+            via_gpu = self.client.post("/predict_slice", content=corte, headers=headers).json()
+            directo = self.client.post("/predict_slice", content=corte,
+                                       headers={"X-API-Key": "clave-de-prueba"}).json()
+            self.assertIn("SageMaker", via_gpu["via"])
+            self.assertEqual(via_gpu["semantic_npz_b64"], directo["semantic_npz_b64"])
+            self.assertEqual(self.client.get("/health?deep=1", headers=headers).json()["model"], CHECKPOINT.name)
+            self.assertEqual(self.client.post("/predict_slice", content=corte,
+                                              headers={"X-API-Key": "otra", "X-Destino": "gpu"}).status_code, 401)
+
 
 if __name__ == "__main__":
     unittest.main()
