@@ -288,6 +288,35 @@ resultados están en el [model card](MODEL_CARD.md), sección 4.8.
 sin perder Dice ([`docs/cuantizacion.md`](docs/cuantizacion.md)). La API elige sola con
 `PRECISION=auto` y el dashboard deja escoger dónde corre el modelo y con qué precisión.
 
+### Ejecución local de la demo - Opcion recomendada
+
+La demo puede ejecutarse completamente en el computador del usuario. Esta opción permite procesar archivos médicos grandes sin depender de AWS, Streamlit Cloud ni de la conexión a Internet.
+
+Desde la raíz del repositorio:
+
+~~~powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+streamlit run app/dashboard.py
+~~~
+
+La aplicación estará disponible en `http://127.0.0.1:8501`.
+
+En la barra lateral se debe seleccionar **Este equipo** y una de estas precisiones:
+
+- **Automática:** selecciona FP16 si detecta una GPU con CUDA; en caso contrario, intenta utilizar INT8 en CPU.
+- **H8 normal (FP32):** opción más estable y compatible para CPU.
+- **H8 cuantizado (INT8):** reduce el consumo y puede acelerar la inferencia en CPU, pero depende de que el procesador y PyTorch sean compatibles.
+- **H8 FP16 para GPU:** opción más rápida cuando PyTorch detecta una GPU NVIDIA con CUDA.
+
+Para comprobar si CUDA está disponible:
+
+~~~powershell
+python -c "import torch; print('CUDA:', torch.cuda.is_available())"
+~~~
+
 ### Despliegue
 
 El dashboard está publicado en **Streamlit Community Cloud** (app `app/dashboard.py`, rama `main`) y
