@@ -43,6 +43,7 @@ class VolumenSubido:
     spacing_xyz: tuple[float, float, float]
     fuente: str                     # "archivo .mha", "serie DICOM (312 cortes)", ...
     orientacion: dict               # qué hizo la orientación con los metadatos
+    pasos: object = None            # pasos_preproceso.Pasos con las etapas «crudo» y «orientado»
 
 
 def preprocess_volume(image_hu: np.ndarray, size: int = 384, gamma: float = GAMMA) -> np.ndarray:
@@ -130,8 +131,20 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
         raise ValueError("El volumen tiene varios canales por vóxel (¿color?); un CT tiene uno.")
     if imagen.GetSize()[2] < MIN_CORTES:
         raise ValueError(f"El volumen tiene {imagen.GetSize()[2]} cortes; se necesitan al menos {MIN_CORTES}.")
+    from normalizacion import diagnosticar
+    from pasos_preproceso import Pasos, texto_matriz
+    matriz = texto_matriz(imagen.GetDirection())
+    diag = diagnosticar(imagen.GetDirection())
     orientacion = {"direccion_original": [round(float(v), 4) for v in imagen.GetDirection()],
                    "estandar": True, "accion": "ninguna"}
+    pasos = Pasos()
+    pasos.agregar_hu("crudo", "Crudo, como viene en el archivo", f"Matriz de dirección de la cabecera: {matriz}. " + (
+        "Es la identidad: el volumen ya viene en la orientación estándar." if diag.es_estandar else
+        "La adquisición es oblicua: los ejes del volumen no coinciden con los del paciente." if diag.oblicuo else
+        "No es la identidad: el volumen está guardado " + ("girado 180° en el plano (LPI)."
+        if diag.ejes_paciente == (0, 1, 2) and diag.signos == (-1, -1, 1) else
+        "con los ejes permutados o volteados respecto al paciente.")),
+        _arreglo(imagen), imagen.GetSpacing(), matriz=matriz)
     if orientar:
         from normalizacion import a_orientacion_estandar
         imagen, _, diag = a_orientacion_estandar(imagen)
@@ -139,13 +152,26 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
                            accion="ninguna (ya estaba en la orientación estándar)" if diag.es_estandar
                            else "remuestreado a dirección identidad (adquisición oblicua)" if diag.oblicuo
                            else "ejes permutados y volteados según la cabecera")
+        pasos.agregar_hu("orientado", "Orientado con los metadatos", (
+            "El metadato no indica ningún giro: no se cambió nada." if diag.es_estandar else
+            "El metadato indica una adquisición oblicua: se remuestreó a la orientación estándar." if diag.oblicuo
+            else "El metadato dice que viene girado o con los ejes cambiados: se permutaron y voltearon los "
+            "ejes (sin interpolar) hasta la orientación estándar, con el sacro abajo."),
+            _arreglo(imagen), imagen.GetSpacing())
+    return VolumenSubido(nombre=corto, image=_arreglo(imagen),
+                         spacing_xyz=tuple(float(s) for s in imagen.GetSpacing()),
+                         fuente=fuente, orientacion=orientacion, pasos=pasos)
+
+
+def _arreglo(imagen) -> np.ndarray:
+    """(z, y, x) en HU como int16 (o float32 si el archivo es de punto flotante)."""
+    import SimpleITK as sitk
     image = sitk.GetArrayFromImage(imagen)
     if image.dtype.kind == "f":
-        image = image.astype(np.float32)
-    elif image.dtype != np.int16:
-        image = np.clip(image, -32768, 32767).astype(np.int16)
-    return VolumenSubido(nombre=corto, image=image, spacing_xyz=tuple(float(s) for s in imagen.GetSpacing()),
-                         fuente=fuente, orientacion=orientacion)
+        return image.astype(np.float32)
+    if image.dtype != np.int16:
+        return np.clip(image, -32768, 32767).astype(np.int16)
+    return image
 
 
 def _leer_dicom(carpeta: Path):

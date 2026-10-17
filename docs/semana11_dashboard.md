@@ -39,6 +39,50 @@ Casos versionados en `outputs/demo/h8_aumm_noise01_noema_w32_e60_s42/`, todos co
 | 099 | validación | sí | Comprobar el enderezado |
 | 039 | test | no | Uno de los dos casos que hundían test con D5; se exporta porque el modelo ya está congelado |
 
+## Los 100 casos de PENGWIN (desde S3)
+
+En la barra lateral, **Origen → Casos PENGWIN (100)**: un selector con los 100 casos, su split
+(train/val/test) y si la cabecera dice que vienen girados 180°. Cada caso tiene dos modos:
+
+- **Precalculado**: el resultado completo (con ground truth y métricas) ya está en S3; se descarga en
+  segundos y queda en caché local (`S3_CACHE`).
+- **Procesar ahora**: descarga el `.mha` original de S3 (con su etiqueta) y corre el pipeline en vivo
+  (`demo_export.preparar_caso` + `exportar_volumen`), con el modelo local o la API de AWS. Tarda unos
+  minutos.
+
+Los archivos están en el bucket privado `pengwin-ct-050752608083` (cuenta de Almia, us-east-2):
+
+| Prefijo | Qué hay | Cómo se llena |
+|---|---|---|
+| `crudos/imagenes/<caso>.mha`, `crudos/etiquetas/<caso>.mha` | Los 100 casos originales, comprimidos sin pérdida (18.5 GB → ~12 GB; etiquetas 13 GB → unos MB). Vóxeles, dirección, spacing y `TransformMatrix` idénticos | `deploy/aws/subir_crudos_s3.py` |
+| `exportados/<modelo>/<caso>/` | `meta.json`, `volume.npz`, `meshes.npz`, `raw_view.npz` y `pasos.npz` de cada caso | `deploy/precalcular_casos.py` |
+
+El precálculo corre en el Mac con 4 procesos en paralelo (2 hilos de torch cada uno), con H8 y TTA,
+unos 6 minutos de CPU por caso. Se hizo en el Mac y no en Colab porque casi la mitad del tiempo de
+cada caso es CPU (distancias, mallas, vista cruda), que una GPU no acelera, y los datos ya estaban en
+disco. Los dos scripts saltan lo que ya está en S3, así que se pueden cortar y volver a correr.
+
+Comprobado: el caso 044 precalculado da exactamente lo mismo que el versionado en `outputs/demo/`
+(solo se agregan los pasos), y el caso 014 bajado de S3 (comprimido) se prepara idéntico al `.mha`
+original de `data/raw`.
+
+## Preprocesamiento paso a paso
+
+Pestaña **Preprocesamiento** (la primera). Muestra, para el corte axial con más hueso y para la MIP
+axial, qué le pasa al volumen antes de la red (`src/pasos_preproceso.py`, guardado en `pasos.npz`):
+
+1. **Crudo, como viene en el archivo**, con la matriz de dirección de la cabecera y lo que significa
+   (identidad = orientación estándar; `-1 0 0 0 -1 0 0 0 1` = guardado girado 180°, el sacro arriba).
+2. **Orientado con los metadatos**: «El metadato dice que viene girado 180°: se giró» o «El metadato no
+   indica ningún giro: no se cambió nada».
+3. **Giro axial del paciente**: el ángulo estimado con la simetría de la pelvis y si se corrigió
+   (solo giros claros de 10° o más).
+4. **Entrada al modelo**: ventana ósea, gamma 1.5 y 384×384, tal cual la recibe la red.
+
+Las etapas 1 a 3 se muestran con la ventana ósea sin gamma y con la proporción real del vóxel, para que
+solo cambie lo que hace cada etapa. Está en los casos de PENGWIN y en los CT subidos; los casos de
+ejemplo versionados se exportaron antes y no la tienen.
+
 ## Subir un CT propio
 
 Pedido del profesor: cargar un CT que no es de los casos de ejemplo y ver al instante la predicción

@@ -55,6 +55,21 @@ Se habilitaron en la configuración de la organización y el despliegue pasó.
 `deploy/build_streamlit_cloud.py` sigue sirviendo para publicar el dashboard desde un repositorio
 aparte, solo con la app y los casos, si algún día el repo principal no puede conectarse.
 
+### Casos PENGWIN desde S3
+
+El origen «Casos PENGWIN (100)» lee el bucket privado `pengwin-ct-050752608083` (ver
+`docs/semana11_dashboard.md`). **No hace falta agregar credenciales de AWS a Streamlit Cloud**: con los
+mismos Secrets de siempre (`INFERENCE_URL` e `INFERENCE_KEY`), el dashboard le pide a la API la lista
+de casos (`GET /s3/listar`) y un enlace firmado de 15 minutos para cada archivo (`GET /s3/url`). La
+Lambda lee el bucket con su propio rol, que tiene solo lectura de `crudos/` y `exportados/`
+(`deploy/aws/lambda-lectura-s3-policy.json`). Los dos endpoints exigen la `X-API-Key` y rechazan
+cualquier clave fuera de esos prefijos.
+
+`src/almacen_s3.py` decide solo: si boto3 encuentra credenciales (en el Mac, `AWS_PROFILE=almia`) va
+directo al bucket; si no, pasa por la API. Opcionalmente, el usuario IAM `pengwin-streamlit-lectura`
+(solo lectura, `deploy/aws/streamlit-lectura-policy.json`) permite el acceso directo si se crea su clave
+y se pone en los Secrets como `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`; no es necesario.
+
 ## 2. API de inferencia en AWS Lambda
 
 | Recurso | Valor |
@@ -116,5 +131,5 @@ Sin verificar todavía:
 
 ## Al terminar el curso
 
-Borrar la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
+Borrar el bucket `pengwin-ct-050752608083` y el usuario `pengwin-streamlit-lectura`, la función `pelvis-api`, el repositorio ECR `pelvis-api`, los roles
 `github-actions-pelvis-api` y `pelvis-api-lambda-exec`, y la app de Streamlit Cloud.

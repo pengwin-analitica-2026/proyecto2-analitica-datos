@@ -41,8 +41,18 @@ RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en te
 UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
 MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 MAX_UPLOAD_MB = 1024
+S3_CACHE = Path(os.environ.get("S3_CACHE", Path(tempfile.gettempdir()) / "pengwin_s3"))
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
+
+# Credenciales de S3 opcionales: si están en los Secrets (usuario de solo lectura), boto3 las lee del
+# entorno. Sin ellas, «Casos PENGWIN» lee el bucket a través de la API (INFERENCE_URL e INFERENCE_KEY).
+for _name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION", "PENGWIN_BUCKET"):
+    try:
+        if _name not in os.environ and _name in st.secrets:
+            os.environ[_name] = str(st.secrets[_name])
+    except Exception:                       # no hay archivo de secretos
+        break
 
 
 def discover_cases() -> dict[str, Path]:
@@ -64,6 +74,10 @@ def load_case(path: str) -> dict:
     if raw.exists():
         with np.load(raw) as view:
             data["raw"] = {key: view[key] for key in view.files}
+    steps = folder / "pasos.npz"
+    if steps.exists():
+        with np.load(steps) as arrays:
+            data["pasos"] = {key: arrays[key] for key in arrays.files}
     return data
 
 
@@ -298,7 +312,7 @@ def upload_page() -> Path | None:
                          f"{volume.orientacion['accion']}")
             started = time.perf_counter()
             exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
-                             enderezar=enderezar, log=status.write,
+                             enderezar=enderezar, log=status.write, pasos=volume.pasos,
                              extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
                                                     "donde": where}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
@@ -309,6 +323,102 @@ def upload_page() -> Path | None:
     return out_dir
 
 
+@st.cache_data(ttl=300, show_spinner="Consultando los casos en S3…")
+def s3_cases(model: str) -> list[dict]:
+    import almacen_s3
+    return almacen_s3.listar_casos(model)
+
+
+def pengwin_page() -> Path | None:
+    """Los 100 casos de PENGWIN desde S3: el precalculado o procesarlo en este momento."""
+    import almacen_s3
+    almacen_s3.configurar_api(setting("INFERENCE_URL"), setting("INFERENCE_KEY"))
+    model = MODEL_CHECKPOINT.stem
+    try:
+        cases = s3_cases(model)
+    except Exception as error:
+        st.error(f"No pude leer el bucket `{almacen_s3.BUCKET}`: {error}. Hace falta un perfil de AWS con acceso "
+                 "(por ejemplo `AWS_PROFILE=almia` en local) o la API de inferencia (`INFERENCE_URL` e "
+                 "`INFERENCE_KEY`), que lee el bucket por su cuenta.")
+        return None
+    if not cases:
+        st.info(f"El bucket `{almacen_s3.BUCKET}` todavía no tiene casos.")
+        return None
+    ready = sum(c["precalculado"] for c in cases)
+    with st.sidebar:
+        case = st.selectbox(f"Caso ({len(cases)} de PENGWIN · {ready} precalculados)", cases, key="pengwin_case",
+                            format_func=lambda c: f"{c['caso']} · {c['split']}"
+                            + (" · girado 180°" if c["girado"] else "")
+                            + (" · precalculado" if c["precalculado"] else ""))
+        options = (["Precalculado", "Procesar ahora"] if case["precalculado"] and case["crudo"]
+                   else ["Precalculado"] if case["precalculado"] else ["Procesar ahora"])
+        mode = st.radio("Resultado", options, horizontal=True, key="pengwin_mode",
+                        help="Precalculado: se descarga de S3 en segundos. Procesar ahora: descarga el .mha "
+                             "original y corre el pipeline completo en vivo (unos minutos).")
+    case_id = case["caso"]
+    if mode == "Precalculado":
+        folder = S3_CACHE / "precalculados" / model / case_id
+        if not (folder / "meta.json").exists():
+            with st.spinner(f"Descargando el caso {case_id} de S3…"):
+                almacen_s3.descargar_exportado(model, case_id, folder)
+        return folder
+
+    st.subheader(f"Caso {case_id} de PENGWIN · procesar ahora")
+    st.caption(f"Split {case['split']}" + (" · la cabecera dice que está guardado girado 180°" if case["girado"]
+                                            else "") + ". Se descarga el .mha original de S3 (con su ground "
+               "truth) y pasa por todo el pipeline: orientación con los metadatos, giro axial, modelo, "
+               "post-proceso 3D, distancias y mallas.")
+    tta = st.checkbox("TTA de espejo", False, key="pengwin_tta",
+                      help="Más preciso y el doble de tiempo. Solo aplica con el modelo local.")
+    folder = S3_CACHE / "en_vivo" / model / f"{case_id}{'-tta' if tta else ''}"
+    if (folder / "meta.json").exists():
+        return folder
+    if not st.button(f"Procesar el caso {case_id}", type="primary"):
+        return None
+    from demo_export import exportar_volumen, preparar_caso
+    with st.status(f"Procesando el caso {case_id}…", expanded=True) as status:
+        try:
+            info, predecir, where = choose_predictor(tta)
+            status.write(f"Modelo: {info['checkpoint']} · {where}")
+            started = time.perf_counter()
+            with tempfile.TemporaryDirectory() as tmp:
+                status.write("Descargando el .mha original de S3…")
+                image_path, label_path = almacen_s3.descargar_crudo(case_id, Path(tmp))
+                image, label, spacing_xyz, flipped, steps = preparar_caso(
+                    image_path, label_path, case_id, bool(info.get("canonical")), log=status.write)
+            exportar_volumen(image, spacing_xyz, folder, info, predecir, label=label, nombre=case_id,
+                             flipped=flipped, pasos=steps, log=status.write,
+                             extra_meta={"en_vivo": {"donde": where}})
+            status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
+        except Exception as error:
+            status.update(label="No se pudo procesar", state="error")
+            st.error(str(error))
+            return None
+    st.rerun()
+
+
+def steps_tab(meta: dict, arrays: dict | None) -> None:
+    st.subheader("Preprocesamiento paso a paso")
+    if not meta.get("pasos") or not arrays:
+        st.info("Este caso se exportó antes de que existiera esta vista. Vuelve a exportarlo (o elige un caso "
+                "de PENGWIN o sube un CT) para verla.")
+        return
+    st.caption("Qué le pasa al volumen antes de entrar a la red. A la izquierda, el corte axial con más hueso "
+               "(el mismo en todas las etapas); a la derecha, la proyección de máxima intensidad (MIP) axial. "
+               "Las etapas 1 a 3 se ven con la ventana ósea y la proporción real del vóxel; la 4, tal cual entra "
+               "al modelo.")
+    for number, step in enumerate(meta["pasos"], 1):
+        st.markdown(f"**{number}. {step['titulo']}**")
+        text, cut, mip = st.columns([2, 2, 2])
+        text.write(step["texto"])
+        if step.get("forma"):
+            text.caption(f"{step['forma'][0]} cortes de {step['forma'][1]}×{step['forma'][2]} · corte mostrado: "
+                         f"{(step.get('z') or 0) + 1}")
+        cut.image(arrays[f"{step['clave']}_corte"], caption="Corte axial", use_container_width=True)
+        mip.image(arrays[f"{step['clave']}_mip"], caption="MIP axial", use_container_width=True)
+        st.divider()
+
+
 # ----------------------------------------------------------------------------- encabezado
 st.title("Fracturas pélvicas en CT")
 st.caption("Detección, segmentación por fragmentos y distancia de separación en milímetros · dataset PENGWIN")
@@ -316,9 +426,13 @@ st.error(NON_CLINICAL, icon="⚠️")
 
 with st.sidebar:
     st.header("Caso")
-    source = st.radio("Origen", ["Casos de ejemplo", "Subir un CT"], horizontal=True, key="source")
+    source = st.radio("Origen", ["Casos de ejemplo", "Casos PENGWIN (100)", "Subir un CT"], key="source")
 
-if source == "Subir un CT":
+if source == "Casos PENGWIN (100)":
+    case_path = pengwin_page()
+    if case_path is None:
+        st.stop()
+elif source == "Subir un CT":
     uploaded = st.session_state.get("uploaded_case")
     if uploaded and Path(uploaded, "meta.json").exists():
         with st.sidebar:
@@ -384,8 +498,11 @@ with st.sidebar:
         real = meta["fragments_gt"]
         st.caption(f"Ground truth: {len(real)} fragmentos ({sum(1 for r in real if not r['is_main'])} secundarios)")
 
-tab1, tab2, tab3, tab4 = st.tabs(["1 · Volumen crudo", "2 · Corte por corte", "3 · Reconstrucción 3D",
-                                  "Métricas y latencia"])
+tab0, tab1, tab2, tab3, tab4 = st.tabs(["Preprocesamiento", "1 · Volumen crudo", "2 · Corte por corte",
+                                        "3 · Reconstrucción 3D", "Métricas y latencia"])
+
+with tab0:
+    steps_tab(meta, data.get("pasos"))
 
 # ----------------------------------------------------------------------------- visualizador 1
 with tab1:

@@ -10,3 +10,5 @@ pandas
 # Subir un CT propio: leer .mha / NIfTI / DICOM, orientarlo, preprocesarlo y armar las mallas.
 SimpleITK
 scikit-image
+# Casos PENGWIN (100) desde S3.
+boto3
