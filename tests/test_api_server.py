@@ -38,7 +38,8 @@ class ApiServer(unittest.TestCase):
         body = self.client.get("/health?deep=1").json()
         self.assertTrue(body["ok"])
         self.assertEqual(body["model"], CHECKPOINT.name)
-        self.assertTrue(body["canonical"])          # H6 espera cortes enderezados
+        self.assertTrue(body["canonical"])          # H8 espera cortes enderezados
+        self.assertEqual(body["precision"], "int8")  # PRECISION=auto en CPU → int8 híbrido
 
     def test_wrong_key_is_rejected(self):
         response = self.client.post("/predict_slice", content=self.npy(np.zeros((384, 384), np.uint8)),
@@ -104,7 +105,7 @@ class ApiServer(unittest.TestCase):
             remote = predecir(images)
         self.assertEqual(info["checkpoint"], CHECKPOINT.name)
         self.assertTrue(info["canonical"])
-        model, device, _ = load_pipeline(CHECKPOINT)
+        model, device, _ = load_pipeline(CHECKPOINT, precision=info["precision"])   # la misma que el servidor
         local = predict_volume(model, images, device, batch_size=4)
         np.testing.assert_array_equal(remote["semantic"], local["semantic"])
         np.testing.assert_array_equal(remote["primary_secondary"], local["primary_secondary"])

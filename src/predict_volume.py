@@ -98,18 +98,33 @@ def predict_volume(model: torch.nn.Module, images_u8: np.ndarray, device: torch.
             "boxes_refined": boxes_refined, "seconds": time.perf_counter() - started}
 
 
-def load_pipeline(checkpoint: str | Path, device: torch.device | None = None, tta: bool = False):
-    """Carga el checkpoint con el mismo código que la evaluación. Devuelve (modelo, device, info)."""
+def load_pipeline(checkpoint: str | Path, device: torch.device | None = None, tta: bool = False,
+                  precision: str = "fp32"):
+    """Carga el checkpoint con el mismo código que la evaluación. Devuelve (modelo, device, info).
+
+    ``precision``: ``fp32`` (como se entrenó), ``int8`` (CPU), ``fp16`` (GPU) o ``auto`` (fp16 en GPU,
+    int8 en CPU). Ver ``precision.py`` y ``docs/cuantizacion.md``; las tres dan el mismo Dice.
+    """
     from evaluate_volumes import load_model
+    from evaluate_week10 import EnsembleTTA
+    import precision as prec
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, _ = load_model([str(checkpoint)], device, tta)
+    elegida = prec.elegir(precision, device)
+    base, _ = load_model([str(checkpoint)], torch.device("cpu") if elegida == "int8" else device, False)
+    parameters = int(sum(p.numel() for p in base.parameters()))
+    canonical = bool(getattr(base, "canonical", False))
+    model, origen = prec.aplicar(base, elegida, device, checkpoint)
+    if tta:
+        model = EnsembleTTA([model], True).to(device)
+    model.canonical = canonical
     raw = torch.load(checkpoint, map_location="cpu")
     info = {"checkpoint": Path(checkpoint).name, "base_channels": int(raw["base_channels"]),
             "input_size": int(raw.get("input_size", 384)), "ema": raw.get("ema"),
-            "parameters": int(sum(p.numel() for p in model.parameters())), "tta": bool(tta),
+            "parameters": parameters, "tta": bool(tta),
+            "precision": elegida, "precision_origen": origen,
             # True: el modelo espera cortes en orientación canónica (orientacion.py); quien lo llama
             # endereza el volumen antes. predict_volume no gira nada.
-            "canonical": bool(getattr(model, "canonical", False))}
+            "canonical": canonical}
     return model, device, info
 
 

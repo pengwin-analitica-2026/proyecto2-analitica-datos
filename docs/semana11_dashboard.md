@@ -129,6 +129,20 @@ Límites: en Streamlit Cloud la memoria es limitada (del orden de 2-3 GB), así 
 grande (por ejemplo 512×512×800) puede no caber. La primera llamada a la API después de un rato sin
 uso tarda hasta ~90 s por el arranque en frío de Lambda.
 
+## Procesamiento: dónde corre el modelo y con qué precisión
+
+Bloque **Procesamiento** de la barra lateral. Aplica a la inferencia en vivo del visualizador 2, a
+«Procesar ahora» (casos de PENGWIN) y a los CT subidos; los casos precalculados no se vuelven a procesar.
+
+- **Dónde corre el modelo**: «Este equipo» (si hay torch y el checkpoint), «AWS · CPU (Lambda)» (si
+  está `INFERENCE_URL`) y «AWS · GPU» (si está `INFERENCE_URL_GPU`). Solo aparecen los disponibles.
+- **Precisión** (en este equipo): H8 normal (fp32), H8 cuantizado int8 (CPU), fp16 (GPU) o automática
+  (int8 en CPU, fp16 en GPU). En AWS la fija el servicio (`PRECISION`) y se informa al procesar.
+
+Es el mismo H8 con el mismo Dice; cambia la velocidad (`docs/cuantizacion.md`). Cada combinación de
+destino y precisión se guarda aparte, para comparar las dos versiones del mismo caso; la barra lateral
+dice con qué precisión se predijo el caso abierto.
+
 ## Orientación
 
 H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están
@@ -165,7 +179,8 @@ No se devuelve el resultado a la orientación original: en la canónica todos lo
 | `src/raw_view.py` | Visualizador 1: MIP en tres ejes e isosuperficie del hueso, sobre el volumen sin procesar |
 | `src/measure_latency.py` | Latencia por imagen en CPU y GPU (mediana y p90); escribe `outputs/demo/latency.json` |
 | `app/dashboard.py` | Dashboard Streamlit con tres pestañas, métricas y latencia, y la advertencia de uso no clínico siempre visible |
-| `api/server.py` | API de inferencia por corte (AWS Lambda) |
+| `api/server.py` | API de inferencia por corte (AWS Lambda); precisión con `PRECISION` |
+| `src/precision.py` | Precisión de H8: fp32, int8 híbrido (CPU, exportable ya cuantizado) o fp16 (GPU); `auto` según el hardware |
 
 ## Lo que se ve en cada visualizador
 

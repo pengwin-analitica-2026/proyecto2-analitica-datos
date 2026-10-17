@@ -113,13 +113,14 @@ def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeou
         semantic = packed["semantic"]
     return {"semantic": semantic[None], "boxes_refined": [payload["boxes_refined"]],
             "boxes_raw": [payload["boxes_raw"]], "latency_ms": payload["latency_ms"],
-            "device": payload["device"], "round_trip_ms": round_trip, "model": payload.get("model")}
+            "device": payload["device"], "round_trip_ms": round_trip, "model": payload.get("model"),
+            "precision": payload.get("precision", "fp32")}
 
 
 @st.cache_resource(show_spinner="Cargando el modelo…")
-def load_live_model(checkpoint: str, tta: bool):
+def load_live_model(checkpoint: str, tta: bool, precision: str = "fp32"):
     from predict_volume import load_pipeline
-    return load_pipeline(checkpoint, tta=tta)
+    return load_pipeline(checkpoint, tta=tta, precision=precision)
 
 
 def legend_html(fragments: list[dict]) -> str:
@@ -242,9 +243,9 @@ def latency_section() -> None:
 
 
 @st.cache_resource(show_spinner="Cargando el modelo…")
-def local_predictor(checkpoint: str, tta: bool):
+def local_predictor(checkpoint: str, tta: bool, precision: str = "fp32"):
     from demo_export import predictor_local
-    return predictor_local(checkpoint, tta=tta)
+    return predictor_local(checkpoint, tta=tta, precision=precision)
 
 
 def torch_available() -> bool:
@@ -255,18 +256,62 @@ def torch_available() -> bool:
         return False
 
 
-def choose_predictor(tta: bool):
-    """Modelo local si hay torch y checkpoint; si no, la API de AWS. Devuelve (info, predecir, dónde)."""
+PRECISION_LABELS = {"auto": "Automática: int8 en CPU, fp16 en GPU", "fp32": "H8 normal (fp32)",
+                    "int8": "H8 cuantizado (int8, para CPU)", "fp16": "H8 fp16 (para GPU)"}
+
+
+def processing_targets() -> dict[str, dict]:
+    """Dónde puede correr el modelo: este equipo (torch + checkpoint), la API en CPU y, si está, en GPU."""
+    targets = {}
     if torch_available() and MODEL_CHECKPOINT.exists():
-        info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta)
-        return info, predecir, f"modelo local ({info['device']})"
-    url = setting("INFERENCE_URL")
-    if url:
-        from inferencia_remota import predictor_remoto
-        info, predecir = predictor_remoto(url, setting("INFERENCE_KEY"))
-        return info, predecir, "API de AWS Lambda"
-    raise RuntimeError("No hay dónde correr el modelo: falta torch con el checkpoint en "
-                       f"`{MODEL_CHECKPOINT.relative_to(ROOT)}` o el servicio de inferencia (`INFERENCE_URL`).")
+        targets["Este equipo"] = {"kind": "local", "slug": "local"}
+    if setting("INFERENCE_URL"):
+        targets["AWS · CPU (Lambda)"] = {"kind": "remote", "slug": "aws-cpu", "url": setting("INFERENCE_URL"),
+                                         "key": setting("INFERENCE_KEY")}
+    if setting("INFERENCE_URL_GPU"):
+        targets["AWS · GPU"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL_GPU"),
+                                "key": setting("INFERENCE_KEY_GPU") or setting("INFERENCE_KEY")}
+    return targets
+
+
+def processing_settings() -> dict | None:
+    """Bloque «Procesamiento» de la barra lateral: dónde corre el modelo y con qué precisión."""
+    targets = processing_targets()
+    if not targets:
+        return None
+    with st.sidebar:
+        st.subheader("Procesamiento")
+        name = st.selectbox("Dónde corre el modelo", list(targets), key="target",
+                            help="Para la inferencia en vivo, «Procesar ahora» y los CT subidos. Los casos ya "
+                                 "precalculados no se vuelven a procesar.")
+        target = dict(targets[name], name=name)
+        if target["kind"] == "local":
+            import torch
+            gpu = torch.cuda.is_available()
+            target["precision"] = st.selectbox(
+                "Precisión", list(PRECISION_LABELS), format_func=PRECISION_LABELS.get, key="precision",
+                help="El mismo H8 con el mismo Dice (docs/cuantizacion.md); cambia la velocidad. int8 solo corre "
+                     "en CPU y fp16 rinde en GPU." + ("" if gpu else " Este equipo no tiene GPU: fp16 será lento."))
+            if target["precision"] == "fp16" and not gpu:
+                st.caption("Sin GPU, fp16 es más lento que fp32: sirve solo para comparar.")
+        else:
+            target["precision"] = "servicio"
+            st.caption("La precisión la fija el servicio (`PRECISION`; con `auto`, int8 en CPU y fp16 en GPU) y "
+                       "se informa al procesar.")
+    return target
+
+
+def choose_predictor(tta: bool, target: dict | None):
+    """Devuelve (info, predecir, dónde) según el destino elegido en «Procesamiento»."""
+    if target is None:
+        raise RuntimeError("No hay dónde correr el modelo: falta torch con el checkpoint en "
+                           f"`{MODEL_CHECKPOINT.relative_to(ROOT)}` o el servicio de inferencia (`INFERENCE_URL`).")
+    if target["kind"] == "local":
+        info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta, target["precision"])
+        return info, predecir, f"este equipo ({info['device']}, {info['precision']})"
+    from inferencia_remota import predictor_remoto
+    info, predecir = predictor_remoto(target["url"], target["key"])
+    return info, predecir, f"{target['name']} ({info['precision']})"
 
 
 def upload_page() -> Path | None:
@@ -297,9 +342,10 @@ def upload_page() -> Path | None:
     archivos = [(f.name, f.getvalue()) for f in files]
     with st.status("Procesando el CT…", expanded=True) as status:
         try:
-            info, predecir, where = choose_predictor(tta)
+            info, predecir, where = choose_predictor(tta, PROCESSING)
             out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
-                f"{huella(archivos)}{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
+                f"{huella(archivos)}-{PROCESSING['slug']}-{info.get('precision', 'fp32')}"
+                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
             if (out_dir / "meta.json").exists():
                 status.update(label="Este CT ya se había procesado", state="complete")
                 return out_dir
@@ -370,7 +416,8 @@ def pengwin_page() -> Path | None:
                "post-proceso 3D, distancias y mallas.")
     tta = st.checkbox("TTA de espejo", False, key="pengwin_tta",
                       help="Más preciso y el doble de tiempo. Solo aplica con el modelo local.")
-    folder = S3_CACHE / "en_vivo" / model / f"{case_id}{'-tta' if tta else ''}"
+    target = PROCESSING or {"slug": "ninguno", "precision": "fp32"}
+    folder = S3_CACHE / "en_vivo" / model / f"{case_id}-{target['slug']}-{target['precision']}{'-tta' if tta else ''}"
     if (folder / "meta.json").exists():
         return folder
     if not st.button(f"Procesar el caso {case_id}", type="primary"):
@@ -378,7 +425,7 @@ def pengwin_page() -> Path | None:
     from demo_export import exportar_volumen, preparar_caso
     with st.status(f"Procesando el caso {case_id}…", expanded=True) as status:
         try:
-            info, predecir, where = choose_predictor(tta)
+            info, predecir, where = choose_predictor(tta, PROCESSING)
             status.write(f"Modelo: {info['checkpoint']} · {where}")
             started = time.perf_counter()
             with tempfile.TemporaryDirectory() as tmp:
@@ -427,6 +474,7 @@ st.error(NON_CLINICAL, icon="⚠️")
 with st.sidebar:
     st.header("Caso")
     source = st.radio("Origen", ["Casos de ejemplo", "Casos PENGWIN (100)", "Subir un CT"], key="source")
+PROCESSING = processing_settings()
 
 if source == "Casos PENGWIN (100)":
     case_path = pengwin_page()
@@ -467,7 +515,7 @@ with st.sidebar:
                f"{meta['spacing_native_xyz'][0]:.2f}×{meta['spacing_native_xyz'][1]:.2f}×"
                f"{meta['spacing_native_xyz'][2]:.2f} mm")
     st.caption(f"Modelo {meta['model']['checkpoint']} · {meta['model']['parameters'] / 1e6:.2f} M parámetros "
-               f"· TTA {'sí' if meta['tta'] else 'no'}")
+               f"· precisión {meta['model'].get('precision', 'fp32')} · TTA {'sí' if meta['tta'] else 'no'}")
     if meta.get("canonical") and not subido:
         st.caption("Orientación canónica (sacro abajo): " + (
             "este volumen venía guardado girado 180° (cabecera LPI) y se enderezó antes de predecir; "
@@ -560,25 +608,25 @@ with tab2:
     st.dataframe(fragments_dataframe(fragments), use_container_width=True, hide_index=True)
 
     with st.expander("Inferir este corte en vivo (modelo real, con latencia)"):
-        remote_url = setting("INFERENCE_URL")
         checkpoint = CHECKPOINT_DIR / meta["model"]["checkpoint"]
-        if not remote_url and not checkpoint.exists():
+        if PROCESSING is None or (PROCESSING["kind"] == "local" and not checkpoint.exists()):
             st.info("La inferencia en vivo no está configurada en esta instalación: falta el servicio de "
                     "inferencia (`INFERENCE_URL`) o el checkpoint en `outputs/s10/`.")
-        elif st.button("Inferir el corte seleccionado"):
+        elif st.button(f"Inferir el corte seleccionado · {PROCESSING['name']}"):
             try:
-                if remote_url:
-                    live = remote_predict_slice(remote_url, setting("INFERENCE_KEY"), data["images"][z])
-                    where = f"{live['device']} del servicio remoto · ida y vuelta {live['round_trip_ms']:.0f} ms"
+                if PROCESSING["kind"] == "remote":
+                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z])
+                    where = (f"{live['device']} en {PROCESSING['name']} · precisión {live.get('precision', 'fp32')} · "
+                             f"ida y vuelta {live['round_trip_ms']:.0f} ms")
                     if live.get("model") and live["model"] != meta["model"]["checkpoint"]:
                         st.warning(f"El servicio usa {live['model']} y este caso se exportó con "
                                    f"{meta['model']['checkpoint']}.")
                 else:
                     from predict_volume import predict_slice
-                    model, device, info = load_live_model(str(checkpoint), False)
+                    model, device, info = load_live_model(str(checkpoint), False, PROCESSING["precision"])
                     predict_slice(model, device, data["images"][z])     # pasada de calentamiento
                     live = predict_slice(model, device, data["images"][z])
-                    where = f"{device} local"
+                    where = f"{device} de este equipo · precisión {info['precision']}"
                 semantic = live["semantic"][0]
                 starts = np.array([0] + [REGION_STARTS[r] for r in REGION_ORDER], dtype=np.uint8)
                 live_ids = starts[semantic]

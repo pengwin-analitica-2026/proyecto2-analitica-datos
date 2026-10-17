@@ -172,10 +172,13 @@ def checkpoint_is_canonical(checkpoint: str | Path) -> bool:
 
 
 def predictor_local(checkpoint: str | Path, tta: bool = True, batch_size: int = 8,
-                    log=print) -> tuple[dict, object]:
-    """Modelo local con torch. Devuelve (info del modelo, función que predice un volumen uint8)."""
+                    log=print, precision: str = "fp32") -> tuple[dict, object]:
+    """Modelo local con torch. Devuelve (info del modelo, función que predice un volumen uint8).
+
+    ``precision``: fp32, int8 (CPU), fp16 (GPU) o auto; ver ``precision.py``.
+    """
     from predict_volume import load_pipeline, predict_volume
-    model, device, info = load_pipeline(checkpoint, tta=tta)
+    model, device, info = load_pipeline(checkpoint, tta=tta, precision=precision)
     info = dict(info, device=str(device))
 
     def predecir(images: np.ndarray, progress=None) -> dict:
