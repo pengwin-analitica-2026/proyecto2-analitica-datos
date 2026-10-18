@@ -1,0 +1,24 @@
+# Imagen de la API con GPU (CUDA) para un endpoint de SageMaker (ml.g4dn.xlarge, NVIDIA T4).
+# Misma API que la Lambda (api/server.py), con PRECISION=auto → fp16 en GPU.
+# La construye GitHub Actions (.github/workflows/build-gpu.yml, a mano); también en local:
+#   docker build --platform linux/amd64 -f api/Dockerfile.gpu -t pelvis-api-gpu .
+# SageMaker la llama en /ping (salud) y /invocations (la ruta va en CustomAttributes, ver server.py).
+FROM public.ecr.aws/docker/library/python:3.11-slim
+
+WORKDIR /app
+COPY api/requirements.txt api/requirements.txt
+# torch con CUDA 12.1 trae sus propias bibliotecas de CUDA; el driver de NVIDIA lo pone la instancia.
+# Son ~3 GB de descargas: más tiempo de espera y reintentos para que un corte no tumbe la construcción.
+RUN pip install --no-cache-dir --timeout 120 --retries 10 torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install --no-cache-dir --timeout 120 --retries 10 -r api/requirements.txt
+
+COPY src/ src/
+COPY api/server.py api/server.py
+COPY api/serve.sh api/serve.sh
+COPY outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth
+COPY outputs/s10/calibracion_int8_h8.npz outputs/s10/calibracion_int8_h8.npz
+RUN chmod -R a+rX /app
+
+ENV MODEL_PATH=/app/outputs/s10/h8_aumm_noise01_noema_w32_e60_s42.pth PRECISION=auto
+EXPOSE 8080
+ENTRYPOINT ["/app/api/serve.sh"]

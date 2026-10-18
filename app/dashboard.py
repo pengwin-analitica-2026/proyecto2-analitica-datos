@@ -92,7 +92,8 @@ def setting(name: str) -> str | None:
         return None
 
 
-def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeout: float = 120.0) -> dict:
+def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeout: float = 120.0,
+                         destino: str | None = None) -> dict:
     """Manda un corte al servicio de inferencia (api/server.py) y devuelve lo mismo que predict_slice."""
     import base64
     import io
@@ -101,7 +102,8 @@ def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeou
     buffer = io.BytesIO()
     np.save(buffer, np.ascontiguousarray(image_u8, dtype=np.uint8), allow_pickle=False)
     request = urllib.request.Request(url.rstrip("/") + "/predict_slice", data=buffer.getvalue(), method="POST",
-                                     headers={"Content-Type": "application/octet-stream", "X-API-Key": key or ""})
+                                     headers={"Content-Type": "application/octet-stream", "X-API-Key": key or "",
+                                              **({"X-Destino": destino} if destino else {})})
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -260,6 +262,17 @@ PRECISION_LABELS = {"auto": "Automática: int8 en CPU, fp16 en GPU", "fp32": "H8
                     "int8": "H8 cuantizado (int8, para CPU)", "fp16": "H8 fp16 (para GPU)"}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def gpu_status(url: str) -> str | None:
+    """Estado del endpoint de GPU según la API («InService» si está encendido); None si no hay o no responde."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url.rstrip("/") + "/health", timeout=10) as response:
+            return json.loads(response.read()).get("gpu")
+    except Exception:
+        return None
+
+
 def processing_targets() -> dict[str, dict]:
     """Dónde puede correr el modelo: este equipo (torch + checkpoint), la API en CPU y, si está, en GPU."""
     targets = {}
@@ -268,10 +281,80 @@ def processing_targets() -> dict[str, dict]:
     if setting("INFERENCE_URL"):
         targets["AWS · CPU (Lambda)"] = {"kind": "remote", "slug": "aws-cpu", "url": setting("INFERENCE_URL"),
                                          "key": setting("INFERENCE_KEY")}
+    if setting("INFERENCE_URL") and gpu_status(setting("INFERENCE_URL")) == "InService":
+        # El endpoint de SageMaker existe y está encendido: la Lambda reenvía los pedidos con X-Destino: gpu.
+        targets["AWS · GPU (SageMaker)"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL"),
+                                            "key": setting("INFERENCE_KEY"), "destino": "gpu"}
     if setting("INFERENCE_URL_GPU"):
         targets["AWS · GPU"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL_GPU"),
                                 "key": setting("INFERENCE_KEY_GPU") or setting("INFERENCE_KEY")}
     return targets
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def gpu_details(url: str, key: str) -> dict | None:
+    from inferencia_remota import control_gpu
+    try:
+        return control_gpu(url, key, "estado")
+    except Exception:
+        return None
+
+
+def falta(iso: str | None) -> str:
+    """«3 h 12 min» hasta la hora UTC ``iso`` (2026-10-17T22:00:00Z)."""
+    if not iso:
+        return ""
+    from datetime import datetime, timezone
+    minutos = max(0, int((datetime.fromisoformat(iso.replace("Z", "+00:00"))
+                          - datetime.now(timezone.utc)).total_seconds() // 60))
+    return f"{minutos // 60} h {minutos % 60:02d} min"
+
+
+GPU_TEXTO = {"InService": "🟢 encendida", "Creating": "🟡 encendiendo (~8 min)", "Updating": "🟡 actualizando",
+             "Deleting": "🟠 apagándose", "Failed": "🔴 falló al encender", None: "⚪ apagada"}
+
+
+def gpu_panel() -> None:
+    """GPU en SageMaker bajo demanda: estado, encender (con apagado automático) y apagar.
+
+    Cada hora encendida cuesta ~0.74 USD; por eso encender y apagar piden la clave de administración
+    del equipo (``GPU_ADMIN_KEY`` en la Lambda) y la GPU se apaga sola a las 4 horas.
+    """
+    url, key = setting("INFERENCE_URL"), setting("INFERENCE_KEY")
+    if not url:
+        return
+    datos = gpu_details(url, key or "")
+    if not datos or not datos.get("endpoint"):
+        return                                   # la API no tiene GPU configurada
+    with st.sidebar.expander(f"GPU (SageMaker) · {GPU_TEXTO.get(datos['estado'], datos['estado'])}"):
+        st.caption(f"NVIDIA T4 (`ml.g4dn.xlarge`, ~0.74 USD/h mientras esté encendida). Encenderla tarda unos "
+                   f"8 minutos; se apaga sola a las {datos.get('horas_apagado', 4):g} h.")
+        if datos.get("apagado_programado"):
+            st.write(f"Se apaga sola en **{falta(datos['apagado_programado'])}** "
+                     f"({datos['apagado_programado'].replace('T', ' ').replace('Z', ' UTC')}).")
+        clave = st.text_input("Clave de administración", type="password", key="gpu_admin",
+                              help="Solo el equipo: evita que cualquier visitante de la app encienda la GPU.")
+        encender, apagar = st.columns(2)
+        accion = None
+        if encender.button("Encender (4 h)" if datos["estado"] is None else "Extender a 4 h",
+                           disabled=datos["estado"] == "Deleting", use_container_width=True):
+            accion = "encender"
+        if apagar.button("Apagar", disabled=datos["estado"] in (None, "Deleting"), use_container_width=True):
+            accion = "apagar"
+        if accion:
+            from inferencia_remota import control_gpu
+            try:
+                control_gpu(url, key, accion, clave)
+            except RuntimeError as error:
+                st.error(f"No se pudo {accion}: {error}")
+            else:
+                gpu_details.clear()
+                gpu_status.clear()
+                st.rerun()
+        if datos["estado"] == "Creating" and st.button("Actualizar estado", use_container_width=True):
+            gpu_details.clear()
+            gpu_status.clear()
+            st.rerun()
 
 
 def processing_settings() -> dict | None:
@@ -298,6 +381,7 @@ def processing_settings() -> dict | None:
             target["precision"] = "servicio"
             st.caption("La precisión la fija el servicio (`PRECISION`; con `auto`, int8 en CPU y fp16 en GPU) y "
                        "se informa al procesar.")
+    gpu_panel()
     return target
 
 
@@ -310,7 +394,7 @@ def choose_predictor(tta: bool, target: dict | None):
         info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta, target["precision"])
         return info, predecir, f"este equipo ({info['device']}, {info['precision']})"
     from inferencia_remota import predictor_remoto
-    info, predecir = predictor_remoto(target["url"], target["key"])
+    info, predecir = predictor_remoto(target["url"], target["key"], destino=target.get("destino"))
     return info, predecir, f"{target['name']} ({info['precision']})"
 
 
@@ -615,7 +699,8 @@ with tab2:
         elif st.button(f"Inferir el corte seleccionado · {PROCESSING['name']}"):
             try:
                 if PROCESSING["kind"] == "remote":
-                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z])
+                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z],
+                                                destino=PROCESSING.get("destino"))
                     where = (f"{live['device']} en {PROCESSING['name']} · precisión {live.get('precision', 'fp32')} · "
                              f"ida y vuelta {live['round_trip_ms']:.0f} ms")
                     if live.get("model") and live["model"] != meta["model"]["checkpoint"]:
