@@ -54,8 +54,6 @@ limitaciones están en el [model card](MODEL_CARD.md) y en [`docs/modelo_h8.md`]
 | [`docs/despliegue_aws_streamlit.md`](docs/despliegue_aws_streamlit.md) | Semana 11: despliegue en Streamlit Cloud y AWS Lambda |
 | [`docs/cicd_github_actions.md`](docs/cicd_github_actions.md) | Semana 11: pruebas y despliegue automáticos |
 | [`docs/cuantizacion.md`](docs/cuantizacion.md) | Cuantización de H8: qué es, int8 para CPU y fp16 para GPU, resultados en validación y test, y cómo se elige la precisión en la API y el dashboard |
-| [`docs/video/demo_computador.mp4`](docs/video/demo_computador.mp4) | Semana 11: recorrido completo del dashboard publicado, grabado en el computador (110 s, con audio): inferencia corte a corte, tres visualizadores, métricas, latencia y tabla de distancias |
-| [`docs/video/demo_celular.mp4`](docs/video/demo_celular.mp4) | Semana 11: video del dashboard publicado, grabado desde un celular |
 | `notebooks/01` a `05` | Seguimiento por semana: EDA, intensidades, Semana 9, Semana 10 y casos difíciles (el 05 se hizo con D5) |
 | `notebooks/11_modelo_h8.ipynb` | Modelo entregado H8: entrenamiento, métricas en validación y test, comparación de modelos, CBAM, HD95/ASSD y distancia |
 
