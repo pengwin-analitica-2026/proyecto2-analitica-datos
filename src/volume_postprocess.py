@@ -53,6 +53,18 @@ def cache_spacing_xyz(row: dict, size: int) -> tuple[float, float, float]:
             float(row["spacing_z_mm"]))
 
 
+def _tamanos(etiquetas: np.ndarray, n: int) -> np.ndarray:
+    """Vóxeles de cada componente 1..n de ``ndi.label``. Igual que ``ndi.sum(mascara, etiquetas,
+    range(1, n + 1))`` cuando las etiquetas salen de esa misma máscara, pero sin convertir el volumen a
+    float64 (0.8 GB por llamada en un CT grande; el dashboard publicado tiene ~2.7 GB)."""
+    # Por bloques de cortes: bincount pasa las etiquetas (int32) a int64, y de una vez sería otra copia
+    # del volumen al doble de tamaño.
+    tamanos = np.zeros(n + 1, dtype=np.int64)
+    for inicio in range(0, len(etiquetas), 32):
+        tamanos += np.bincount(etiquetas[inicio:inicio + 32].ravel(), minlength=n + 1)
+    return tamanos[1:]
+
+
 def postprocess_3d(semantic: np.ndarray, primary_secondary: np.ndarray, min_voxels: int = 30,
                    min_region_voxels: int = 200, fill_unlabeled: bool = True) -> np.ndarray:
     """Volumen [z,y,x] de IDs PENGWIN a partir de la semántica y del mapa de 7 clases.
@@ -68,29 +80,36 @@ def postprocess_3d(semantic: np.ndarray, primary_secondary: np.ndarray, min_voxe
         components, n = ndi.label(anatomical, structure=STRUCTURE_3D)
         if n == 0:
             continue
-        sizes = np.asarray(ndi.sum(anatomical, components, index=range(1, n + 1)))
-        keep = np.flatnonzero(sizes >= min_region_voxels) + 1
-        anatomical = np.isin(components, keep)
+        sizes = _tamanos(components, n)
+        # Tabla por componente en vez de np.isin: isin ordena todo el volumen de etiquetas con
+        # temporales int64 (más de 1 GB en un CT grande); la tabla da lo mismo con 1 byte por vóxel.
+        conservar = np.zeros(n + 1, dtype=bool)
+        conservar[1:] = sizes >= min_region_voxels
+        anatomical = conservar[components]
+        del components
         if not anatomical.any():
             continue
         primary = (primary_secondary == 2 * region + 1) & anatomical
         secondary = (primary_secondary == 2 * region + 2) & anatomical
         labeled, n = ndi.label(primary, structure=STRUCTURE_3D)
         if n > 0:
-            sizes = np.asarray(ndi.sum(primary, labeled, index=range(1, n + 1)))
+            sizes = _tamanos(labeled, n)
             main = labeled == (int(np.argmax(sizes)) + 1)
+            del labeled
             secondary |= primary & ~main
         else:   # sin primario predicho: el componente anatómico mayor hace de principal
             labeled, n = ndi.label(anatomical, structure=STRUCTURE_3D)
-            sizes = np.asarray(ndi.sum(anatomical, labeled, index=range(1, n + 1)))
+            sizes = _tamanos(labeled, n)
             main = labeled == (int(np.argmax(sizes)) + 1)
+            del labeled
             secondary &= ~main
         output[main] = start
         pieces, n = ndi.label(secondary, structure=STRUCTURE_3D)
-        sizes = np.asarray(ndi.sum(secondary, pieces, index=range(1, n + 1))) if n else np.array([])
+        sizes = _tamanos(pieces, n) if n else np.array([])
         order = [int(i) + 1 for i in np.argsort(-sizes) if sizes[i] >= min_voxels][:9]
         for rank, piece in enumerate(order):
             output[pieces == piece] = start + 1 + rank
+        del pieces, primary, secondary, main
         # Vóxeles de la región sin etiqueta (secundarios chicos, huecos) → principal.
         if fill_unlabeled:
             output[anatomical & (output == 0)] = start

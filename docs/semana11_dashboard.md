@@ -161,6 +161,21 @@ Resultado (pico de RAM del pipeline, sin el modelo, que en la nube corre en la L
 a 1.73 GB; caso 001 (el más grande, 420 MB), de 4.05 a 2.55 GB. Los casos precalculados y las
 exportaciones oficiales (`demo_export.py`) no cambian.
 
+**Segunda caída (17 de octubre, caso 044).** Con lo anterior ya integrado, subir el `.mha` del 044 volvió
+a tumbar la app. El 044 tiene 27 fragmentos predichos y su caja del hueso es casi todo el volumen
+(393×373×330), así que recortar no ayudaba; el pico estaba en dos funciones que copiaban el volumen de
+etiquetas a tipos más grandes. Además, la sesión llevaba dos horas abierta con dos casos guardados en la
+caché. Medido con el 044:
+
+| Cambio | Dónde | Antes → ahora |
+|---|---|---|
+| Tamaño de cada componente con `np.bincount` por bloques de cortes en vez de `ndi.sum` (que pasa la máscara a float64) y una tabla por componente en vez de `np.isin` (que ordena todo el volumen con temporales int64); los volúmenes de etiquetas se liberan al dejar de usarse | `volume_postprocess.postprocess_3d` | 1.60 → 0.48 GB |
+| La transformada de distancia pide solo los índices del vóxel más cercano, en int32, sin el mapa de distancias float64 que no se usaba | `fragment_distances.edge_distance_mm` | 1.20 → 0.61 GB |
+| Antes de procesar un CT o un caso «Procesar ahora» se sueltan los casos guardados en la caché | `app/dashboard.free_memory` | Lo que pesen los dos casos abiertos |
+
+Pico del pipeline completo con el 044: de 1.83 a 0.96 GB. El volumen de IDs y la tabla de las 27
+distancias son idénticos a los del código anterior (comparados vóxel a vóxel), y pasan las 171 pruebas.
+
 ## Orientación
 
 H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están

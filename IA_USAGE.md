@@ -931,8 +931,27 @@ pedido de Gustavo con los prompts copiados tal cual.
   depende de que alguien se acuerde, sino de una tarea en AWS. El permiso de la Lambda para crear
   endpoints se limitó a ese nombre y esa configuración, para que el botón no pueda levantar otra
   instancia más cara. Al revisar, la IA encontró que la sincronización del PR #19 había dejado
-  `IA_USAGE.md` sin las entradas 37 a 41; se restauraron sin tocar las de main.
+  `IA_USAGE.md` sin las entradas 37 a 41; se restauraron sin tocar las de main. Al correr `preparar` por primera vez
+  en AWS, `CreateModel` falló con «cannot pull»: el rol y su política se acababan de crear y IAM
+  todavía no los había propagado; el script ahora reintenta unas veces antes de rendirse.
 
+### 43. Segunda caída del dashboard publicado con un .mha (caso 044)
+
+- **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-opus-5-5`.
+  17 de octubre de 2026, rama `fix/memoria-distancias`.
+- **Prompt exacto:**
+  > mmira que me falló otra vez al subir el .mha 044
+- **Qué produjo la IA:** el diagnóstico con el log (otra vez sin error de Python: el sistema mató la app
+  por memoria) y la medición del pico por función con el 044 y el modelo real: el post-proceso 3D
+  (`ndi.sum` y `np.isin` copiaban el volumen de etiquetas a float64 e int64) y la transformada de
+  distancia (pedía un mapa de distancias que no se usaba). Los arreglos bajan el pico de 1.83 a 0.96 GB
+  con el resultado idéntico, y el dashboard suelta los casos en caché antes de procesar.
+- **Qué se hizo a mano:** Gustavo encontró la caída en producción y bajó el log.
+- **Análisis crítico:** el arreglo anterior (entrada 41) se midió con los casos 050 y 001, que tienen
+  pocos fragmentos y una caja del hueso más chica; el 044 tiene 27 fragmentos y la caja es casi todo
+  el volumen, así que recortar no bastaba. Tampoco se había contado la caché de casos de una sesión
+  larga. El primer intento (índices en int32) no movió el pico: medir por función mostró que estaba
+  en otra parte. Para que no vuelva a pasar falta medir los casos extremos, no solo los grandes.
 ---
 
 # Parte 2. Análisis crítico

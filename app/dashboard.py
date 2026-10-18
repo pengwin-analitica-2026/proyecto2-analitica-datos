@@ -66,6 +66,18 @@ def discover_cases() -> dict[str, Path]:
     return cases
 
 
+def free_memory() -> None:
+    """Suelta los casos que la app tiene en memoria antes de procesar un CT nuevo.
+
+    Streamlit Cloud tiene ~2.7 GB por app y la memoria la comparten todas las sesiones: dos casos ya
+    abiertos (volúmenes y mallas) más un CT grande en proceso la pasaban. El caso se vuelve a leer del
+    disco cuando se lo pide otra vez (unos segundos).
+    """
+    import gc
+    load_case.clear()
+    gc.collect()
+
+
 @st.cache_resource(show_spinner="Cargando caso…", max_entries=2)
 def load_case(path: str) -> dict:
     folder = Path(path)
@@ -447,6 +459,7 @@ def upload_page() -> Path | None:
     from demo_export import exportar_volumen
     from volumen_entrada import huella, leer_subida
     archivos = [(f.name, f.getbuffer()) for f in files]     # sin copiar los bytes subidos (memoria)
+    free_memory()
     with st.status("Procesando el CT…", expanded=True) as status:
         try:
             info, predecir, where = choose_predictor(tta, PROCESSING)
@@ -532,6 +545,7 @@ def pengwin_page() -> Path | None:
     if not st.button(f"Procesar el caso {case_id}", type="primary"):
         return None
     from demo_export import exportar_volumen, preparar_caso
+    free_memory()
     with st.status(f"Procesando el caso {case_id}…", expanded=True) as status:
         try:
             info, predecir, where = choose_predictor(tta, PROCESSING)
