@@ -41,6 +41,10 @@ RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en te
 UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
 MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 MAX_UPLOAD_MB = 1024
+# Vista cruda (visualizador 1) de un CT subido o procesado en vivo: por encima de estos vóxeles se calcula
+# con menos resolución en el plano. Streamlit Community Cloud da ~2.7 GB por app y un .mha de 230 MB
+# llegaba a 3.4 GB y tumbaba la app (sin error en el log: el sistema mata el proceso).
+VISTA_MAX_VOXELES = int(os.environ.get("VISTA_MAX_VOXELES", 20_000_000))
 S3_CACHE = Path(os.environ.get("S3_CACHE", Path(tempfile.gettempdir()) / "pengwin_s3"))
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
@@ -398,6 +402,25 @@ def choose_predictor(tta: bool, target: dict | None):
     return info, predecir, f"{target['name']} ({info['precision']})"
 
 
+def max_upload_voxels() -> int | None:
+    """Tope de vóxeles para procesar un CT en el dashboard publicado (sin torch: Streamlit Cloud, ~2.7 GB).
+
+    El caso más grande de PENGWIN (001) tiene 105 millones de vóxeles y cabe con margen. En local no hay
+    tope salvo que se fije ``MAX_VOXELES_SUBIDA``."""
+    value = setting("MAX_VOXELES_SUBIDA")
+    if value:
+        return int(value)
+    return None if torch_available() else 120_000_000
+
+
+def check_volume_size(voxels: int) -> None:
+    limit = max_upload_voxels()
+    if limit and voxels > limit:
+        raise RuntimeError(f"El volumen tiene {voxels / 1e6:.0f} millones de vóxeles y el dashboard publicado procesa "
+                           f"hasta {limit / 1e6:.0f} millones (memoria limitada). Úsalo en el dashboard local "
+                           "(`streamlit run app/dashboard.py`), que no tiene ese tope.")
+
+
 def upload_page() -> Path | None:
     """Carga de un CT propio. Devuelve la carpeta del caso procesado, o None si todavía no hay uno."""
     st.subheader("Subir un CT propio")
@@ -423,7 +446,7 @@ def upload_page() -> Path | None:
         return None
     from demo_export import exportar_volumen
     from volumen_entrada import huella, leer_subida
-    archivos = [(f.name, f.getvalue()) for f in files]
+    archivos = [(f.name, f.getbuffer()) for f in files]     # sin copiar los bytes subidos (memoria)
     with st.status("Procesando el CT…", expanded=True) as status:
         try:
             info, predecir, where = choose_predictor(tta, PROCESSING)
@@ -436,6 +459,7 @@ def upload_page() -> Path | None:
             status.write(f"Modelo: {info['checkpoint']} · {where}")
             volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
             del archivos
+            check_volume_size(volume.image.size)
             status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "
                          f"{volume.image.shape[1]}×{volume.image.shape[2]} · vóxel "
                          f"{'×'.join(f'{v:.2f}' for v in volume.spacing_xyz)} mm · orientación: "
@@ -443,6 +467,7 @@ def upload_page() -> Path | None:
             started = time.perf_counter()
             exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
                              enderezar=enderezar, log=status.write, pasos=volume.pasos,
+                             max_voxeles_vista=VISTA_MAX_VOXELES,
                              extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
                                                     "donde": where}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
@@ -518,7 +543,7 @@ def pengwin_page() -> Path | None:
                 image, label, spacing_xyz, flipped, steps = preparar_caso(
                     image_path, label_path, case_id, bool(info.get("canonical")), log=status.write)
             exportar_volumen(image, spacing_xyz, folder, info, predecir, label=label, nombre=case_id,
-                             flipped=flipped, pasos=steps, log=status.write,
+                             flipped=flipped, pasos=steps, log=status.write, max_voxeles_vista=VISTA_MAX_VOXELES,
                              extra_meta={"en_vivo": {"donde": where}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
         except Exception as error:

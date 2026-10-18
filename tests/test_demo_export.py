@@ -136,3 +136,22 @@ class EnderezadoDeLaDemo(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CajaDelHueso(unittest.TestCase):
+    def test_recortar_al_hueso_da_la_misma_tabla(self):
+        from demo_export import _caja_hueso, _desplazar
+        volume = np.zeros((20, 60, 70), np.uint8)
+        volume[5:12, 10:20, 15:30] = 11            # principal del coxal izquierdo
+        volume[6:10, 10:20, 36:40] = 12            # fragmento a 6 vóxeles en x
+        spacing = (0.8, 0.9, 1.2)
+        caja = _caja_hueso(volume, None)
+        self.assertEqual(caja, (slice(3, 14), slice(8, 22), slice(13, 42)))
+        origen = np.array([c.start for c in caja])
+        completa = fragment_table(volume, spacing)
+        recortada = _desplazar(fragment_table(volume[caja], spacing), origen)
+        for a, b in zip(completa, recortada):
+            self.assertEqual({k: v for k, v in a.items() if k != "centroid_zyx_vox"},
+                             {k: v for k, v in b.items() if k != "centroid_zyx_vox"})
+            np.testing.assert_allclose(a["centroid_zyx_vox"], b["centroid_zyx_vox"])
+        self.assertEqual(_caja_hueso(np.zeros((4, 5, 6), np.uint8)), (slice(0, 4), slice(0, 5), slice(0, 6)))
