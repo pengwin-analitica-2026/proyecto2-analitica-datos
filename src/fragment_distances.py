@@ -56,9 +56,12 @@ def edge_distance_mm(fragment_mask: np.ndarray, main_mask: np.ndarray,
     fragment_mask = fragment_mask[crop]
     main_mask = main_mask[crop]
     spacing_zyx = np.asarray(spacing_xyz[::-1], dtype=np.float64)
-    _, nearest = ndi.distance_transform_edt(
-        ~main_mask, sampling=spacing_zyx, return_indices=True
-    )
+    # Solo hacen falta los índices del vóxel principal más cercano, no el mapa de distancias. Pedirlos
+    # sin distancias y en int32 usa 12 bytes por vóxel en vez de 32 (float64 + índices int64): en un CT
+    # grande con muchos fragmentos esto pasaba de 1.8 GB y tumbaba el dashboard publicado (~2.7 GB).
+    nearest = np.empty((3,) + main_mask.shape, dtype=np.int32)
+    ndi.distance_transform_edt(~main_mask, sampling=spacing_zyx, return_distances=False,
+                               return_indices=True, indices=nearest)
     fragment_coords = np.argwhere(fragment_mask)
     nearest_main = nearest[:, fragment_mask].T
     voxel_delta = np.abs(fragment_coords - nearest_main)
