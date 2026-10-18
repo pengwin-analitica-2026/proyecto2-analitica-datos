@@ -1,0 +1,11 @@
+# Igual que api/requirements.txt (la API web reutiliza api/server.py para el corte en vivo) más el
+# formulario del modo local. torch (CPU) se instala aparte en web/Dockerfile.
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+scipy
+scikit-image
+SimpleITK
+pillow
+boto3

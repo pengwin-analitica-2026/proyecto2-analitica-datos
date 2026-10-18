@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/pestanas.tsx","./src/components/subida.tsx","./src/components/trabajo.tsx","./src/components/visor3d.tsx","./src/lib/api.ts","./src/lib/caso.ts","./src/lib/corte.ts","./src/lib/paleta.ts"],"version":"5.6.3"}
