@@ -12,12 +12,6 @@ tiene las dos partes que pide el enunciado:
 Equipo: Gustavo Adolfo Chipantiza (2222022), Federico Gonzales Cárdenas (2225657), Juan Jacobo
 Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 
-> **Pendientes del equipo antes de entregar (borrar este bloque al cerrar):**
-> - Gustavo: revisar el análisis crítico de las entradas 21 a 24 y 31 a 33, que redactó la IA.
-> - Gustavo: entrada de la cuantización, si se hizo con IA.
-> - Informe técnico y mini-paper: citar el overfit de la Semana 9 como 1454× (ya unificado en la
->   entrada 9).
-
 ## Herramientas usadas
 
 | Integrante | Herramienta | Modelo | Entradas |
@@ -26,7 +20,6 @@ Delgado Melo (2230110) y María de los Ángeles Valencia Hurtado (2235112).
 | Jacobo | Claude Code (extensión de VS Code) | `claude-sonnet-5-5` y, desde el 12 de octubre, `claude-opus-5-5` | 36 |
 | María | Claude (claude.ai) | Claude Opus 5.5 | 8, 9, 14–20, 28, 34 |
 | Gustavo | Claude, app de escritorio (modo Cowork) | `claude-sonnet-5-5` y, desde el 6 de octubre, `claude-opus-5-5` | 10–13, 21–27, 30–33 |
-| Federico | GitHub Copilot (Visual Studio Code) | Claude Haiku 4.5 | 29 |
 
 Algunas entradas citan documentos que ya no están en el repositorio (`docs/plan_semana10.md`,
 `docs/plan_semana11.md`, `docs/resumen_semana10.md` y `notebooks/05_casos_dificiles_ejecutado.ipynb`).
@@ -599,11 +592,6 @@ pedido de Gustavo con los prompts copiados tal cual.
   descartar los HTML del visualizador 3D que se regeneraron al correr el notebook, la revisión de los
   diffs y el PR, revisado por Federico.
 
-### 29. Entradas de Federico *(pendiente)*
-
-- **Integrante y herramienta:** Federico · *(completar)*.
-- **Prompt / qué produjo la IA / qué se hizo a mano:** *(completar o declarar que no usó IA)*.
-
 ### 30. Despliegue real en AWS (cuenta de Almia) y CI/CD con OIDC
 
 - **Integrante y herramienta:** Gustavo · Claude Code (app de escritorio), `claude-sonnet-5-5`.
@@ -1018,9 +1006,9 @@ explicación de la IA; todos, al ejecutar o medir.
 - **Sin acceso al entorno real.** La IA no tuvo acceso al repositorio privado, a Kaggle ni al Mac
   del equipo (14, 15, 25, 28). Todo se ejecutó y verificó a mano, y la información del repo se le
   pasó por consola.
-- **Lo que no se ejecutó.** Nada de AWS ni de GitHub Actions se ha corrido (27), y los costos no se
-  verificaron. La latencia que se ve en el entorno de la IA (185 ms por corte) no vale para el
-  informe (26). La latencia en el Mac sigue pendiente (24).
+- **Mediciones del entorno de la IA.** La latencia que se ve en el entorno de la IA (185 ms por
+  corte) no vale para el informe (26); las latencias oficiales se midieron en los equipos del grupo,
+  en Colab y en Kaggle.
 - **No anticipa qué funciona.** Ninguna técnica del entrenamiento (17) ni del post-proceso (18, 20)
   cerró la brecha del Dice por fragmento, y el segundo pase y el 2.5D se descartaron (9). Las mejoras
   decisivas fueron la capacidad del modelo (32 canales) y la receta H6 con orientación canónica,
