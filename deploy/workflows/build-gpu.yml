@@ -1,0 +1,61 @@
+name: Imagen GPU (SageMaker)
+
+# Construye api/Dockerfile.gpu (la API con CUDA) y la sube a ECR como pelvis-api-gpu:latest y :<sha>.
+# Solo a mano (Actions → «Imagen GPU (SageMaker)» → Run workflow, o `gh workflow run build-gpu.yml`):
+# la GPU se enciende para pruebas o la presentación (deploy/aws/gpu_sagemaker.sh crear), así que no
+# hace falta reconstruirla en cada push. Construir no cuesta en SageMaker: solo el endpoint cobra por hora.
+# Se construye aquí y no en un computador porque la imagen pesa ~3 GB y una conexión de casa se corta.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: build-gpu
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write               # OIDC: el mismo rol del despliegue de la API
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      REPOSITORIO: pelvis-api-gpu
+    steps:
+      - uses: actions/checkout@v4
+
+      # La imagen con CUDA ocupa ~8 GB descomprimida y el runner trae poco espacio libre.
+      - name: Liberar espacio en el disco
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af > /dev/null
+          df -h /
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # La base viene del registro público de AWS; sin sesión, los runners caen en el límite de
+      # descargas anónimas (429 Too Many Requests).
+      - name: Iniciar sesión en ECR Public
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
+        env:
+          AWS_REGION: us-east-1
+
+      - name: Construir y subir la imagen
+        run: |
+          BASE="${{ steps.ecr.outputs.registry }}/${REPOSITORIO}"
+          docker build --platform linux/amd64 --provenance=false -f api/Dockerfile.gpu \
+            -t "$BASE:${GITHUB_SHA}" -t "$BASE:latest" .
+          docker push "$BASE:${GITHUB_SHA}"
+          docker push "$BASE:latest"
+          echo "Imagen: $BASE:latest (${GITHUB_SHA})" >> "$GITHUB_STEP_SUMMARY"

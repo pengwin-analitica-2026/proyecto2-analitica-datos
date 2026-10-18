@@ -17,7 +17,10 @@
         "ecr:BatchGetImage",
         "ecr:GetDownloadUrlForLayer"
       ],
-      "Resource": "arn:aws:ecr:us-east-2:050752608083:repository/pelvis-api"
+      "Resource": [
+        "arn:aws:ecr:us-east-2:050752608083:repository/pelvis-api",
+        "arn:aws:ecr:us-east-2:050752608083:repository/pelvis-api-gpu"
+      ]
     },
     {
       "Effect": "Allow",
