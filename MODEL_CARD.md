@@ -167,7 +167,7 @@ El ruido probado es el mismo tipo que se usó para entrenar; no se midió con ar
 El giro grande depende del enderezado previo, que la demo aplica desde esta versión
 (`src/demo_export.py`) y la evaluación oficial no.
 
-### 4.4 Ablación de CBAM (sobre H8)
+### 4.4 Ablación de CBAM (sobre H8) - Modelo Final
 
 Modelo con la receta exacta de H8 entrenado sin CBAM (`--cbam none`). Diferencia a favor de CBAM,
 media por cabeza:
@@ -234,7 +234,7 @@ La columna del equipo del grupo se midió con H8 (`src/measure_latency.py`,
 `outputs/demo/latency.json`). Las de Colab se midieron con H6; H8 tiene exactamente la misma
 arquitectura, así que su latencia es la misma.
 
-### 4.8.1 Cuantización
+### 4.8.1 Cuantización ( No se pierde Dice en el proceso de Cuantización )
 
 El mismo H8 en menos bits, sin reentrenar (detalle en `docs/cuantizacion.md`). Validación con TTA y
 test una vez por variante elegida, en Kaggle:
@@ -445,7 +445,7 @@ pesos en `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth`.
   de fragmentos o en la lateralidad tendría consecuencias clínicas.
 - El rendimiento puede bajar con escáneres, protocolos o poblaciones distintas a las del dataset.
 
-## 8. Despliegue
+## 8. Despliegue - Streamlit Community Cloud
 
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda en CPU; los dos se vuelven a desplegar en cada push a `main`
@@ -455,7 +455,7 @@ además una GPU bajo demanda (SageMaker, NVIDIA T4) que sirve H8 en fp16 a trav�
 se apaga sola a las 4 horas (sección 4.8.1). El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
 enunciado. La advertencia de uso no clínico está siempre visible en el dashboard.
 
-## 9. Modelos entrenados y pesos en el repositorio
+## 9. Modelos entrenados y pesos en el repositorio   
 
 El sistema es un solo modelo multitarea, así que hay un model card. Los pesos versionados son:
 
