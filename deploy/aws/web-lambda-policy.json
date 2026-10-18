@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BucketWebLecturaEscritura",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": "arn:aws:s3:::{BUCKET}/*"
+    },
+    {
+      "Sid": "BucketWebListar",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::{BUCKET}"
+    },
+    {
+      "Sid": "PengwinSoloLectura",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": ["arn:aws:s3:::{PENGWIN_BUCKET}/crudos/*", "arn:aws:s3:::{PENGWIN_BUCKET}/exportados/*"]
+    },
+    {
+      "Sid": "PengwinListar",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::{PENGWIN_BUCKET}",
+      "Condition": {"StringLike": {"s3:prefix": ["crudos/*", "exportados/*"]}}
+    },
+    {
+      "Sid": "TrabajosAsincronos",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:{REGION}:{CUENTA}:function:{FUNCION}"
+    }
+  ]
+}
