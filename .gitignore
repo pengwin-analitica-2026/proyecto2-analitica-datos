@@ -10,14 +10,7 @@ data/cache/
 .venv/
 
 .env
-# Herramientas de asistente de IA y credenciales (no se suben)
-.claude/
-CLAUDE.md
-.claude-cuenta2/
-.agents/
-kaggle.json
-.kaggle/
-*.token
+
 
 # Semana 11: casos exportados para el dashboard (se regeneran con src/demo_export.py)
 outputs/demo/*
