@@ -159,6 +159,53 @@ def _es_gpu(destino: str | None) -> bool:
     return (destino or "").lower() == "gpu"
 
 
+# Encender y apagar la GPU desde el dashboard. Encender crea el endpoint (~8 min hasta «InService») y
+# programa su borrado automático a las GPU_HORAS_APAGADO horas (4 por defecto) en EventBridge Scheduler
+# (src/gpu_bajo_demanda.py). Como la app es pública y cada encendido cuesta hasta ~3 USD, además de la
+# X-API-Key se pide una segunda clave, GPU_ADMIN_KEY, que solo tiene el equipo. Sin ella, 403.
+GPU_ADMIN_KEY = os.environ.get("GPU_ADMIN_KEY", "")
+
+
+def _check_admin(key: str | None) -> None:
+    if not GPU_ADMIN_KEY or not key or not hmac.compare_digest(key, GPU_ADMIN_KEY):
+        raise HTTPException(status_code=403, detail="clave de administración inválida")
+
+
+def _gpu_accion(accion: str) -> dict:
+    import gpu_bajo_demanda
+    try:
+        datos = getattr(gpu_bajo_demanda, accion)()
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    _GPU_ESTADO.update(valor=datos["estado"], hasta=time.time() + 60)
+    return datos
+
+
+@app.get("/gpu/estado")
+def gpu_estado(x_api_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    if not SAGEMAKER_ENDPOINT:
+        return {"endpoint": None, "estado": None, "apagado_programado": None}
+    import gpu_bajo_demanda
+    return gpu_bajo_demanda.estado()
+
+
+@app.post("/gpu/encender")
+def gpu_encender(x_api_key: str | None = Header(default=None),
+                 x_admin_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    _check_admin(x_admin_key)
+    return _gpu_accion("encender")
+
+
+@app.post("/gpu/apagar")
+def gpu_apagar(x_api_key: str | None = Header(default=None),
+               x_admin_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    _check_admin(x_admin_key)
+    return _gpu_accion("apagar")
+
+
 @app.get("/health")
 def health(deep: int = 0, x_destino: str | None = Header(default=None),
            x_api_key: str | None = Header(default=None)) -> dict:

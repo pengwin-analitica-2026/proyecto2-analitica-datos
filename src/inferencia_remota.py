@@ -91,3 +91,22 @@ def predictor_remoto(url: str, key: str | None, lote: int = 8, paralelo: int = 4
                 "boxes_refined": [b for p in orden for b in p["boxes_refined"]],
                 "seconds": time.perf_counter() - started}
     return info, predecir
+
+
+def control_gpu(url: str, key: str | None, accion: str, clave_admin: str | None = None) -> dict:
+    """``accion``: «estado» (GET) o «encender»/«apagar» (POST, piden la clave de administración)."""
+    cabeceras = {"X-API-Key": key or ""}
+    if clave_admin:
+        cabeceras["X-Admin-Key"] = clave_admin
+    request = urllib.request.Request(url.rstrip("/") + f"/gpu/{accion}", headers=cabeceras,
+                                     method="GET" if accion == "estado" else "POST")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        detalle = error.read()[:200].decode(errors="replace")
+        try:
+            detalle = json.loads(detalle).get("detail", detalle)
+        except ValueError:
+            pass
+        raise RuntimeError(f"{error.code}: {detalle}") from error

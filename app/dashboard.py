@@ -291,6 +291,72 @@ def processing_targets() -> dict[str, dict]:
     return targets
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def gpu_details(url: str, key: str) -> dict | None:
+    from inferencia_remota import control_gpu
+    try:
+        return control_gpu(url, key, "estado")
+    except Exception:
+        return None
+
+
+def falta(iso: str | None) -> str:
+    """«3 h 12 min» hasta la hora UTC ``iso`` (2026-10-17T22:00:00Z)."""
+    if not iso:
+        return ""
+    from datetime import datetime, timezone
+    minutos = max(0, int((datetime.fromisoformat(iso.replace("Z", "+00:00"))
+                          - datetime.now(timezone.utc)).total_seconds() // 60))
+    return f"{minutos // 60} h {minutos % 60:02d} min"
+
+
+GPU_TEXTO = {"InService": "🟢 encendida", "Creating": "🟡 encendiendo (~8 min)", "Updating": "🟡 actualizando",
+             "Deleting": "🟠 apagándose", "Failed": "🔴 falló al encender", None: "⚪ apagada"}
+
+
+def gpu_panel() -> None:
+    """GPU en SageMaker bajo demanda: estado, encender (con apagado automático) y apagar.
+
+    Cada hora encendida cuesta ~0.74 USD; por eso encender y apagar piden la clave de administración
+    del equipo (``GPU_ADMIN_KEY`` en la Lambda) y la GPU se apaga sola a las 4 horas.
+    """
+    url, key = setting("INFERENCE_URL"), setting("INFERENCE_KEY")
+    if not url:
+        return
+    datos = gpu_details(url, key or "")
+    if not datos or not datos.get("endpoint"):
+        return                                   # la API no tiene GPU configurada
+    with st.sidebar.expander(f"GPU (SageMaker) · {GPU_TEXTO.get(datos['estado'], datos['estado'])}"):
+        st.caption(f"NVIDIA T4 (`ml.g4dn.xlarge`, ~0.74 USD/h mientras esté encendida). Encenderla tarda unos "
+                   f"8 minutos; se apaga sola a las {datos.get('horas_apagado', 4):g} h.")
+        if datos.get("apagado_programado"):
+            st.write(f"Se apaga sola en **{falta(datos['apagado_programado'])}** "
+                     f"({datos['apagado_programado'].replace('T', ' ').replace('Z', ' UTC')}).")
+        clave = st.text_input("Clave de administración", type="password", key="gpu_admin",
+                              help="Solo el equipo: evita que cualquier visitante de la app encienda la GPU.")
+        encender, apagar = st.columns(2)
+        accion = None
+        if encender.button("Encender (4 h)" if datos["estado"] is None else "Extender a 4 h",
+                           disabled=datos["estado"] == "Deleting", use_container_width=True):
+            accion = "encender"
+        if apagar.button("Apagar", disabled=datos["estado"] in (None, "Deleting"), use_container_width=True):
+            accion = "apagar"
+        if accion:
+            from inferencia_remota import control_gpu
+            try:
+                control_gpu(url, key, accion, clave)
+            except RuntimeError as error:
+                st.error(f"No se pudo {accion}: {error}")
+            else:
+                gpu_details.clear()
+                gpu_status.clear()
+                st.rerun()
+        if datos["estado"] == "Creating" and st.button("Actualizar estado", use_container_width=True):
+            gpu_details.clear()
+            gpu_status.clear()
+            st.rerun()
+
+
 def processing_settings() -> dict | None:
     """Bloque «Procesamiento» de la barra lateral: dónde corre el modelo y con qué precisión."""
     targets = processing_targets()
@@ -315,6 +381,7 @@ def processing_settings() -> dict | None:
             target["precision"] = "servicio"
             st.caption("La precisión la fija el servicio (`PRECISION`; con `auto`, int8 en CPU y fp16 en GPU) y "
                        "se informa al procesar.")
+    gpu_panel()
     return target
 
 

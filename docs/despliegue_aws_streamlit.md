@@ -101,13 +101,34 @@ del endpoint (`gpu`); el dashboard muestra «AWS · GPU (SageMaker)» en «Proce
 `InService`. El contenedor atiende las rutas que exige SageMaker: `/ping` y `/invocations` (la ruta
 interna va en `CustomAttributes`).
 
-**Cobra por hora mientras el endpoint exista**, así que se enciende para probar o presentar y se borra:
+**Cobra por hora mientras el endpoint exista**, así que se enciende para probar o presentar y se apaga.
+Apagar es borrar el endpoint; el modelo, la configuración, la imagen y los roles no cobran por hora y se
+quedan, así que volver a encender es solo crear el endpoint otra vez (~8 minutos hasta `InService`).
 
 ```bash
-AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh imagen   # GitHub Actions construye y sube la imagen (~15 min)
-AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh crear    # endpoint + puente en la Lambda (~8 min)
-AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh borrar   # apaga lo que cobra (imagen y roles se quedan)
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh imagen     # GitHub Actions construye y sube la imagen (~15 min)
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh preparar   # una vez: modelo, configuración, roles, variables de la Lambda
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh encender   # crea el endpoint y programa el apagado a las 4 h
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh apagar     # borra el endpoint y cancela el apagado programado
+AWS_PROFILE=almia bash deploy/aws/gpu_sagemaker.sh borrar     # además borra el modelo y la configuración
 ```
+
+**Botón en el dashboard.** En la barra lateral, «GPU (SageMaker)» muestra el estado (apagada,
+encendiendo, encendida) y cuánto falta para el apagado automático, con los botones «Encender (4 h)»
+(«Extender a 4 h» si ya está encendida) y «Apagar». La Lambda los atiende en `POST /gpu/encender` y
+`POST /gpu/apagar` (`src/gpu_bajo_demanda.py`); `GET /gpu/estado` solo pide la `X-API-Key`. Como la app
+es pública y cada encendido puede costar hasta ~3 USD, encender y apagar piden además una **clave de
+administración** (`GPU_ADMIN_KEY` en la Lambda, cabecera `X-Admin-Key`); sin ella responden 403.
+`preparar` la genera una vez y la deja en `~/.config/pengwin/gpu_admin_key` (permisos 600) para
+compartirla con el equipo por un canal privado.
+
+**Apagado automático a las 4 horas.** Al encender (por el botón o por el script) se programa en
+EventBridge Scheduler una tarea única, `apagar-pelvis-h8-gpu`, con `at(<hora UTC>)` que llama a
+`sagemaker:DeleteEndpoint` y se borra sola al ejecutarse. Encender otra vez con la GPU ya encendida
+corre esa hora a 4 horas desde ese momento; apagar a mano la cancela. Así, si nadie se acuerda de
+apagarla, el peor caso son 4 horas (~3 USD). El programador usa su propio rol, `pelvis-gpu-apagado`, que
+solo puede borrar ese endpoint. La Lambda puede crear y borrar solo ese endpoint (desde su configuración),
+manejar solo esa tarea y pasarle solo ese rol al programador. `GPU_HORAS_APAGADO` cambia las 4 horas.
 
 La imagen (~3 GB) la construye el workflow `build-gpu.yml`, a mano: desde una conexión de casa la capa
 de PyTorch con CUDA (3.1 GB) se cortaba a mitad de la subida y Docker la reintentaba desde cero. Construir

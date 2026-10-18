@@ -911,16 +911,27 @@ pedido de Gustavo con los prompts copiados tal cual.
   > en lo de poder procesar en GPU, creo que con SageMaker, aparte del endpoint. Mira si ese es el mejor, si el XLarge G4 DN es el mejor, o si hay uno mejor para esos momentos.
 
   > Pues no entiendo por qué no se puede subir desde acá el de locales. ¿Cuál sería el problema? Bueno, sí, hagamos lo necesario para que todo funcione. Porfa, hagamos un PR.
+
+  > sí, agrega el apagado automático a las 4 horas , y hay forma de con un botón ir prendiendo la GPU? y que pasa cuando se pushea a main , siempre se crea uno nuevo?
 - **Qué produjo la IA:** la comparación de instancias con el cupo y el precio reales de la cuenta
   (T4 elegida); `api/Dockerfile.gpu`, `/ping` e `/invocations` en la API, el puente desde la Lambda
   (`X-Destino: gpu`) para no poner credenciales en Streamlit, la opción GPU del dashboard,
-  `deploy/aws/gpu_sagemaker.sh` (imagen, crear, estado, borrar) y el workflow `build-gpu.yml`; pruebas
-  del puente con SageMaker simulado.
-- **Qué se hizo a mano:** Gustavo eligió SageMaker y autorizó crear los recursos; decidió PR separados.
+  `deploy/aws/gpu_sagemaker.sh` (imagen, preparar, encender, apagar, estado, borrar) y el workflow
+  `build-gpu.yml`; el encendido desde un botón del dashboard con clave de administración y el apagado
+  automático a las 4 horas con EventBridge Scheduler (`src/gpu_bajo_demanda.py`, `/gpu/*` en la API);
+  la explicación de qué cambia con cada push a `main` y la regla de ECR que conserva 5 imágenes de la
+  Lambda; pruebas del puente y del encendido/apagado con SageMaker y Scheduler simulados.
+- **Qué se hizo a mano:** Gustavo eligió SageMaker y autorizó crear los recursos; decidió PR separados
+  y pidió el apagado automático y el botón.
 - **Análisis crítico:** la IA intentó subir la imagen de ~3 GB desde la conexión de la casa y falló en
   cinco intentos (la capa de 3.1 GB se reiniciaba con cada corte); se pasó la construcción a GitHub
   Actions. Como un workflow manual solo corre desde `main`, la imagen y la medición en la T4 real quedan
-  para después de integrar el PR. El endpoint no se dejó encendido por su costo por hora.
+  para después de integrar el PR. El endpoint no se dejó encendido por su costo por hora. Un botón de
+  encendido en una app pública es un riesgo de costo: por eso pide una segunda clave y el apagado no
+  depende de que alguien se acuerde, sino de una tarea en AWS. El permiso de la Lambda para crear
+  endpoints se limitó a ese nombre y esa configuración, para que el botón no pueda levantar otra
+  instancia más cara. Al revisar, la IA encontró que la sincronización del PR #19 había dejado
+  `IA_USAGE.md` sin las entradas 37 a 41; se restauraron sin tocar las de main.
 
 ---
 
