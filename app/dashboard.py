@@ -41,6 +41,10 @@ RESULTS_DIR = ROOT / "outputs"                  # JSON de las evaluaciones en te
 UPLOAD_ROOT = Path(os.environ.get("UPLOAD_ROOT", Path(tempfile.gettempdir()) / "pengwin_subidos"))
 MODEL_CHECKPOINT = Path(os.environ.get("MODEL_CHECKPOINT", CHECKPOINT_DIR / "h8_aumm_noise01_noema_w32_e60_s42.pth"))
 MAX_UPLOAD_MB = 1024
+# Vista cruda (visualizador 1) de un CT subido o procesado en vivo: por encima de estos vóxeles se calcula
+# con menos resolución en el plano. Streamlit Community Cloud da ~2.7 GB por app y un .mha de 230 MB
+# llegaba a 3.4 GB y tumbaba la app (sin error en el log: el sistema mata el proceso).
+VISTA_MAX_VOXELES = int(os.environ.get("VISTA_MAX_VOXELES", 20_000_000))
 S3_CACHE = Path(os.environ.get("S3_CACHE", Path(tempfile.gettempdir()) / "pengwin_s3"))
 
 st.set_page_config(page_title="PENGWIN · fracturas pélvicas", page_icon="🦴", layout="wide")
@@ -92,7 +96,8 @@ def setting(name: str) -> str | None:
         return None
 
 
-def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeout: float = 120.0) -> dict:
+def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeout: float = 120.0,
+                         destino: str | None = None) -> dict:
     """Manda un corte al servicio de inferencia (api/server.py) y devuelve lo mismo que predict_slice."""
     import base64
     import io
@@ -101,7 +106,8 @@ def remote_predict_slice(url: str, key: str | None, image_u8: np.ndarray, timeou
     buffer = io.BytesIO()
     np.save(buffer, np.ascontiguousarray(image_u8, dtype=np.uint8), allow_pickle=False)
     request = urllib.request.Request(url.rstrip("/") + "/predict_slice", data=buffer.getvalue(), method="POST",
-                                     headers={"Content-Type": "application/octet-stream", "X-API-Key": key or ""})
+                                     headers={"Content-Type": "application/octet-stream", "X-API-Key": key or "",
+                                              **({"X-Destino": destino} if destino else {})})
     started = time.perf_counter()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -260,6 +266,17 @@ PRECISION_LABELS = {"auto": "Automática: int8 en CPU, fp16 en GPU", "fp32": "H8
                     "int8": "H8 cuantizado (int8, para CPU)", "fp16": "H8 fp16 (para GPU)"}
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def gpu_status(url: str) -> str | None:
+    """Estado del endpoint de GPU según la API («InService» si está encendido); None si no hay o no responde."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url.rstrip("/") + "/health", timeout=10) as response:
+            return json.loads(response.read()).get("gpu")
+    except Exception:
+        return None
+
+
 def processing_targets() -> dict[str, dict]:
     """Dónde puede correr el modelo: este equipo (torch + checkpoint), la API en CPU y, si está, en GPU."""
     targets = {}
@@ -268,10 +285,80 @@ def processing_targets() -> dict[str, dict]:
     if setting("INFERENCE_URL"):
         targets["AWS · CPU (Lambda)"] = {"kind": "remote", "slug": "aws-cpu", "url": setting("INFERENCE_URL"),
                                          "key": setting("INFERENCE_KEY")}
+    if setting("INFERENCE_URL") and gpu_status(setting("INFERENCE_URL")) == "InService":
+        # El endpoint de SageMaker existe y está encendido: la Lambda reenvía los pedidos con X-Destino: gpu.
+        targets["AWS · GPU (SageMaker)"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL"),
+                                            "key": setting("INFERENCE_KEY"), "destino": "gpu"}
     if setting("INFERENCE_URL_GPU"):
         targets["AWS · GPU"] = {"kind": "remote", "slug": "aws-gpu", "url": setting("INFERENCE_URL_GPU"),
                                 "key": setting("INFERENCE_KEY_GPU") or setting("INFERENCE_KEY")}
     return targets
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def gpu_details(url: str, key: str) -> dict | None:
+    from inferencia_remota import control_gpu
+    try:
+        return control_gpu(url, key, "estado")
+    except Exception:
+        return None
+
+
+def falta(iso: str | None) -> str:
+    """«3 h 12 min» hasta la hora UTC ``iso`` (2026-10-17T22:00:00Z)."""
+    if not iso:
+        return ""
+    from datetime import datetime, timezone
+    minutos = max(0, int((datetime.fromisoformat(iso.replace("Z", "+00:00"))
+                          - datetime.now(timezone.utc)).total_seconds() // 60))
+    return f"{minutos // 60} h {minutos % 60:02d} min"
+
+
+GPU_TEXTO = {"InService": "🟢 encendida", "Creating": "🟡 encendiendo (~8 min)", "Updating": "🟡 actualizando",
+             "Deleting": "🟠 apagándose", "Failed": "🔴 falló al encender", None: "⚪ apagada"}
+
+
+def gpu_panel() -> None:
+    """GPU en SageMaker bajo demanda: estado, encender (con apagado automático) y apagar.
+
+    Cada hora encendida cuesta ~0.74 USD; por eso encender y apagar piden la clave de administración
+    del equipo (``GPU_ADMIN_KEY`` en la Lambda) y la GPU se apaga sola a las 4 horas.
+    """
+    url, key = setting("INFERENCE_URL"), setting("INFERENCE_KEY")
+    if not url:
+        return
+    datos = gpu_details(url, key or "")
+    if not datos or not datos.get("endpoint"):
+        return                                   # la API no tiene GPU configurada
+    with st.sidebar.expander(f"GPU (SageMaker) · {GPU_TEXTO.get(datos['estado'], datos['estado'])}"):
+        st.caption(f"NVIDIA T4 (`ml.g4dn.xlarge`, ~0.74 USD/h mientras esté encendida). Encenderla tarda unos "
+                   f"8 minutos; se apaga sola a las {datos.get('horas_apagado', 4):g} h.")
+        if datos.get("apagado_programado"):
+            st.write(f"Se apaga sola en **{falta(datos['apagado_programado'])}** "
+                     f"({datos['apagado_programado'].replace('T', ' ').replace('Z', ' UTC')}).")
+        clave = st.text_input("Clave de administración", type="password", key="gpu_admin",
+                              help="Solo el equipo: evita que cualquier visitante de la app encienda la GPU.")
+        encender, apagar = st.columns(2)
+        accion = None
+        if encender.button("Encender (4 h)" if datos["estado"] is None else "Extender a 4 h",
+                           disabled=datos["estado"] == "Deleting", use_container_width=True):
+            accion = "encender"
+        if apagar.button("Apagar", disabled=datos["estado"] in (None, "Deleting"), use_container_width=True):
+            accion = "apagar"
+        if accion:
+            from inferencia_remota import control_gpu
+            try:
+                control_gpu(url, key, accion, clave)
+            except RuntimeError as error:
+                st.error(f"No se pudo {accion}: {error}")
+            else:
+                gpu_details.clear()
+                gpu_status.clear()
+                st.rerun()
+        if datos["estado"] == "Creating" and st.button("Actualizar estado", use_container_width=True):
+            gpu_details.clear()
+            gpu_status.clear()
+            st.rerun()
 
 
 def processing_settings() -> dict | None:
@@ -298,6 +385,7 @@ def processing_settings() -> dict | None:
             target["precision"] = "servicio"
             st.caption("La precisión la fija el servicio (`PRECISION`; con `auto`, int8 en CPU y fp16 en GPU) y "
                        "se informa al procesar.")
+    gpu_panel()
     return target
 
 
@@ -310,8 +398,27 @@ def choose_predictor(tta: bool, target: dict | None):
         info, predecir = local_predictor(str(MODEL_CHECKPOINT), tta, target["precision"])
         return info, predecir, f"este equipo ({info['device']}, {info['precision']})"
     from inferencia_remota import predictor_remoto
-    info, predecir = predictor_remoto(target["url"], target["key"])
+    info, predecir = predictor_remoto(target["url"], target["key"], destino=target.get("destino"))
     return info, predecir, f"{target['name']} ({info['precision']})"
+
+
+def max_upload_voxels() -> int | None:
+    """Tope de vóxeles para procesar un CT en el dashboard publicado (sin torch: Streamlit Cloud, ~2.7 GB).
+
+    El caso más grande de PENGWIN (001) tiene 105 millones de vóxeles y cabe con margen. En local no hay
+    tope salvo que se fije ``MAX_VOXELES_SUBIDA``."""
+    value = setting("MAX_VOXELES_SUBIDA")
+    if value:
+        return int(value)
+    return None if torch_available() else 120_000_000
+
+
+def check_volume_size(voxels: int) -> None:
+    limit = max_upload_voxels()
+    if limit and voxels > limit:
+        raise RuntimeError(f"El volumen tiene {voxels / 1e6:.0f} millones de vóxeles y el dashboard publicado procesa "
+                           f"hasta {limit / 1e6:.0f} millones (memoria limitada). Úsalo en el dashboard local "
+                           "(`streamlit run app/dashboard.py`), que no tiene ese tope.")
 
 
 def upload_page() -> Path | None:
@@ -339,7 +446,7 @@ def upload_page() -> Path | None:
         return None
     from demo_export import exportar_volumen
     from volumen_entrada import huella, leer_subida
-    archivos = [(f.name, f.getvalue()) for f in files]
+    archivos = [(f.name, f.getbuffer()) for f in files]     # sin copiar los bytes subidos (memoria)
     with st.status("Procesando el CT…", expanded=True) as status:
         try:
             info, predecir, where = choose_predictor(tta, PROCESSING)
@@ -352,6 +459,7 @@ def upload_page() -> Path | None:
             status.write(f"Modelo: {info['checkpoint']} · {where}")
             volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
             del archivos
+            check_volume_size(volume.image.size)
             status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "
                          f"{volume.image.shape[1]}×{volume.image.shape[2]} · vóxel "
                          f"{'×'.join(f'{v:.2f}' for v in volume.spacing_xyz)} mm · orientación: "
@@ -359,6 +467,7 @@ def upload_page() -> Path | None:
             started = time.perf_counter()
             exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
                              enderezar=enderezar, log=status.write, pasos=volume.pasos,
+                             max_voxeles_vista=VISTA_MAX_VOXELES,
                              extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
                                                     "donde": where}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
@@ -434,7 +543,7 @@ def pengwin_page() -> Path | None:
                 image, label, spacing_xyz, flipped, steps = preparar_caso(
                     image_path, label_path, case_id, bool(info.get("canonical")), log=status.write)
             exportar_volumen(image, spacing_xyz, folder, info, predecir, label=label, nombre=case_id,
-                             flipped=flipped, pasos=steps, log=status.write,
+                             flipped=flipped, pasos=steps, log=status.write, max_voxeles_vista=VISTA_MAX_VOXELES,
                              extra_meta={"en_vivo": {"donde": where}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
         except Exception as error:
@@ -615,7 +724,8 @@ with tab2:
         elif st.button(f"Inferir el corte seleccionado · {PROCESSING['name']}"):
             try:
                 if PROCESSING["kind"] == "remote":
-                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z])
+                    live = remote_predict_slice(PROCESSING["url"], PROCESSING["key"], data["images"][z],
+                                                destino=PROCESSING.get("destino"))
                     where = (f"{live['device']} en {PROCESSING['name']} · precisión {live.get('precision', 'fp32')} · "
                              f"ida y vuelta {live['round_trip_ms']:.0f} ms")
                     if live.get("model") and live["model"] != meta["model"]["checkpoint"]:

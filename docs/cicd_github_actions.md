@@ -63,11 +63,19 @@ de H6 y D5 (la primera evaluación en test).
 | El arranque en frío se cortaba a los 10 s | El adaptador de Lambda espera a que `/health` responda, y cargar torch y el modelo tarda más | `/health` responde al instante; `/health?deep=1` carga el modelo (lo usa la prueba de humo) |
 | `ci.yml` fallaba con `No module named 'pytest'` | `tests/test_orientacion.py` usa `pytest` | Se instala `pytest` en los dos workflows |
 | `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Formato inmutable del `sub` (ver arriba) | Política de confianza con el `sub` inmutable |
+| El despliegue falla al construir con `429 Too Many Requests` desde `public.ecr.aws` | Las imágenes base vienen del registro público de AWS y los runners de GitHub comparten IP: caen en el límite de descargas anónimas | El workflow inicia sesión en ECR Public antes de construir (`amazon-ecr-login` con `registry-type: public`); el rol tiene `ecr-public:GetAuthorizationToken` y `sts:GetServiceBearerToken` |
 
 ## Cuidados
 
 - **Todo push a `main` despliega.** No hay filtro por rutas: un cambio solo de documentación también
   reconstruye la imagen (unos 8 minutos). Es intencional: `main` y la Lambda nunca quedan desfasadas.
+- **Qué cambia en cada push y qué no.** Se actualiza el código de la **misma** función `pelvis-api`
+  (`update-function-code`): la URL, la `API_KEY`, las variables de la GPU (`SAGEMAKER_ENDPOINT`,
+  `GPU_ADMIN_KEY`, …) y los permisos no cambian. Streamlit Cloud vuelve a desplegar la misma app con la
+  misma dirección. La GPU de SageMaker no se toca: ni se crea ni se enciende ni se apaga con un push, y
+  su imagen solo se construye a mano (`build-gpu.yml`). Lo único que se acumula es una imagen nueva en
+  ECR por push; las reglas de ciclo de vida conservan las 5 más recientes en `pelvis-api` y las 3 en
+  `pelvis-api-gpu`, así que el almacenamiento no crece.
 - **`main` protegida.** El enunciado pide merges con revisión por pares. Pendiente de activar en
   Settings → Branches: requerir PR con una aprobación antes de integrar.
 - **Al terminar el curso:** borrar los recursos de AWS (lista en

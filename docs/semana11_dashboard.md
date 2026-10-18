@@ -143,6 +143,24 @@ Es el mismo H8 con el mismo Dice; cambia la velocidad (`docs/cuantizacion.md`). 
 destino y precisión se guarda aparte, para comparar las dos versiones del mismo caso; la barra lateral
 dice con qué precisión se predijo el caso abierto.
 
+## Memoria en el dashboard publicado
+
+Streamlit Community Cloud da unos 2.7 GB por app. El 17 de octubre, procesar un `.mha` de 230 MB (caso
+050) tumbó la app publicada: el pico llegaba a 3.4 GB y el sistema mató el proceso (por eso el log no
+trae ningún error de Python, solo «Oh no. Error running app»). Medido paso a paso:
+
+| Cambio | Dónde | Ahorro |
+|---|---|---|
+| El post-proceso 3D, las distancias y las mallas se calculan en la caja que contiene el hueso (predicho y real), no en todo el volumen a 384 px | `demo_export.exportar_volumen` | De +1.8 GB a +0.4 GB en el caso 001. Resultado idéntico (verificado con el 024: tablas, comparación, volumen y vista cruda iguales; centroides y vértices difieren por redondeo, < 1e-4) |
+| El `.mha` se lee directo en int16 (muchos guardan los HU en 32 bits) y las vistas de los pasos usan `GetArrayViewFromImage`, sin copias | `volumen_entrada.leer_subida` | ~0.4 GB menos al leer |
+| El archivo subido se pasa sin copiarlo (`getbuffer`) | `app/dashboard.py` | Lo que pese el archivo |
+| La vista cruda (visualizador 1, solo visual) se calcula con menos resolución en el plano si el volumen pasa de 20 millones de vóxeles (`VISTA_MAX_VOXELES`) | `demo_export._vista_cruda` | La limpieza de la máscara ósea pasaba de 1.6 GB |
+| Tope de 120 millones de vóxeles en el dashboard publicado, con un mensaje claro en vez de caerse (`MAX_VOXELES_SUBIDA`; el caso más grande de PENGWIN tiene 105 millones) | `app/dashboard.py` | Evita que un volumen enorme tumbe la app |
+
+Resultado (pico de RAM del pipeline, sin el modelo, que en la nube corre en la Lambda): caso 050, de 3.43
+a 1.73 GB; caso 001 (el más grande, 420 MB), de 4.05 a 2.55 GB. Los casos precalculados y las
+exportaciones oficiales (`demo_export.py`) no cambian.
+
 ## Orientación
 
 H8, como H6, se entrenó con los volúmenes en orientación canónica: 34 de los 100 `.mha` de PENGWIN están

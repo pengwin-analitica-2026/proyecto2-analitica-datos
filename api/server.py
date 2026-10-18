@@ -21,8 +21,10 @@ from __future__ import annotations
 import base64
 import hmac
 import io
+import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -57,12 +59,7 @@ def _check_key(key: str | None) -> None:
         raise HTTPException(status_code=401, detail="clave inválida")
 
 
-@app.get("/health")
-def health(deep: int = 0) -> dict:
-    # Sin ?deep=1 responde al instante: el adaptador de Lambda lo usa como chequeo de arranque (10 s)
-    # y cargar torch + el modelo tarda más en frío. Con ?deep=1 carga el modelo y lo reporta.
-    if not deep:
-        return {"ok": True, "loaded": bool(_state)}
+def _health_deep() -> dict:
     state = _load()
     return {"ok": True, "model": state["info"]["checkpoint"], "device": str(state["device"]),
             "parameters": state["info"]["parameters"], "tta": state["info"]["tta"],
@@ -70,10 +67,7 @@ def health(deep: int = 0) -> dict:
             "precision": state["info"]["precision"], "precision_origen": state["info"]["precision_origen"]}
 
 
-@app.post("/predict_slice")
-async def predict_slice_endpoint(request: Request, x_api_key: str | None = Header(default=None)) -> dict:
-    _check_key(x_api_key)
-    body = await request.body()
+def _slice(body: bytes) -> dict:
     if len(body) > MAX_BYTES:
         raise HTTPException(status_code=413, detail="corte demasiado grande")
     try:
@@ -95,15 +89,7 @@ async def predict_slice_endpoint(request: Request, x_api_key: str | None = Heade
             "precision": state["info"]["precision"]}
 
 
-@app.post("/predict_batch")
-async def predict_batch_endpoint(request: Request, x_api_key: str | None = Header(default=None)) -> dict:
-    """Varios cortes uint8 [n,S,S] (.npy) → semántica, primario/secundario, clasificación y cajas.
-
-    Lo usa el dashboard para inferir un CT subido completo (``src/inferencia_remota.py``). Los cortes
-    llegan ya preprocesados y en la orientación canónica; el servidor no gira nada.
-    """
-    _check_key(x_api_key)
-    body = await request.body()
+def _batch(body: bytes) -> dict:
     if len(body) > MAX_LOTE * MAX_BYTES // 10:
         raise HTTPException(status_code=413, detail=f"lote demasiado grande (máximo {MAX_LOTE} cortes)")
     try:
@@ -125,6 +111,155 @@ async def predict_batch_endpoint(request: Request, x_api_key: str | None = Heade
             "seconds": result["seconds"], "device": str(state["device"]),
             "model": state["info"]["checkpoint"], "tta": state["info"]["tta"],
             "precision": state["info"]["precision"]}
+
+
+# --------------------------------------------------------------------------- GPU en SageMaker
+# Un endpoint de SageMaker no tiene URL pública: se invoca con credenciales de AWS. La Lambda (que
+# tiene rol) hace de puente: si el pedido trae la cabecera «X-Destino: gpu» y está configurado
+# SAGEMAKER_ENDPOINT, lo reenvía al endpoint (la misma API en una imagen con CUDA, api/Dockerfile.gpu)
+# y devuelve su respuesta. Así el dashboard no necesita credenciales nuevas. El endpoint se crea y se
+# borra con deploy/aws/gpu_sagemaker.sh, porque cobra por hora mientras exista.
+SAGEMAKER_ENDPOINT = os.environ.get("SAGEMAKER_ENDPOINT", "")
+_GPU_ESTADO: dict = {"valor": None, "hasta": 0.0}
+
+
+def _gpu_estado() -> str | None:
+    """Estado del endpoint de GPU («InService», «Creating», …) o None si no existe; se guarda 60 s."""
+    if not SAGEMAKER_ENDPOINT:
+        return None
+    if time.time() < _GPU_ESTADO["hasta"]:
+        return _GPU_ESTADO["valor"]
+    try:
+        import boto3
+        valor = boto3.client("sagemaker").describe_endpoint(EndpointName=SAGEMAKER_ENDPOINT)["EndpointStatus"]
+    except Exception:
+        valor = None
+    _GPU_ESTADO.update(valor=valor, hasta=time.time() + 60)
+    return valor
+
+
+def _gpu(ruta: str, body: bytes = b"") -> dict:
+    if _gpu_estado() != "InService":
+        raise HTTPException(status_code=503, detail="la GPU (SageMaker) no está encendida")
+    import boto3
+    inicio = time.perf_counter()
+    try:
+        respuesta = boto3.client("sagemaker-runtime").invoke_endpoint(
+            EndpointName=SAGEMAKER_ENDPOINT, ContentType="application/octet-stream",
+            CustomAttributes=f"ruta={ruta}", Body=body or b"{}")
+    except Exception as error:
+        raise HTTPException(status_code=502, detail=f"la GPU respondió con error: {str(error)[:200]}") from error
+    datos = json.loads(respuesta["Body"].read())
+    datos["via"] = f"SageMaker {SAGEMAKER_ENDPOINT}"
+    datos["puente_ms"] = (time.perf_counter() - inicio) * 1000.0
+    return datos
+
+
+def _es_gpu(destino: str | None) -> bool:
+    return (destino or "").lower() == "gpu"
+
+
+# Encender y apagar la GPU desde el dashboard. Encender crea el endpoint (~8 min hasta «InService») y
+# programa su borrado automático a las GPU_HORAS_APAGADO horas (4 por defecto) en EventBridge Scheduler
+# (src/gpu_bajo_demanda.py). Como la app es pública y cada encendido cuesta hasta ~3 USD, además de la
+# X-API-Key se pide una segunda clave, GPU_ADMIN_KEY, que solo tiene el equipo. Sin ella, 403.
+GPU_ADMIN_KEY = os.environ.get("GPU_ADMIN_KEY", "")
+
+
+def _check_admin(key: str | None) -> None:
+    if not GPU_ADMIN_KEY or not key or not hmac.compare_digest(key, GPU_ADMIN_KEY):
+        raise HTTPException(status_code=403, detail="clave de administración inválida")
+
+
+def _gpu_accion(accion: str) -> dict:
+    import gpu_bajo_demanda
+    try:
+        datos = getattr(gpu_bajo_demanda, accion)()
+    except RuntimeError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    _GPU_ESTADO.update(valor=datos["estado"], hasta=time.time() + 60)
+    return datos
+
+
+@app.get("/gpu/estado")
+def gpu_estado(x_api_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    if not SAGEMAKER_ENDPOINT:
+        return {"endpoint": None, "estado": None, "apagado_programado": None}
+    import gpu_bajo_demanda
+    return gpu_bajo_demanda.estado()
+
+
+@app.post("/gpu/encender")
+def gpu_encender(x_api_key: str | None = Header(default=None),
+                 x_admin_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    _check_admin(x_admin_key)
+    return _gpu_accion("encender")
+
+
+@app.post("/gpu/apagar")
+def gpu_apagar(x_api_key: str | None = Header(default=None),
+               x_admin_key: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    _check_admin(x_admin_key)
+    return _gpu_accion("apagar")
+
+
+@app.get("/health")
+def health(deep: int = 0, x_destino: str | None = Header(default=None),
+           x_api_key: str | None = Header(default=None)) -> dict:
+    # Sin ?deep=1 responde al instante: el adaptador de Lambda lo usa como chequeo de arranque (10 s)
+    # y cargar torch + el modelo tarda más en frío. Con ?deep=1 carga el modelo y lo reporta.
+    if not deep:
+        return {"ok": True, "loaded": bool(_state), "gpu": _gpu_estado()}
+    if _es_gpu(x_destino):
+        _check_key(x_api_key)
+        return _gpu("health")
+    return _health_deep()
+
+
+@app.post("/predict_slice")
+async def predict_slice_endpoint(request: Request, x_api_key: str | None = Header(default=None),
+                                 x_destino: str | None = Header(default=None)) -> dict:
+    _check_key(x_api_key)
+    body = await request.body()
+    return _gpu("predict_slice", body) if _es_gpu(x_destino) else _slice(body)
+
+
+@app.post("/predict_batch")
+async def predict_batch_endpoint(request: Request, x_api_key: str | None = Header(default=None),
+                                 x_destino: str | None = Header(default=None)) -> dict:
+    """Varios cortes uint8 [n,S,S] (.npy) → semántica, primario/secundario, clasificación y cajas.
+
+    Lo usa el dashboard para inferir un CT subido completo (``src/inferencia_remota.py``). Los cortes
+    llegan ya preprocesados y en la orientación canónica; el servidor no gira nada.
+    """
+    _check_key(x_api_key)
+    body = await request.body()
+    return _gpu("predict_batch", body) if _es_gpu(x_destino) else _batch(body)
+
+
+# Rutas que exige SageMaker para un contenedor propio. No piden X-API-Key: al endpoint solo se llega
+# con credenciales de AWS (la Lambda, con su rol). La ruta interna va en CustomAttributes («ruta=…»).
+@app.get("/ping")
+def ping() -> dict:
+    return {"ok": True}
+
+
+@app.post("/invocations")
+async def invocations(request: Request,
+                      x_amzn_sagemaker_custom_attributes: str | None = Header(default=None)) -> dict:
+    atributos = dict(p.split("=", 1) for p in (x_amzn_sagemaker_custom_attributes or "").split(",") if "=" in p)
+    ruta = atributos.get("ruta", "predict_slice")
+    body = await request.body()
+    if ruta == "health":
+        return _health_deep()
+    if ruta == "predict_batch":
+        return _batch(body)
+    if ruta == "predict_slice":
+        return _slice(body)
+    raise HTTPException(status_code=404, detail=f"ruta desconocida: {ruta}")
 
 
 # --------------------------------------------------------------------------- casos de PENGWIN en S3

@@ -115,7 +115,7 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
                                  f"{', '.join(Path(n).name for n, _ in volumenes)}).")
             nombre = Path(volumenes[0][0]).name
             try:
-                imagen = sitk.ReadImage(str(carpeta / nombre))
+                imagen = _leer_compacto(str(carpeta / nombre))
             except RuntimeError as error:
                 raise ValueError(f"SimpleITK no pudo leer {nombre}: {str(error).splitlines()[0][:200]}. "
                                  "Si es un .mhd o .nhdr, sube también su archivo de datos.") from error
@@ -133,6 +133,9 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
         raise ValueError(f"El volumen tiene {imagen.GetSize()[2]} cortes; se necesitan al menos {MIN_CORTES}.")
     from normalizacion import diagnosticar
     from pasos_preproceso import Pasos, texto_matriz
+    # Memoria: el tipo se ajusta dentro de SimpleITK (int16 o float32) y las vistas de los pasos usan
+    # GetArrayViewFromImage, sin copiar el volumen. Así un .mha de 230 MB no se multiplica en RAM.
+    imagen = _tipo_compacto(imagen)
     matriz = texto_matriz(imagen.GetDirection())
     diag = diagnosticar(imagen.GetDirection())
     orientacion = {"direccion_original": [round(float(v), 4) for v in imagen.GetDirection()],
@@ -144,7 +147,7 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
         "No es la identidad: el volumen está guardado " + ("girado 180° en el plano (LPI)."
         if diag.ejes_paciente == (0, 1, 2) and diag.signos == (-1, -1, 1) else
         "con los ejes permutados o volteados respecto al paciente.")),
-        _arreglo(imagen), imagen.GetSpacing(), matriz=matriz)
+        sitk.GetArrayViewFromImage(imagen), imagen.GetSpacing(), matriz=matriz)
     if orientar:
         from normalizacion import a_orientacion_estandar
         imagen, _, diag = a_orientacion_estandar(imagen)
@@ -157,21 +160,38 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
             "El metadato indica una adquisición oblicua: se remuestreó a la orientación estándar." if diag.oblicuo
             else "El metadato dice que viene girado o con los ejes cambiados: se permutaron y voltearon los "
             "ejes (sin interpolar) hasta la orientación estándar, con el sacro abajo."),
-            _arreglo(imagen), imagen.GetSpacing())
-    return VolumenSubido(nombre=corto, image=_arreglo(imagen),
-                         spacing_xyz=tuple(float(s) for s in imagen.GetSpacing()),
+            sitk.GetArrayViewFromImage(imagen), imagen.GetSpacing())
+    image = sitk.GetArrayFromImage(imagen)
+    spacing_xyz = tuple(float(s) for s in imagen.GetSpacing())
+    del imagen
+    return VolumenSubido(nombre=corto, image=image, spacing_xyz=spacing_xyz,
                          fuente=fuente, orientacion=orientacion, pasos=pasos)
 
 
-def _arreglo(imagen) -> np.ndarray:
-    """(z, y, x) en HU como int16 (o float32 si el archivo es de punto flotante)."""
+def _leer_compacto(ruta: str):
+    """Lee el volumen directo en int16 (o float32 si es de punto flotante), sin una copia de 32 bits.
+
+    Muchos .mha guardan los HU con 32 bits por vóxel: leerlos así y convertir después duplicaba la
+    memoria (un .mha de 420 MB ocupaba 630 MB solo al leerlo)."""
     import SimpleITK as sitk
-    image = sitk.GetArrayFromImage(imagen)
-    if image.dtype.kind == "f":
-        return image.astype(np.float32)
-    if image.dtype != np.int16:
-        return np.clip(image, -32768, 32767).astype(np.int16)
-    return image
+    lector = sitk.ImageFileReader()
+    lector.SetFileName(ruta)
+    lector.ReadImageInformation()
+    flotante = lector.GetPixelID() in (sitk.sitkFloat32, sitk.sitkFloat64)
+    if lector.GetNumberOfComponents() == 1:
+        lector.SetOutputPixelType(sitk.sitkFloat32 if flotante else sitk.sitkInt16)
+    return lector.Execute()
+
+
+def _tipo_compacto(imagen):
+    """El volumen en int16 (HU) o float32 si es de punto flotante, convertido dentro de SimpleITK."""
+    import SimpleITK as sitk
+    tipo = imagen.GetPixelID()
+    if tipo in (sitk.sitkInt16,  sitk.sitkFloat32):
+        return imagen
+    if tipo == sitk.sitkFloat64:
+        return sitk.Cast(imagen, sitk.sitkFloat32)
+    return sitk.Cast(sitk.Clamp(imagen, lowerBound=-32768, upperBound=32767), sitk.sitkInt16)
 
 
 def _leer_dicom(carpeta: Path):
@@ -184,6 +204,7 @@ def _leer_dicom(carpeta: Path):
     if len(archivos) < MIN_CORTES:
         raise ValueError(f"La serie DICOM tiene {len(archivos)} cortes; se necesitan al menos {MIN_CORTES}.")
     lector.SetFileNames(archivos)
+    lector.SetOutputPixelType(sitk.sitkInt16)        # DICOM de CT: HU enteros; evita una copia de 32 bits
     try:
         return lector.Execute(), len(archivos)
     except RuntimeError as error:
