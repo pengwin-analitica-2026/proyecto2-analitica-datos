@@ -931,7 +931,9 @@ pedido de Gustavo con los prompts copiados tal cual.
   depende de que alguien se acuerde, sino de una tarea en AWS. El permiso de la Lambda para crear
   endpoints se limitó a ese nombre y esa configuración, para que el botón no pueda levantar otra
   instancia más cara. Al revisar, la IA encontró que la sincronización del PR #19 había dejado
-  `IA_USAGE.md` sin las entradas 37 a 41; se restauraron sin tocar las de main.
+  `IA_USAGE.md` sin las entradas 37 a 41; se restauraron sin tocar las de main. Al correr `preparar` por primera vez
+  en AWS, `CreateModel` falló con «cannot pull»: el rol y su política se acababan de crear y IAM
+  todavía no los había propagado; el script ahora reintenta unas veces antes de rendirse.
 
 ---
 
