@@ -240,7 +240,6 @@ del coxal derecho.
 | Orientación | Sale de la cabecera del `.mha`, no de la lista de casos, para que sirva con volúmenes que no sean de PENGWIN |
 | Modelos en la demo | Solo el entregado (H8). El selector de modelos se descartó y los casos exportados con D5 y H6 se borraron |
 | Casos | Tres de validación y uno de test (039), este último porque el modelo ya estaba congelado |
-| Videos de respaldo | `docs/video/demo_computador.mp4` (recorrido completo, 110 s) y `docs/video/demo_celular.mp4` (prueba en celular, 70 s) |
 | Publicación | Streamlit Community Cloud y una API en AWS Lambda, probados desde computador y celular (6 de octubre). El profesor aprobó este despliegue en lugar del túnel de Cloudflare del enunciado |
 
 ## Pendiente
