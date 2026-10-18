@@ -382,14 +382,14 @@ function VistaCaso({ prefijo, destino, nombreDestino, resumen, volver }: {
   return (
     <div className="vista-caso">
       <div className="cabeza-caso">
-        <button className="boton-texto" onClick={volver}>← Cambiar de caso</button>
+        <button className="boton-texto" onClick={volver}>{m.subido ? "← Subir otro CT" : "← Cambiar de caso"}</button>
         <div className="titulo-caso">
           <h2>{titulo}</h2>
           <div className="chips">
             <span className="chip">{m.n_slices} cortes</span>
             <span className="chip">vóxel {m.spacing_native_xyz.map((v) => v.toFixed(2)).join("×")} mm</span>
             <span className="chip">{m.fragments_pred.length} fragmentos</span>
-            {m.fragments_gt && <span className="chip gt">GT: {m.fragments_gt.length} fragmentos</span>}
+            {m.fragments_gt && <span className="chip gt">Ground truth: {m.fragments_gt.length} fragmentos ({m.fragments_gt.filter((f) => !f.is_main).length} secundarios)</span>}
             {m.en_vivo && <span className="chip vivo">procesado ahora</span>}
           </div>
         </div>

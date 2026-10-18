@@ -109,6 +109,54 @@ class LeerSubida(unittest.TestCase):
         self.assertNotEqual(huella(a), huella([("x.mha", b"124")]))
 
 
+def cortes_mha(array: np.ndarray, spacing=(0.8, 0.9, 1.5), direccion=None, en_2d=False) -> list[tuple[str, bytes]]:
+    """Un .mha por corte, con nombres que no siguen el orden (c10 antes que c2 en orden alfabético)."""
+    imagen = sitk.GetImageFromArray(array)
+    imagen.SetSpacing(spacing)
+    imagen.SetOrigin((-120.0, -80.0, 300.0))
+    if direccion is not None:
+        imagen.SetDirection(direccion)
+    salida = []
+    with tempfile.TemporaryDirectory() as d:
+        for z in range(array.shape[0]):
+            corte = imagen[:, :, z] if en_2d else imagen[:, :, z:z + 1]
+            ruta = Path(d) / f"c{z}.mha"
+            sitk.WriteImage(corte, str(ruta))
+            salida.append((f"serie/c{z}.mha", ruta.read_bytes()))
+    rng = np.random.default_rng(1)
+    return [salida[i] for i in rng.permutation(len(salida))]
+
+
+class CarpetaDeCortes(unittest.TestCase):
+    def test_cortes_con_posicion_dan_el_mismo_volumen(self):
+        array = volumen_prueba()
+        for direccion in (None, LPI):
+            completo = leer_subida([("v.mha", a_bytes(array, ".mha", direccion))])
+            apilado = leer_subida(cortes_mha(array, direccion=direccion))
+            self.assertTrue(np.array_equal(apilado.image, completo.image))
+            self.assertEqual(apilado.spacing_xyz, completo.spacing_xyz)
+            self.assertIn("posición en el paciente", apilado.fuente)
+            self.assertEqual(apilado.nombre, "serie")
+
+    def test_cortes_2d_piden_el_grosor_y_se_ordenan_por_nombre(self):
+        array = volumen_prueba()
+        archivos = cortes_mha(array, en_2d=True)
+        with self.assertRaisesRegex(ValueError, "grosor entre cortes"):
+            leer_subida(archivos)
+        volumen = leer_subida(archivos, grosor_mm=1.5)
+        self.assertTrue(np.array_equal(volumen.image, array))
+        self.assertAlmostEqual(volumen.spacing_xyz[2], 1.5)
+
+    def test_falta_un_corte_o_llegan_volumenes(self):
+        archivos = cortes_mha(volumen_prueba())
+        sin_uno = [a for a in archivos if a[0] != "serie/c5.mha"]
+        with self.assertRaisesRegex(ValueError, "Faltan cortes"):
+            leer_subida(sin_uno)
+        dos = [("a.mha", a_bytes(volumen_prueba(), ".mha")), ("b.mha", a_bytes(volumen_prueba(), ".mha"))]
+        with self.assertRaisesRegex(ValueError, "varios volúmenes"):
+            leer_subida(dos)
+
+
 class ExportarVolumenSinGroundTruth(unittest.TestCase):
     def test_pipeline_completo_con_predictor_falso(self):
         from demo_export import exportar_volumen
