@@ -248,6 +248,13 @@ test una vez por variante elegida, en Kaggle:
 Ninguna pierde Dice. La API usa int8 en CPU y fp16 en GPU (`PRECISION=auto`); las métricas oficiales
 de este documento son las de fp32.
 
+Cómo se aplicó: int8 es cuantización posterior al entrenamiento (PTQ) con pesos por canal, calibrada
+con 128 cortes de 8 casos de entrenamiento (nunca de validación ni de test). Las 4 convoluciones
+transpuestas del decoder quedan en fp32 solo por velocidad: cuantizadas dan el mismo Dice, pero PyTorch
+no las acelera en CPU y el modelo termina más lento que fp32 (197 ms). fp16 es una conversión directa
+al cargar. Las variantes se eligieron en validación y cada una se midió una sola vez en test.
+`src/precision.py` aplica la precisión al cargar el modelo.
+
 ### 4.9 Distancia de separación y métricas de superficie (41 secundarios)
 
 Distancia mínima borde a borde en 3D entre cada fragmento secundario y el principal de su hueso, con
@@ -443,8 +450,9 @@ pesos en `outputs/s10/h8_aumm_noise01_noema_w32_e60_s4{3,4}.pth`.
 El dashboard (Streamlit) está publicado en Streamlit Community Cloud y la inferencia en vivo de un
 corte corre en una API en AWS Lambda en CPU; los dos se vuelven a desplegar en cada push a `main`
 (ver `docs/despliegue_aws_streamlit.md`). La imagen de la API copia el checkpoint de H8 y al
-construirse genera su versión int8, que es la que sirve la Lambda (CPU); con GPU usaría fp16 (sección
-4.8.1). El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
+construirse genera su versión int8, que es la que sirve la Lambda (CPU). Para la presentación hay
+además una GPU bajo demanda (SageMaker, NVIDIA T4) que sirve H8 en fp16 a través de la misma Lambda y
+se apaga sola a las 4 horas (sección 4.8.1). El profesor aprobó este despliegue en lugar del túnel de Cloudflare que nombra el
 enunciado. La advertencia de uso no clínico está siempre visible en el dashboard.
 
 ## 9. Modelos entrenados y pesos en el repositorio
