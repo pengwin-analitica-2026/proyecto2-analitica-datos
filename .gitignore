@@ -52,3 +52,6 @@ outputs/s10/*_int8.pt
 
 # id de la distribución de CloudFront de la página web (deploy/aws/web.sh)
 deploy/aws/.web_estado
+
+# datos de la página web corriendo en local (README, sección B)
+datos_web/
