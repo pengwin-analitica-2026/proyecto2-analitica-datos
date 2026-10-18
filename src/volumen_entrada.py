@@ -4,6 +4,9 @@ El dashboard deja subir un volumen que no es de PENGWIN, en dos formas:
 
 - **Un archivo volumétrico**: ``.mha``, ``.mhd`` con su ``.raw`` o ``.zraw``, ``.nii``, ``.nii.gz`` o
   ``.nrrd``. SimpleITK lee la cabecera de todos con la misma interfaz.
+- **Una carpeta de cortes .mha** (o .nii, .nrrd: un archivo por corte). Se apilan en un volumen
+  (``_leer_cortes``): ordenados por su posición en el paciente si cada archivo la trae, o por nombre y
+  con el grosor entre cortes que indique el usuario si son imágenes 2D.
 - **Una carpeta de cortes DICOM** (un archivo por corte). Se arma la serie con GDCM, que ordena los
   cortes por su posición en el paciente y aplica ``RescaleSlope`` y ``RescaleIntercept``, así la
   imagen queda en HU. Si la carpeta trae varias series, se usa la que tiene más cortes.
@@ -21,6 +24,7 @@ la hace la API de AWS (``inferencia_remota.py``).
 from __future__ import annotations
 
 import hashlib
+import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -89,8 +93,13 @@ def _nombre_corto(nombre: str) -> str:
     return (limpio or "volumen")[:40]
 
 
-def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> VolumenSubido:
-    """Lee lo que subió el usuario: un volumen o una carpeta DICOM. ``archivos`` = [(nombre, bytes)].
+def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
+                grosor_mm: float | None = None) -> VolumenSubido:
+    """Lee lo que subió el usuario: un volumen, una carpeta DICOM o una carpeta de cortes (un .mha por
+    corte). ``archivos`` = [(nombre, bytes)].
+
+    ``grosor_mm`` es la distancia entre cortes para una carpeta de cortes 2D, que no guardan su posición;
+    si los cortes la traen (archivos 3D de un solo corte), se usa la de los archivos.
 
     Con ``orientar=True`` (modelos con orientación canónica) lleva el volumen a la orientación estándar
     con la matriz de dirección de la cabecera.
@@ -109,10 +118,15 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
         for nombre, datos in archivos:
             destino = carpeta / Path(nombre).name
             destino.write_bytes(datos)
-        if volumenes:
-            if len(volumenes) > 1:
-                raise ValueError("Sube un solo volumen a la vez (llegaron "
-                                 f"{', '.join(Path(n).name for n, _ in volumenes)}).")
+        primero = Path(archivos[0][0])
+        carpeta_origen = primero.parent.name if str(primero.parent) not in ("", ".") else ""
+        if len(volumenes) > 1:
+            # Una carpeta donde cada archivo (.mha, .nii, ...) es un corte: se apilan en un volumen.
+            imagen, n_cortes, orden = _leer_cortes([carpeta / Path(n).name for n, _ in volumenes], grosor_mm)
+            ext = _extension(volumenes[0][0])
+            fuente = f"carpeta de cortes {ext} ({n_cortes} cortes, ordenados por {orden})"
+            corto = _nombre_corto(carpeta_origen or f"cortes{ext}")
+        elif volumenes:
             nombre = Path(volumenes[0][0]).name
             try:
                 imagen = _leer_compacto(str(carpeta / nombre))
@@ -122,8 +136,6 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
             fuente, corto = f"archivo {_extension(nombre)}", _nombre_corto(nombre)
         else:
             imagen, n_cortes = _leer_dicom(carpeta)
-            primero = Path(archivos[0][0])
-            carpeta_origen = primero.parent.name if str(primero.parent) not in ("", ".") else ""
             fuente, corto = f"serie DICOM ({n_cortes} cortes)", _nombre_corto(carpeta_origen or "dicom")
     if imagen.GetDimension() != 3:
         raise ValueError(f"Se esperaba un volumen 3D y llegó uno de {imagen.GetDimension()} dimensiones.")
@@ -166,6 +178,76 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True) -> Vol
     del imagen
     return VolumenSubido(nombre=corto, image=image, spacing_xyz=spacing_xyz,
                          fuente=fuente, orientacion=orientacion, pasos=pasos)
+
+
+def _clave_natural(ruta: Path) -> list:
+    """corte2.mha antes que corte10.mha."""
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", ruta.name)]
+
+
+def _leer_cortes(rutas: list[Path], grosor_mm: float | None = None):
+    """Apila una carpeta de cortes (un archivo por corte) en un volumen 3D de SimpleITK.
+
+    Si cada archivo es 3D de un solo corte, trae su origen y su dirección: se ordenan por la posición a lo
+    largo de la normal del corte y el espaciado en z sale de la distancia entre posiciones, como hace GDCM
+    con una serie DICOM. Si son 2D, no hay posición: se ordenan por nombre (orden natural) y hace falta
+    ``grosor_mm``, porque el modelo y las distancias en mm necesitan el espaciado real.
+    Devuelve (imagen, número de cortes, cómo se ordenaron).
+    """
+    import SimpleITK as sitk
+    cortes = []
+    for ruta in rutas:
+        try:
+            corte = _leer_compacto(str(ruta))
+        except RuntimeError as error:
+            raise ValueError(f"SimpleITK no pudo leer {ruta.name}: {str(error).splitlines()[0][:200]}") from error
+        if corte.GetDimension() == 3 and corte.GetSize()[2] != 1:
+            raise ValueError(f"Llegaron varios volúmenes completos ({ruta.name} tiene {corte.GetSize()[2]} cortes). "
+                             "Sube un solo volumen, o una carpeta donde cada archivo sea un corte.")
+        if corte.GetDimension() not in (2, 3) or corte.GetNumberOfComponentsPerPixel() != 1:
+            raise ValueError(f"{ruta.name} no es un corte de CT (un plano en escala de grises).")
+        cortes.append((ruta, corte))
+    if len(cortes) < MIN_CORTES:
+        raise ValueError(f"La carpeta tiene {len(cortes)} cortes; se necesitan al menos {MIN_CORTES}.")
+    tamanos = {tuple(c.GetSize()[:2]) for _, c in cortes}
+    if len(tamanos) > 1:
+        raise ValueError(f"Los cortes no tienen todos el mismo tamaño ({', '.join(f'{a}×{b}' for a, b in sorted(tamanos))}).")
+    primero = cortes[0][1]
+    sx, sy = (float(v) for v in primero.GetSpacing()[:2])
+    posiciones = None
+    if primero.GetDimension() == 3 and all(c.GetDimension() == 3 for _, c in cortes):
+        direccion = np.array(primero.GetDirection(), dtype=float).reshape(3, 3)
+        normal = direccion[:, 2]
+        posiciones = np.array([float(np.dot(c.GetOrigin(), normal)) for _, c in cortes])
+        if len(np.unique(np.round(posiciones, 3))) < len(posiciones):
+            posiciones = None                                 # posiciones repetidas: no sirven para ordenar
+    if posiciones is not None:
+        orden = np.argsort(posiciones)
+        saltos = np.diff(posiciones[orden])
+        dz = float(np.median(saltos))
+        if saltos.max() > 1.5 * dz + 1e-3:
+            raise ValueError(f"Faltan cortes: la distancia entre cortes va de {saltos.min():.2f} a {saltos.max():.2f} mm.")
+        origen = cortes[orden[0]][1].GetOrigin()
+        como = "posición en el paciente"
+    else:
+        if not grosor_mm or grosor_mm <= 0:
+            raise ValueError("Los cortes son imágenes 2D: no guardan su posición en el paciente, así que no se sabe "
+                             "la distancia entre ellos, que el modelo y las distancias en mm necesitan. Indica el "
+                             "grosor entre cortes en mm (está en los datos del estudio; suele ser 0.5 a 3 mm).")
+        orden = sorted(range(len(cortes)), key=lambda i: _clave_natural(cortes[i][0]))
+        dz = float(grosor_mm)
+        d2 = np.array(primero.GetDirection(), dtype=float).reshape(primero.GetDimension(), -1)[:2, :2]
+        direccion = np.eye(3)
+        direccion[:2, :2] = d2
+        origen = (*primero.GetOrigin()[:2], 0.0)
+        como = f"nombre, {dz:g} mm entre cortes"
+    ancho, alto = tamanos.pop()
+    volumen = np.stack([sitk.GetArrayFromImage(cortes[i][1]).reshape(alto, ancho) for i in orden])
+    imagen = sitk.GetImageFromArray(volumen)
+    imagen.SetSpacing((sx, sy, dz))
+    imagen.SetOrigin(tuple(float(v) for v in origen))
+    imagen.SetDirection(tuple(float(v) for v in direccion.ravel()))
+    return imagen, len(cortes), como
 
 
 def _leer_compacto(ruta: str):

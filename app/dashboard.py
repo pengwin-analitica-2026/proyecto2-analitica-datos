@@ -11,7 +11,7 @@ Con ``DEMO_ROOT`` se cambia la carpeta de casos exportados. El botón de inferen
 visualizador 2 necesita ``torch`` y el checkpoint; el resto solo lee archivos.
 
 SUBIR UN CT. En la barra lateral, «Subir un CT» deja cargar un volumen propio (``.mha``, ``.nii``,
-``.nii.gz``, ``.nrrd``) o una carpeta de cortes DICOM. El dashboard lo lee y lo orienta con los
+``.nii.gz``, ``.nrrd``) o una carpeta de cortes (DICOM, o un .mha por corte). El dashboard lo lee y lo orienta con los
 metadatos (``volumen_entrada.py``), corre el mismo pipeline de ``demo_export`` (enderezado, modelo,
 post-proceso 3D, distancias y mallas) y lo muestra en los tres visualizadores, sin ground truth. El
 modelo corre en local si hay ``torch`` y el checkpoint; si no (Streamlit Cloud), en la API de AWS
@@ -436,19 +436,28 @@ def check_volume_size(voxels: int) -> None:
 def upload_page() -> Path | None:
     """Carga de un CT propio. Devuelve la carpeta del caso procesado, o None si todavía no hay uno."""
     st.subheader("Subir un CT propio")
-    st.caption("Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o la carpeta "
-               "con los cortes DICOM de una serie. Se orienta con los metadatos, se endereza el giro del "
+    st.caption("Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o una carpeta "
+               "de cortes: los DICOM de una serie o un .mha por corte. Se orienta con los metadatos, se endereza el giro del "
                "paciente si es claro, y pasa por el mismo pipeline que los casos de ejemplo. No hay ground "
                "truth, así que no se calculan métricas. Una carpeta de PNG o JPG no sirve: no guarda las "
                "unidades Hounsfield ni el tamaño del vóxel.")
-    modo = st.radio("Qué vas a subir", ["Archivo de volumen", "Carpeta DICOM"], horizontal=True)
+    modo = st.radio("Qué vas a subir", ["Archivo de volumen", "Carpeta de cortes (DICOM o .mha)"], horizontal=True)
     if modo == "Archivo de volumen":
         files = st.file_uploader("Volumen", type=["mha", "mhd", "raw", "zraw", "nii", "gz", "nrrd", "nhdr"],
                                  accept_multiple_files=True, max_upload_size=MAX_UPLOAD_MB,
                                  help="Un .mhd o .nhdr se sube junto con su archivo de datos.")
     else:
-        files = st.file_uploader("Carpeta con los cortes DICOM", accept_multiple_files="directory",
-                                 max_upload_size=MAX_UPLOAD_MB)
+        files = st.file_uploader("Carpeta con los cortes", accept_multiple_files="directory",
+                                 max_upload_size=MAX_UPLOAD_MB,
+                                 help="Una serie DICOM, o un .mha (.nii, .nrrd) por corte. Los .mha se ordenan por "
+                                      "su posición en el paciente si la traen.")
+    grosor = None
+    if modo != "Archivo de volumen":
+        grosor = st.number_input("Grosor entre cortes (mm), solo para cortes .mha en 2D", min_value=0.0,
+                                 max_value=20.0, value=0.0, step=0.1, format="%.2f",
+                                 help="Un .mha 2D no guarda su posición en el paciente, así que no se sabe la "
+                                      "distancia entre cortes. Si los cortes la traen (o es una serie DICOM), "
+                                      "déjalo en 0 y se usa la de los archivos.") or None
     c1, c2 = st.columns(2)
     tta = c1.checkbox("TTA de espejo", False, help="Predice también la imagen en espejo y promedia: un poco "
                       "más preciso y el doble de tiempo. Solo aplica con el modelo local.")
@@ -465,12 +474,12 @@ def upload_page() -> Path | None:
             info, predecir, where = choose_predictor(tta, PROCESSING)
             out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
                 f"{huella(archivos)}-{PROCESSING['slug']}-{info.get('precision', 'fp32')}"
-                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}")
+                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}{f'-g{grosor:g}' if grosor else ''}")
             if (out_dir / "meta.json").exists():
                 status.update(label="Este CT ya se había procesado", state="complete")
                 return out_dir
             status.write(f"Modelo: {info['checkpoint']} · {where}")
-            volume = leer_subida(archivos, orientar=bool(info.get("canonical")))
+            volume = leer_subida(archivos, orientar=bool(info.get("canonical")), grosor_mm=grosor)
             del archivos
             check_volume_size(volume.image.size)
             status.write(f"Leído: {volume.fuente} · {volume.image.shape[0]} cortes de "

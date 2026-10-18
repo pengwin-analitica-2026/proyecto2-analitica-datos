@@ -40,6 +40,7 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
   const [archivos, setArchivos] = useState<Archivo[]>([]);
   const [tta, setTta] = useState(false);
   const [enderezar, setEnderezar] = useState(true);
+  const [grosor, setGrosor] = useState("");
   const [arrastrando, setArrastrando] = useState(false);
   const [subido, setSubido] = useState<{ bytes: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +82,9 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         }
       };
       await Promise.all(Array.from({ length: Math.min(6, enviar.length) }, obrero));
-      const { trabajo: idTrabajo } = await api.procesarSubida(id, { destino, tta, enderezar });
-      const nombre = modo === "dicom" ? enviar[0].nombre.split("/")[0] || "serie DICOM" : enviar[0].nombre;
+      const grosorMm = modo === "dicom" && parseFloat(grosor.replace(",", ".")) > 0 ? parseFloat(grosor.replace(",", ".")) : null;
+      const { trabajo: idTrabajo } = await api.procesarSubida(id, { destino, tta, enderezar, grosor_mm: grosorMm });
+      const nombre = modo === "dicom" ? enviar[0].nombre.split("/")[0] || "carpeta de cortes" : enviar[0].nombre;
       trabajo(idTrabajo, `CT subido · ${nombre}`);
     } catch (e) {
       setError((e as Error).message);
@@ -97,13 +99,13 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         <span className="sobretitulo">Subir un CT propio</span>
         <h2>Procesa tu volumen con el mismo pipeline</h2>
         <p className="tenue">
-          Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o la carpeta con los cortes
-          DICOM de una serie. Se orienta con los metadatos, se endereza el giro del paciente si es claro, y pasa por el
+          Un volumen en un solo archivo (.mha, .nii, .nii.gz, .nrrd; un .mhd con su .raw) o una carpeta de cortes: los
+          DICOM de una serie o un .mha por corte. Se orienta con los metadatos, se endereza el giro del paciente si es claro, y pasa por el
           mismo pipeline que los casos de ejemplo. No hay ground truth, así que no se calculan métricas.
         </p>
       </div>
       <Segmentado valor={modo} cambiar={(v) => { setModo(v); setArchivos([]); }}
-        opciones={[{ valor: "volumen", texto: "Archivo de volumen" }, { valor: "dicom", texto: "Carpeta DICOM" }]} />
+        opciones={[{ valor: "volumen", texto: "Archivo de volumen" }, { valor: "dicom", texto: "Carpeta de cortes (DICOM o .mha)" }]} />
       <div
         className={`zona-soltar ${arrastrando ? "encima" : ""} ${archivos.length ? "con-archivos" : ""}`}
         onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
@@ -131,12 +133,20 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
           </>
         ) : (
           <>
-            <b>{modo === "dicom" ? "Arrastra aquí la carpeta DICOM" : "Arrastra aquí el archivo del volumen"}</b>
+            <b>{modo === "dicom" ? "Arrastra aquí la carpeta con los cortes" : "Arrastra aquí el archivo del volumen"}</b>
             <span className="tenue">o haz clic para elegir{modo === "volumen" ? " (un .mhd o .nhdr va junto con su archivo de datos)" : " la carpeta"} · hasta {maxMb} MB</span>
           </>
         )}
       </div>
       {aviso && <div className="alerta aviso">{aviso}</div>}
+      {modo === "dicom" && (
+        <label className="campo campo-grosor">
+          <span>Grosor entre cortes (mm) · solo si son cortes .mha en 2D</span>
+          <input inputMode="decimal" placeholder="Déjalo vacío si es DICOM o si los .mha traen su posición" value={grosor}
+            onChange={(e) => setGrosor(e.target.value)} />
+          <small>Un .mha 2D no guarda su posición en el paciente, así que no se sabe la distancia entre cortes. Si hace falta, el servidor lo pide.</small>
+        </label>
+      )}
       <div className="opciones">
         <label className="casilla"><input type="checkbox" checked={tta} onChange={(e) => setTta(e.target.checked)} />
           <span><b>TTA de espejo</b><small>Predice también la imagen en espejo y promedia: un poco más preciso y el doble de tiempo. En la GPU la fija el servicio.</small></span></label>
