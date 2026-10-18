@@ -49,3 +49,6 @@ build/
 # Modelo int8 exportado (src/precision.py exportar): depende de la versión de torch con que se hizo;
 # la imagen de la API lo genera al construirse. La calibración (calibracion_int8_h8.npz) sí se versiona.
 outputs/s10/*_int8.pt
+
+# id de la distribución de CloudFront de la página web (deploy/aws/web.sh)
+deploy/aws/.web_estado
