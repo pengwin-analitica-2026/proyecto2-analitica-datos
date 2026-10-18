@@ -63,7 +63,6 @@ rol_sagemaker() {
   if ! aws iam get-role --role-name "$ROL" >/dev/null 2>&1; then
     aws iam create-role --role-name "$ROL" --assume-role-policy-document \
       '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"sagemaker.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
-    sleep 10   # IAM tarda unos segundos en propagar un rol nuevo
   fi
   # Solo bajar su imagen y escribir sus logs.
   aws iam put-role-policy --role-name "$ROL" --policy-name pelvis-gpu-minimo --policy-document "{
@@ -109,10 +108,17 @@ preparar() {
   # Lo que no cobra por hora y se crea una sola vez. Encender después es solo crear el endpoint.
   rol_sagemaker
   rol_apagado
-  aws sagemaker describe-model --model-name "$NOMBRE" >/dev/null 2>&1 \
-    || aws sagemaker create-model --model-name "$NOMBRE" \
+  # IAM tarda en propagar un rol o una política nuevos: CreateModel comprueba que el rol pueda bajar la
+  # imagen y falla con «cannot pull» si se llama enseguida. Se reintenta unas veces.
+  local intento
+  for intento in 1 2 3 4 5 6; do
+    aws sagemaker describe-model --model-name "$NOMBRE" >/dev/null 2>&1 && break
+    aws sagemaker create-model --model-name "$NOMBRE" \
          --execution-role-arn "arn:aws:iam::$CUENTA:role/$ROL" \
-         --primary-container "Image=$IMAGEN,Environment={PRECISION=auto}" >/dev/null
+         --primary-container "Image=$IMAGEN,Environment={PRECISION=auto}" >/dev/null 2>&1 && break
+    [ "$intento" = 6 ] && { echo "No se pudo crear el modelo: el rol $ROL no puede bajar $IMAGEN"; exit 1; }
+    echo "Esperando a que IAM propague los permisos del rol…"; sleep 15
+  done
   aws sagemaker describe-endpoint-config --endpoint-config-name "$NOMBRE" >/dev/null 2>&1 \
     || aws sagemaker create-endpoint-config --endpoint-config-name "$NOMBRE" --production-variants \
          "VariantName=principal,ModelName=$NOMBRE,InstanceType=$INSTANCIA,InitialInstanceCount=1,ContainerStartupHealthCheckTimeoutInSeconds=600" >/dev/null
