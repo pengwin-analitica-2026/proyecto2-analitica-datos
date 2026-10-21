@@ -152,7 +152,8 @@ def legend_html(fragments: list[dict]) -> str:
 def fragments_dataframe(rows: list[dict]):
     import pandas as pd
     return pd.DataFrame([{"Hueso": REGION_LABELS[r["region"]], "Fragmento": local_name(r["id"]),
-                          "Distancia al principal": "—" if r["is_main"] else distance_text(r["distance_mm"]),
+                          "Distancia al principal": "—" if r["is_main"] else distance_text(r["distance_mm"])
+                          + ("  ⚠ metal" if r.get("metal") else ""),
                           "Volumen (mm³)": round(r["volume_mm3"]), "Cortes": f"{r['z_range'][0]}–{r['z_range'][1]}"}
                          for r in rows])
 
@@ -452,7 +453,13 @@ def upload_page() -> Path | None:
                                  help="Una serie DICOM, o un .mha (.nii, .nrrd) por corte. Los .mha se ordenan por "
                                       "su posición en el paciente si la traen.")
     grosor = None
-    if modo != "Archivo de volumen":
+    if modo == "Archivo de volumen":
+        grosor = st.number_input("Corregir el grosor entre cortes (mm), opcional", min_value=0.0,
+                                 max_value=20.0, value=0.0, step=0.1, format="%.2f",
+                                 help="Solo si la cabecera está mal (por ejemplo, dice 100 mm entre cortes). "
+                                      "Reemplaza la distancia entre cortes del archivo; déjalo en 0 para usar "
+                                      "la de la cabecera.") or None
+    else:
         grosor = st.number_input("Grosor entre cortes (mm), solo para cortes .mha en 2D", min_value=0.0,
                                  max_value=20.0, value=0.0, step=0.1, format="%.2f",
                                  help="Un .mha 2D no guarda su posición en el paciente, así que no se sabe la "
@@ -658,6 +665,8 @@ with st.sidebar:
         st.caption(f"Giro axial del paciente: {giro['angulo']:+.1f}° estimado; " + (
             "se enderezó antes de predecir (las tres vistas y el ground truth están enderezados)."
             if giro["corregido"] else f"no se corrigió (solo se corrigen giros claros de {giro['giro_minimo']:.0f}° o más)."))
+    for aviso in meta.get("avisos") or []:
+        st.warning(f"**{aviso['titulo']}.** {aviso['texto']}", icon="⚠️")
     st.markdown(legend_html(meta["fragments_pred"]), unsafe_allow_html=True)
 
 all_fragments = meta["fragments_pred"]

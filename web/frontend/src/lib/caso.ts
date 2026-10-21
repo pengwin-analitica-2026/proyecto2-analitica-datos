@@ -10,6 +10,7 @@ export interface Fragmento {
   distance_mm: number | null;
   centroid_zyx_vox: [number, number, number];
   z_range: [number, number];
+  metal?: boolean; // secundario en cortes con artefactos de metal (calidad_entrada.py)
 }
 
 export interface Comparacion {
@@ -20,6 +21,12 @@ export interface Comparacion {
   pred_mm: number | null;
   abs_error_mm: number | null;
   dice3d: number;
+}
+
+export interface Aviso {
+  tipo: "espaciado" | "metal" | string;
+  titulo: string;
+  texto: string;
 }
 
 export interface Paso {
@@ -50,6 +57,8 @@ export interface Meta {
   flipped?: boolean;
   enderezado?: { angulo: number; corregido: boolean; giro_minimo: number } | null;
   pasos?: Paso[];
+  avisos?: Aviso[];
+  metal?: { volumen_mm3: number; n_cortes: number; rango_z: [number, number] | null; avisar: boolean } | null;
   bone_z_range: [number, number] | null;
   fragments_pred: Fragmento[];
   fragments_gt: Fragmento[] | null;

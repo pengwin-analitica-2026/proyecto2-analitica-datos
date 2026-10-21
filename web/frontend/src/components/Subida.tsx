@@ -82,7 +82,7 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         }
       };
       await Promise.all(Array.from({ length: Math.min(6, enviar.length) }, obrero));
-      const grosorMm = modo === "dicom" && parseFloat(grosor.replace(",", ".")) > 0 ? parseFloat(grosor.replace(",", ".")) : null;
+      const grosorMm = parseFloat(grosor.replace(",", ".")) > 0 ? parseFloat(grosor.replace(",", ".")) : null;
       const { trabajo: idTrabajo } = await api.procesarSubida(id, { destino, tta, enderezar, grosor_mm: grosorMm });
       const nombre = modo === "dicom" ? enviar[0].nombre.split("/")[0] || "carpeta de cortes" : enviar[0].nombre;
       trabajo(idTrabajo, `CT subido · ${nombre}`);
@@ -104,7 +104,7 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
           mismo pipeline que los casos de ejemplo. No hay ground truth, así que no se calculan métricas.
         </p>
       </div>
-      <Segmentado valor={modo} cambiar={(v) => { setModo(v); setArchivos([]); }}
+      <Segmentado valor={modo} cambiar={(v) => { setModo(v); setArchivos([]); setGrosor(""); }}
         opciones={[{ valor: "volumen", texto: "Archivo de volumen" }, { valor: "dicom", texto: "Carpeta de cortes (DICOM o .mha)" }]} />
       <div
         className={`zona-soltar ${arrastrando ? "encima" : ""} ${archivos.length ? "con-archivos" : ""}`}
@@ -139,12 +139,19 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         )}
       </div>
       {aviso && <div className="alerta aviso">{aviso}</div>}
-      {modo === "dicom" && (
+      {modo === "dicom" ? (
         <label className="campo campo-grosor">
           <span>Grosor entre cortes (mm) · solo si son cortes .mha en 2D</span>
           <input inputMode="decimal" placeholder="Déjalo vacío si es DICOM o si los .mha traen su posición" value={grosor}
             onChange={(e) => setGrosor(e.target.value)} />
           <small>Un .mha 2D no guarda su posición en el paciente, así que no se sabe la distancia entre cortes. Si hace falta, el servidor lo pide.</small>
+        </label>
+      ) : (
+        <label className="campo campo-grosor">
+          <span>Corregir el grosor entre cortes (mm) · opcional</span>
+          <input inputMode="decimal" placeholder="Déjalo vacío para usar el de la cabecera del archivo" value={grosor}
+            onChange={(e) => setGrosor(e.target.value)} />
+          <small>Solo si la cabecera está mal (por ejemplo, dice 100 mm entre cortes). Reemplaza la distancia entre cortes del archivo; las distancias, los volúmenes y las vistas 3D dependen de ella.</small>
         </label>
       )}
       <div className="opciones">

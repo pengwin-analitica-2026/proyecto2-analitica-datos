@@ -49,6 +49,7 @@ from scipy import ndimage as ndi
 from skimage import measure
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from calidad_entrada import aviso_metal, marcar_fragmentos_con_metal, revisar_espaciado, revisar_metal
 from fragment_distances import REGIONS, measure_fragment_distances
 from volume_postprocess import match_fragments, postprocess_3d, umbrales_en_voxeles
 
@@ -324,6 +325,16 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     rows = _desplazar(fragment_table(ids_caja, spacing), origen)
     log(f"{tag} distancias predichas ({len(rows)} fragmentos) en {time.perf_counter() - t:.1f} s")
 
+    # Controles de calidad (calidad_entrada.py): espaciado de la cabecera y cortes con metal. No cambian la
+    # predicción; avisan y marcan los fragmentos que caen en cortes con artefactos de metal.
+    avisos = revisar_espaciado(spacing_xyz)
+    metal = revisar_metal(image, spacing_xyz)
+    marcados = marcar_fragmentos_con_metal(rows, metal["cortes"] if metal["avisar"] else [])
+    if (aviso := aviso_metal(metal, marcados)) is not None:
+        avisos.append(aviso)
+    for aviso in avisos:
+        log(f"{tag} AVISO · {aviso['titulo']}")
+
     gt_rows = comparison = None
     if gt_ids is not None:
         gt_caja = gt_ids[caja]
@@ -364,6 +375,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
             "ms_per_slice": 1000 * pred["seconds"] / len(images), "min_voxels": min_voxels,
             "distance_method": method, "canonical": bool(info.get("canonical")), "flipped": flipped,
             "enderezado": giro, "umbrales_postproceso": umbrales, "pasos": pasos.textos,
+            "avisos": avisos, "metal": metal,
             "bone_z_range": [int(bone_z[0]), int(bone_z[-1])] if len(bone_z) else None,
             "fragments_pred": rows, "fragments_gt": gt_rows, "comparison": comparison,
             "slices": [{"z": z, "classification": [round(float(p), 4) for p in pred["classification"][z]],

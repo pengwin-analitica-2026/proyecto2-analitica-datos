@@ -145,7 +145,7 @@ function rotulosDelCorte(ids: Uint8Array, fragmentos: Fragmento[], size: number)
   for (const [id, [sx, sy, n]] of [...sumas.entries()].sort((a, b) => a[0] - b[0])) {
     const f = porId.get(id);
     if (!f || f.is_main || n < 4) continue;
-    rotulos.push({ id, texto: `${localName(id)} · ${shortDistance(f.distance_mm)}`, x: sx / n, y: sy / n });
+    rotulos.push({ id, texto: `${localName(id)} · ${shortDistance(f.distance_mm)}${f.metal ? " ⚠" : ""}`, x: sx / n, y: sy / n });
   }
   return rotulos;
 }

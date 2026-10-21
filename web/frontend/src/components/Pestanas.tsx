@@ -150,7 +150,7 @@ export function TablaFragmentos({ fragmentos }: { fragmentos: Fragmento[] }) {
             <tr key={f.id}>
               <td><span className="punto" style={{ background: hex(fragmentRgb(f.id)) }} />{REGION_LABELS[f.region]}</td>
               <td>{localName(f.id)}</td>
-              <td>{f.is_main ? "—" : distanceText(f.distance_mm)}</td>
+              <td>{f.is_main ? "—" : distanceText(f.distance_mm)}{f.metal && <span className="marca-metal" title="En cortes con metal: puede ser un artefacto">⚠ metal</span>}</td>
               <td className="num">{Math.round(f.volume_mm3).toLocaleString("es-CO")}</td>
               <td>{f.z_range[0]}–{f.z_range[1]}</td>
             </tr>
@@ -384,11 +384,11 @@ export function PestanaRecon({ caso, fragmentos }: { caso: Caso; fragmentos: Fra
   const centro = (f: Fragmento): [number, number, number] =>
     [f.centroid_zyx_vox[2] * sx, f.centroid_zyx_vox[1] * sy, f.centroid_zyx_vox[0] * sz];
   const marcadores = useMemo(() => secundarios.map((f) => ({ pos: centro(f),
-    texto: `${REGION_LABELS[f.region]} · ${localName(f.id)} · ${distanceText(f.distance_mm)}` })), [fragmentos]); // eslint-disable-line
+    texto: `${REGION_LABELS[f.region]} · ${localName(f.id)} · ${distanceText(f.distance_mm)}${f.metal ? " · ⚠ en cortes con metal" : ""}` })), [fragmentos]); // eslint-disable-line
   const rotulos = useMemo<Rotulo3D[]>(() => secundarios
     .filter((f) => contactos || (f.distance_mm ?? 0) >= 0.05)
     .map((f, indice) => ({ pos: centro(f), indice, color: hex(fragmentRgb(f.id)),
-      texto: `<b>${localName(f.id)} · ${shortDistance(f.distance_mm)}</b>` })), [fragmentos, contactos]); // eslint-disable-line
+      texto: `<b>${localName(f.id)} · ${shortDistance(f.distance_mm)}${f.metal ? " ⚠" : ""}</b>` })), [fragmentos, contactos]); // eslint-disable-line
 
   return (
     <div>

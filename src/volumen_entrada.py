@@ -99,7 +99,8 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
     corte). ``archivos`` = [(nombre, bytes)].
 
     ``grosor_mm`` es la distancia entre cortes para una carpeta de cortes 2D, que no guardan su posición;
-    si los cortes la traen (archivos 3D de un solo corte), se usa la de los archivos.
+    si los cortes la traen (archivos 3D de un solo corte), se usa la de los archivos. En un volumen o una
+    serie DICOM reemplaza la distancia entre cortes de la cabecera, para corregir una cabecera errónea.
 
     Con ``orientar=True`` (modelos con orientación canónica) lleva el volumen a la orientación estándar
     con la matriz de dirección de la cabecera.
@@ -139,6 +140,13 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
             fuente, corto = f"serie DICOM ({n_cortes} cortes)", _nombre_corto(carpeta_origen or "dicom")
     if imagen.GetDimension() != 3:
         raise ValueError(f"Se esperaba un volumen 3D y llegó uno de {imagen.GetDimension()} dimensiones.")
+    if grosor_mm and grosor_mm > 0 and len(volumenes) <= 1:
+        # Volumen o serie DICOM: el usuario corrige el grosor entre cortes de la cabecera (p. ej. un .mha que
+        # dice 100 mm; ver calidad_entrada.py). Se cambia el espaciado del eje de cortes antes de orientar.
+        espaciado = list(imagen.GetSpacing())
+        original, espaciado[2] = espaciado[2], float(grosor_mm)
+        imagen.SetSpacing(espaciado)
+        fuente += f" · grosor entre cortes corregido a {grosor_mm:g} mm (la cabecera decía {original:g} mm)"
     if imagen.GetNumberOfComponentsPerPixel() != 1:
         raise ValueError("El volumen tiene varios canales por vóxel (¿color?); un CT tiene uno.")
     if imagen.GetSize()[2] < MIN_CORTES:

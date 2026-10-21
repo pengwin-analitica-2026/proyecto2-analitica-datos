@@ -107,7 +107,8 @@ def slice_labels(ids_slice: np.ndarray, fragments: list[dict]) -> list[dict]:
         ys, xs = np.nonzero(ids_slice == fragment_id)
         if len(xs) < 4:
             continue
-        labels.append({"id": fragment_id, "text": f"{local_name(fragment_id)} · {short_distance(row['distance_mm'])}",
+        labels.append({"id": fragment_id, "text": f"{local_name(fragment_id)} · {short_distance(row['distance_mm'])}"
+                       + (" ⚠" if row.get("metal") else ""),
                        "x": float(xs.mean()), "y": float(ys.mean()), "distance_mm": row["distance_mm"],
                        "region": row["region"]})
     return labels
@@ -249,7 +250,8 @@ def mesh_figure(meshes: dict[str, np.ndarray], fragments: list[dict],
     for index, row in enumerate(r for r in secondary if label_contacts or (r["distance_mm"] or 0) >= 0.05):
         z, y, x = np.asarray(row["centroid_zyx_vox"]) * spacing_zyx
         annotations.append(dict(
-            x=float(x), y=float(y), z=float(z), text=f"<b>{local_name(row['id'])} · {short_distance(row['distance_mm'])}</b>",
+            x=float(x), y=float(y), z=float(z), text=f"<b>{local_name(row['id'])} · {short_distance(row['distance_mm'])}"
+                 f"{' ⚠' if row.get('metal') else ''}</b>",
             showarrow=True, arrowhead=0, arrowwidth=1.5, arrowcolor="#222222",
             ax=-46 + 28 * (index % 3), ay=-48 - 16 * (index % 4),          # reparte los rótulos para no apilarlos
             font=dict(size=13, color="#111111"), bgcolor="rgba(255,255,255,0.88)",
