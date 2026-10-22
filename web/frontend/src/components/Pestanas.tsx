@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type CorteVivo } from "../lib/api";
 import { cargarHueso, grisDelCorte, type Caso, type Fragmento, type Malla } from "../lib/caso";
-import { dibujarCorte } from "../lib/corte";
+import { HU_MAX, HU_MIN, dibujarCorte } from "../lib/corte";
 import {
   GT_RGB, REGION_LABELS, REGION_ORDER, REGION_STARTS, distanceText, fragmentRgb, hex, localName, shortDistance,
 } from "../lib/paleta";
@@ -161,6 +161,32 @@ export function TablaFragmentos({ fragmentos }: { fragmentos: Fragmento[] }) {
   );
 }
 
+// Ventana de visualización en HU: cambia solo cómo se ven los grises, no lo que recibe el modelo.
+const VENTANAS: Record<string, [number, number] | null> = {
+  red: null, hueso: [150, 1300], blando: [-160, 240], metal: [800, 1300],
+};
+function ControlVentana({ ventana, cambiar }: {
+  ventana: [number, number] | null; cambiar: (v: [number, number] | null) => void;
+}) {
+  const [lo, hi] = ventana ?? [HU_MIN, HU_MAX];
+  const preset = Object.keys(VENTANAS).find((k) => JSON.stringify(VENTANAS[k]) === JSON.stringify(ventana)) ?? "manual";
+  const mover = (nuevoLo: number, nuevoHi: number) =>
+    cambiar([Math.min(nuevoLo, nuevoHi - 20), Math.max(nuevoHi, nuevoLo + 20)]);
+  return (
+    <div className="control">
+      <div className="control-titulo"><span>Ventana de grises (HU)</span><b>{ventana ? `${lo} a ${hi}` : "la del modelo"}</b></div>
+      <Segmentado valor={preset} cambiar={(v) => v !== "manual" && cambiar(VENTANAS[v])}
+        opciones={[{ valor: "red", texto: "Modelo" }, { valor: "hueso", texto: "Hueso" },
+          { valor: "blando", texto: "Tejido" }, { valor: "metal", texto: "Denso" }]} />
+      <label className="rango-hu"><span>Mínimo {lo} HU</span>
+        <input type="range" min={HU_MIN} max={HU_MAX} step={10} value={lo} onChange={(e) => mover(+e.target.value, hi)} /></label>
+      <label className="rango-hu"><span>Máximo {hi} HU</span>
+        <input type="range" min={HU_MIN} max={HU_MAX} step={10} value={hi} onChange={(e) => mover(lo, +e.target.value)} /></label>
+      <span className="dato">Solo cambia cómo se ve el corte; el modelo siempre recibe −500 a +1300 HU con gamma 1.5. Lo que pasa de +1300 HU (metal) ya viene en blanco.</span>
+    </div>
+  );
+}
+
 export function corteInicial(caso: Caso): number {
   const [primero, ultimo] = caso.meta.bone_z_range ?? [0, caso.meta.n_slices - 1];
   return Math.floor((primero + ultimo) / 2);
@@ -177,6 +203,7 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
   const [cajas, setCajas] = useState(true);
   const [tipoCaja, setTipoCaja] = useState<"refined" | "raw">("refined");
   const [verGt, setVerGt] = useState(false);
+  const [ventana, setVentana] = useState<[number, number] | null>(null);   // solo visual
   const [gris, setGris] = useState<{ z: number; datos: Uint8Array } | null>(null);
   const lienzo = useRef<HTMLCanvasElement>(null);
 
@@ -201,9 +228,9 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
       gris: gris.datos, ids: idsCorte, gt: caso.gt ? caso.gt.subarray(gris.z * S * S, (gris.z + 1) * S * S) : null,
       fragmentos, cajas: tipoCaja === "refined" ? m.slices[gris.z].boxes_refined : m.slices[gris.z].boxes_raw,
       mostrarMascaras: mascaras, mostrarCajas: cajas, mostrarGt: verGt && !!caso.gt,
-      titulo: `corte ${gris.z + 1}/${m.n_slices}`,
+      titulo: `corte ${gris.z + 1}/${m.n_slices}`, ventana,
     }, S);
-  }, [gris, idsCorte, fragmentos, mascaras, cajas, tipoCaja, verGt, caso, m, S]);
+  }, [gris, idsCorte, fragmentos, mascaras, cajas, tipoCaja, verGt, ventana, caso, m, S]);
 
   const mover = (d: number) => setZ((v) => Math.min(m.n_slices - 1, Math.max(0, v + d)));
   const rueda = (e: React.WheelEvent) => { e.preventDefault(); mover(e.deltaY > 0 ? 1 : -1); };
@@ -245,6 +272,7 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
           <Interruptor activo={verGt} cambiar={setVerGt} deshabilitado={!caso.gt}>
             Contorno del ground truth {!caso.gt && <small>(sin GT)</small>}
           </Interruptor>
+          <ControlVentana ventana={ventana} cambiar={setVentana} />
           <div className="control">
             <div className="control-titulo"><span>Presencia por región en este corte</span></div>
             {REGION_ORDER.map((r, i) => {

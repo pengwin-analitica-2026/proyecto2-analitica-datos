@@ -73,5 +73,25 @@ class Render(unittest.TestCase):
         self.assertEqual([t.type for t in no_main.data].count("mesh3d"), 2)
 
 
+
+class VentanaVisual(unittest.TestCase):
+    def test_deshace_la_ventana_del_modelo(self):
+        from demo_render import lut_ventana
+        from pengwin_io import window_hu
+        hu = np.array([-500, -160, 0, 240, 600, 1300], dtype=np.float32)
+        gris = np.rint(window_hu(hu) * 255).astype(np.uint8)       # como se guarda el corte
+        visto = lut_ventana(-160, 240)[gris].astype(float)
+        esperado = np.clip(255 * (hu + 160) / 400, 0, 255)
+        np.testing.assert_allclose(visto, esperado, atol=4)       # error de redondeo de uint8
+
+    def test_sin_ventana_no_cambia_el_corte(self):
+        imagen = np.tile(np.arange(64, dtype=np.uint8) * 4, (64, 1))
+        ids = np.zeros((64, 64), dtype=np.uint8)
+        normal = np.asarray(render_slice(imagen, ids, [], show_boxes=False, scale=1))
+        otra = np.asarray(render_slice(imagen, ids, [], show_boxes=False, scale=1, window=(150, 1300)))
+        self.assertFalse(np.array_equal(normal, otra))
+        self.assertEqual(normal.shape, otra.shape)
+
+
 if __name__ == "__main__":
     unittest.main()

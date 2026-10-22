@@ -32,7 +32,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, REGION_STARTS, bone_figure,
+from demo_render import (BASE_RGB, HU_MAX, HU_MIN, NON_CLINICAL, REGION_LABELS, REGION_ORDER, REGION_STARTS, bone_figure,
                          distance_text, hex_color, legend_items, local_name, mesh_figure, render_slice)
 
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
@@ -732,6 +732,14 @@ with tab2:
         box_kind = st.radio("Caja", ["refined", "raw"], horizontal=True,
                             format_func=lambda k: "refinada con la semántica" if k == "refined" else "cabeza grid cruda")
         show_gt = st.checkbox("Contorno del ground truth", False, disabled=not has_gt)
+        windows = {"Modelo": None, "Hueso": (150, 1300), "Tejido": (-160, 240), "Denso": (800, 1300),
+                   "Manual": "manual"}
+        window_name = st.radio("Ventana de grises (HU)", list(windows), horizontal=True,
+                               help="Solo cambia cómo se ve el corte; el modelo siempre recibe −500 a +1300 HU "
+                                    "con gamma 1.5. Lo que pasa de +1300 HU (metal) ya viene en blanco.")
+        window = windows[window_name]
+        if window == "manual":
+            window = st.slider("Rango de HU", int(HU_MIN), int(HU_MAX), (-500, 1300), step=10)
         slice_meta = meta["slices"][z]
         st.markdown("**Presencia por región en este corte**")
         for name, prob in zip(REGION_ORDER, slice_meta["classification"]):
@@ -741,7 +749,7 @@ with tab2:
         image = render_slice(data["images"][z], ids_slice, fragments, slice_meta,
                              gt_slice=data["gt_ids"][z] if has_gt else None, boxes=box_kind,
                              show_masks=show_masks, show_boxes=show_boxes, show_gt=show_gt,
-                             title=f"corte {z + 1}/{meta['n_slices']}")
+                             title=f"corte {z + 1}/{meta['n_slices']}", window=window)
         st.image(image, use_container_width=True)
     st.caption("La distancia junto a cada fragmento es la mínima borde a borde, en mm, entre ese fragmento y el "
                "principal de su hueso, medida sobre el volumen 3D completo (spacing del header): es la misma en "

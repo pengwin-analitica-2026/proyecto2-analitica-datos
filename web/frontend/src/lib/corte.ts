@@ -15,6 +15,21 @@ export interface OpcionesCorte {
   titulo?: string;
   escala?: number;
   alpha?: number;
+  ventana?: [number, number] | null; // HU [mínimo, máximo] solo para ver; null = como la ve la red
+}
+
+// Los cortes guardados ya pasaron por la ventana del modelo (−500 a +1300 HU) y gamma 1.5 (pengwin_io.window_hu).
+// Para mostrar otra ventana se deshace esa curva: HU = −500 + 1800 · (gris/255)^(1/1.5). Fuera de −500…1300 HU
+// la imagen guardada ya está saturada, así que la ventana de visualización solo puede moverse dentro de ese rango.
+export const HU_MIN = -500, HU_MAX = 1300;
+export function huDeGris(g: number): number {
+  return HU_MIN + (HU_MAX - HU_MIN) * Math.pow(g / 255, 1 / 1.5);
+}
+export function lutVentana(lo: number, hi: number): Uint8Array {
+  const lut = new Uint8Array(256);
+  const ancho = Math.max(hi - lo, 1);
+  for (let g = 0; g < 256; g++) lut[g] = Math.round(255 * Math.min(1, Math.max(0, (huDeGris(g) - lo) / ancho)));
+  return lut;
 }
 
 const FUENTE = "'Inter', system-ui, sans-serif";
@@ -31,8 +46,9 @@ export function dibujarCorte(lienzo: HTMLCanvasElement, o: OpcionesCorte, size: 
   fuente.width = fuente.height = size;
   const fctx = fuente.getContext("2d")!;
   const img = fctx.createImageData(size, size);
+  const lut = o.ventana ? lutVentana(o.ventana[0], o.ventana[1]) : null;
   for (let i = 0; i < size * size; i++) {
-    const g = o.gris[i];
+    const g = lut ? lut[o.gris[i]] : o.gris[i];
     img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = g;
     img.data[i * 4 + 3] = 255;
   }
