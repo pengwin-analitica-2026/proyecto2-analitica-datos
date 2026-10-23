@@ -23,7 +23,7 @@ import numpy as np
 # gruesos de un estudio antiguo); en el plano: 0.2 a 2.5. Fuera de eso la cabecera casi seguro está mal.
 ENTRE_CORTES_MM = (0.3, 10.0)
 EN_PLANO_MM = (0.2, 2.5)
-METAL_HU = 3000            # el hueso cortical no pasa de ~2000 HU; arriba es metal
+METAL_HU = 2500            # el hueso cortical no pasa de ~2000 HU; desde aquí es metal (incluye 3000 exactos)
 METAL_MIN_VOXELES = 20     # vóxeles de metal para contar un corte como «con metal»
 METAL_AVISO_MM3 = 1000.0   # metal total a partir del cual se avisa (implantes pequeños no afectan)
 FRACCION_CORTES = 0.5      # un fragmento se marca si la mitad o más de sus cortes tienen metal
@@ -54,7 +54,7 @@ def revisar_espaciado(spacing_xyz) -> list[dict]:
 def cortes_con_metal(image_hu: np.ndarray, umbral_hu: float = METAL_HU,
                      min_voxeles: int = METAL_MIN_VOXELES) -> tuple[np.ndarray, np.ndarray]:
     """(corte con metal [z] bool, vóxeles de metal por corte [z]). Corte a corte, sin copiar el volumen."""
-    conteo = np.array([int(np.count_nonzero(corte > umbral_hu)) for corte in image_hu], dtype=np.int64)
+    conteo = np.array([int(np.count_nonzero(corte >= umbral_hu)) for corte in image_hu], dtype=np.int64)
     return conteo >= min_voxeles, conteo
 
 
@@ -93,7 +93,7 @@ def aviso_metal(resumen: dict, marcados: int) -> dict | None:
         return None
     z0, z1 = resumen["rango_z"]
     volumen = f"{resumen['volumen_mm3']:,.0f}".replace(",", ".")          # separador de miles en español
-    texto = (f"Hay unos {volumen} mm³ de metal (más de {resumen['umbral_hu']} HU) en "
+    texto = (f"Hay unos {volumen} mm³ de metal ({resumen['umbral_hu']} HU o más) en "
              f"{resumen['n_cortes']} cortes, entre el {z0} y el {z1}. Las rayas de artefacto del metal pueden "
              "hacer que el modelo marque tejido como fragmentos de hueso. ")
     texto += (f"{marcados} fragmento{'s' if marcados != 1 else ''} en esos cortes "

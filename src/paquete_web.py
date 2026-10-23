@@ -36,6 +36,18 @@ def _png(array: np.ndarray) -> bytes:
     return buffer.getvalue()
 
 
+def _png_hu(corte_hu: np.ndarray) -> bytes:
+    """Corte en HU como PNG RGB sin pérdida: (HU + 1024) en 16 bits, byte alto en R y bajo en G.
+
+    El navegador lee un PNG de 8 bits por canal sin tocar los valores; uno de 16 bits por canal no se puede
+    leer en un canvas sin perder precisión. Así el visor recupera el HU exacto: R·256 + G − 1024.
+    """
+    valor = (np.clip(corte_hu.astype(np.int32), -1024, 64511) + 1024).astype(np.uint16)
+    rgb = np.zeros(valor.shape + (3,), dtype=np.uint8)
+    rgb[..., 0], rgb[..., 1] = valor >> 8, valor & 0xFF
+    return _png(rgb)
+
+
 def _gz(data: bytes) -> bytes:
     return gzip.compress(data, compresslevel=6, mtime=0)
 
@@ -72,6 +84,13 @@ def empaquetar(carpeta: str | Path, escribir) -> dict:
         for z in range(len(images)):
             escribir(f"cortes/{z:04d}.png", _png(images[z]))
         del images
+        paquete["hu"] = None
+        if "hu" in volumen.files:                 # exportaciones nuevas: ventana de grises de rango completo
+            hu = volumen["hu"]
+            for z in range(len(hu)):
+                escribir(f"hu/{z:04d}.png", _png_hu(hu[z]))
+            paquete["hu"] = "hu/{z}.png"
+            del hu
         escribir("ids.bin.gz", _gz(np.ascontiguousarray(volumen["ids"], dtype=np.uint8).tobytes()))
         paquete["ids"] = "ids.bin.gz"
         paquete["gt"] = None

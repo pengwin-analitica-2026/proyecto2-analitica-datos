@@ -260,7 +260,7 @@ def ejecutar(id_: str) -> None:
             resultado = _vivo(p["caso"], p["destino"], p["tta"], trabajo.log)
         else:
             resultado = _subida(p["subida"], p["destino"], p["tta"], p["enderezar"], trabajo.log,
-                                p.get("grosor_mm"))
+                                p.get("grosor_mm"), bool(p.get("reducir_metal")))
     except Exception as error:                     # se informa en la página tal cual
         traceback.print_exc()
         trabajo.terminar(error=str(error) or error.__class__.__name__)
@@ -328,7 +328,8 @@ def _vivo(caso: str, destino: str, tta: bool, log) -> str:
         return _empaquetar(tmp / "exportado", prefijo, log)
 
 
-def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, grosor_mm: float | None = None) -> str:
+def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, grosor_mm: float | None = None,
+            reducir_metal: bool = False) -> str:
     from demo_export import exportar_volumen
     from volumen_entrada import leer_subida
     manifiesto = json.loads(ALMACEN.leer(f"subidas/{id_subida}/manifiesto.json") or b"null")
@@ -348,7 +349,8 @@ def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, groso
         huella = h.hexdigest()[:10]
         info, predecir, donde = _predictor(destino, tta)
         prefijo = (f"resultados/{MODELO}/subidas/{huella}-{_slug(destino, info, tta)}"
-                   f"{'' if enderezar else '-sinenderezar'}{f'-g{grosor_mm:g}' if grosor_mm else ''}")
+                   f"{'' if enderezar else '-sinenderezar'}{f'-g{grosor_mm:g}' if grosor_mm else ''}"
+                   f"{'-mar' if reducir_metal else ''}")
         if resultado_listo(prefijo):
             log("Este CT ya se había procesado con la misma configuración")
             return prefijo
@@ -363,8 +365,9 @@ def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, groso
         inicio = time.perf_counter()
         exportar_volumen(volume.image, volume.spacing_xyz, tmp / "exportado", info, predecir, nombre=volume.nombre,
                          enderezar=enderezar, log=log, pasos=volume.pasos, max_voxeles_vista=VISTA_MAX_VOXELES,
+                         reducir_metal=reducir_metal,
                          extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
-                                                "donde": donde}})
+                                                "donde": donde, "entrada": volume.entrada}})
         del volume
         log(f"Pipeline listo en {time.perf_counter() - inicio:.0f} s")
         return _empaquetar(tmp / "exportado", prefijo, log)
@@ -516,7 +519,8 @@ async def procesar_subida(id_: str, request: Request) -> dict:
     if not 0 <= grosor <= 20:
         raise HTTPException(status_code=422, detail="el grosor entre cortes va de 0 a 20 mm")
     trabajo = Trabajo.nuevo("subida", subida=id_, grosor_mm=grosor or None, destino=_destino_valido(datos.get("destino", "cpu")),
-                            tta=bool(datos.get("tta")), enderezar=bool(datos.get("enderezar", True)))
+                            tta=bool(datos.get("tta")), enderezar=bool(datos.get("enderezar", True)),
+                            reducir_metal=bool(datos.get("reducir_metal")))
     lanzar(trabajo)
     return {"trabajo": trabajo.datos["id"]}
 

@@ -107,7 +107,7 @@ export const api = {
       "/api/subidas",
       json({ archivos }),
     ),
-  procesarSubida: (id: string, cuerpo: { destino: string; tta: boolean; enderezar: boolean; grosor_mm: number | null }) =>
+  procesarSubida: (id: string, cuerpo: { destino: string; tta: boolean; enderezar: boolean; grosor_mm: number | null; reducir_metal: boolean }) =>
     pedir<{ trabajo: string }>(`/api/subidas/${id}/procesar`, json(cuerpo)),
   corte: (bytes: Uint8Array, destino: string) =>
     pedir<CorteVivo>("/api/corte", {

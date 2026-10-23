@@ -249,7 +249,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
                      min_voxels: int = 30, raw_view: bool = True, enderezar: bool = True,
                      umbral_mm: bool = True, flipped: bool = False, extra_meta: dict | None = None,
                      pred_guardada: dict | None = None, pasos=None, log=print,
-                     max_voxeles_vista: int | None = None) -> Path:
+                     max_voxeles_vista: int | None = None, reducir_metal: bool = False) -> Path:
     """Pipeline completo sobre un volumen ya cargado y en la orientación que espera el modelo.
 
     ``image`` (z,y,x) en HU y ``label`` opcional, ya orientados. ``info`` describe el modelo
@@ -269,6 +269,17 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = f"[{nombre}]"
     pasos = pasos or Pasos()
+    reduccion = None
+    if reducir_metal:
+        # Experimental (reduccion_metal.py): atenúa las rayas del metal antes del modelo. Va antes del enderezado
+        # porque trabaja corte a corte sobre los HU tal como vienen.
+        from reduccion_metal import reducir_artefactos_metal
+        image, reduccion = reducir_artefactos_metal(image, log=lambda texto: log(f"{tag} {texto}"))
+        pasos.agregar_hu("metal", "Reducción de artefactos de metal (experimental)",
+                         (f"LI-MAR en {len(reduccion['cortes'])} cortes con metal ({reduccion['segundos']:.0f} s): se "
+                          "reemplazan los rayos que pasan por el metal por una interpolación de los vecinos y se "
+                          "reconstruye el corte; el metal se repone tal cual." if reduccion["cortes"] else
+                          "No hay cortes con metal: el volumen no cambia."), image, spacing_xyz)
     giro = None
     if enderezar:
         from normalizacion import normalizar
@@ -290,6 +301,11 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     log(f"{tag} volumen {image.shape} spacing nativo {tuple(round(float(s), 3) for s in spacing_xyz)} mm")
 
     images = preprocess_volume(image, size)
+    # HU originales del corte (ya orientado y enderezado), a la misma resolución que ``images``: solo para que
+    # los visualizadores dejen elegir cualquier ventana de grises, de −1024 HU al máximo del volumen (metal).
+    from pengwin_io import resize_slice
+    hu_vista = np.stack([np.rint(resize_slice(np.clip(corte, -1024, 32000).astype(np.float32), size))
+                         for corte in image]).astype(np.int16)
     pasos.agregar_entrada("Entrada al modelo", f"Ventana ósea (−500 a 1300 HU), gamma 1.5 y cada corte estirado "
                           f"a {size}×{size} píxeles: exactamente lo que recibe la red, corte por corte.", images)
     np.savez_compressed(out_dir / "pasos.npz", **pasos.arreglos)
@@ -331,6 +347,9 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
     metal = revisar_metal(image, spacing_xyz)
     marcados = marcar_fragmentos_con_metal(rows, metal["cortes"] if metal["avisar"] else [])
     if (aviso := aviso_metal(metal, marcados)) is not None:
+        if reduccion and reduccion["cortes"]:
+            aviso["texto"] += (" Se aplicó la reducción de artefactos de metal (experimental): las rayas se atenúan, "
+                               "pero pueden quedar restos.")
         avisos.append(aviso)
     for aviso in avisos:
         log(f"{tag} AVISO · {aviso['titulo']}")
@@ -342,7 +361,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
         comparison = compare_tables(rows, gt_rows, ids_caja, gt_caja)
         log(f"{tag} ground truth: {len(gt_rows)} fragmentos, {len(comparison)} secundarios")
 
-    arrays = {"images": images, "semantic": pred["semantic"], "ids": ids}
+    arrays = {"images": images, "semantic": pred["semantic"], "ids": ids, "hu": hu_vista}
     if gt_ids is not None:
         arrays["gt_ids"] = gt_ids
     np.savez_compressed(out_dir / "volume.npz", **arrays)
@@ -375,7 +394,7 @@ def exportar_volumen(image: np.ndarray, spacing_xyz, out_dir: str | Path, info: 
             "ms_per_slice": 1000 * pred["seconds"] / len(images), "min_voxels": min_voxels,
             "distance_method": method, "canonical": bool(info.get("canonical")), "flipped": flipped,
             "enderezado": giro, "umbrales_postproceso": umbrales, "pasos": pasos.textos,
-            "avisos": avisos, "metal": metal,
+            "avisos": avisos, "metal": metal, "reduccion_metal": reduccion, "hu_rango": [int(hu_vista.min()), int(hu_vista.max())],
             "bone_z_range": [int(bone_z[0]), int(bone_z[-1])] if len(bone_z) else None,
             "fragments_pred": rows, "fragments_gt": gt_rows, "comparison": comparison,
             "slices": [{"z": z, "classification": [round(float(p), 4) for p in pred["classification"][z]],

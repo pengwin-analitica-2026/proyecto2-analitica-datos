@@ -132,12 +132,18 @@ def render_slice(image_u8: np.ndarray, ids_slice: np.ndarray, fragments: list[di
                  slice_meta: dict | None = None, gt_slice: np.ndarray | None = None,
                  boxes: str = "refined", show_masks: bool = True, show_boxes: bool = True,
                  show_gt: bool = False, scale: int = 2, alpha: float = 0.45,
-                 title: str | None = None, window: tuple[float, float] | None = None) -> Image.Image:
+                 title: str | None = None, window: tuple[float, float] | None = None,
+                 hu_slice: np.ndarray | None = None) -> Image.Image:
     """Visualizador 2 para un corte. ``boxes`` es 'refined' (con la semántica) o 'raw' (cabeza grid).
 
-    ``window`` = (HU mínimo, HU máximo) para ver los grises con otra ventana; None = como la ve la red.
+    ``window`` = (HU mínimo, HU máximo) para ver los grises con otra ventana; None = como la ve la red. Con
+    ``hu_slice`` (los HU originales del corte, exportaciones nuevas) la ventana puede ir de −1024 HU al metal;
+    sin él solo se puede reestirar dentro de −500 a +1300 HU.
     """
-    if window is not None:
+    if window is not None and hu_slice is not None:
+        lo, hi = window
+        image_u8 = np.clip(np.rint(255 * (hu_slice.astype(np.float32) - lo) / max(hi - lo, 1.0)), 0, 255).astype(np.uint8)
+    elif window is not None:
         image_u8 = lut_ventana(*window)[image_u8]
     size = image_u8.shape[0]
     side = size * scale

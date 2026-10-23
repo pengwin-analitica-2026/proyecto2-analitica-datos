@@ -16,6 +16,7 @@ export interface OpcionesCorte {
   escala?: number;
   alpha?: number;
   ventana?: [number, number] | null; // HU [mínimo, máximo] solo para ver; null = como la ve la red
+  hu?: Int16Array | null; // HU originales del corte: la ventana puede ir de −1024 al metal
 }
 
 // Los cortes guardados ya pasaron por la ventana del modelo (−500 a +1300 HU) y gamma 1.5 (pengwin_io.window_hu).
@@ -46,9 +47,12 @@ export function dibujarCorte(lienzo: HTMLCanvasElement, o: OpcionesCorte, size: 
   fuente.width = fuente.height = size;
   const fctx = fuente.getContext("2d")!;
   const img = fctx.createImageData(size, size);
-  const lut = o.ventana ? lutVentana(o.ventana[0], o.ventana[1]) : null;
+  const lut = o.ventana && !o.hu ? lutVentana(o.ventana[0], o.ventana[1]) : null;
+  const [lo, hi] = o.ventana ?? [0, 1];
+  const ancho = Math.max(hi - lo, 1);
   for (let i = 0; i < size * size; i++) {
-    const g = lut ? lut[o.gris[i]] : o.gris[i];
+    const g = o.ventana && o.hu ? Math.round(255 * Math.min(1, Math.max(0, (o.hu[i] - lo) / ancho)))
+      : lut ? lut[o.gris[i]] : o.gris[i];
     img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = g;
     img.data[i * 4 + 3] = 255;
   }

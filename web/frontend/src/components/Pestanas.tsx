@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type CorteVivo } from "../lib/api";
-import { cargarHueso, grisDelCorte, type Caso, type Fragmento, type Malla } from "../lib/caso";
+import { cargarHueso, grisDelCorte, huDelCorte, type Caso, type Entrada, type Fragmento, type Malla } from "../lib/caso";
 import { HU_MAX, HU_MIN, dibujarCorte } from "../lib/corte";
 import {
   GT_RGB, REGION_LABELS, REGION_ORDER, REGION_STARTS, distanceText, fragmentRgb, hex, localName, shortDistance,
@@ -37,8 +37,47 @@ export function Segmentado<T extends string>({ opciones, valor, cambiar }: {
 }
 
 // --------------------------------------------------------------------------- preprocesamiento
+// Todo lo que trae el archivo subido, tal cual, y qué se le cambió (volumen_entrada.describir_entrada).
+function PanelEntrada({ e }: { e: Entrada }) {
+  const n = (v: number, d = 0) => v.toLocaleString("es-CO", { maximumFractionDigits: d });
+  const filas: [string, string][] = [
+    ["Fuente", e.fuente],
+    ["Archivos", `${e.n_archivos} · ${n(e.bytes_total / 1e6, 1)} MB`],
+    ["Tamaño (x × y × cortes)", e.tamano_xyz.join(" × ")],
+    ["Espaciado (mm)", e.espaciado_xyz.map((v) => n(v, 4)).join(" × ")],
+    ["Origen (mm)", e.origen_xyz.map((v) => n(v, 2)).join("  ")],
+    ["Matriz de dirección", e.direccion.join(" ")],
+    ["Tipo de vóxel", e.tipo_voxel],
+    ["HU mínimo / máximo", `${n(e.hu.min)} / ${n(e.hu.max)}`],
+    ["HU percentiles 1 / 50 / 99", `${n(e.hu.p1)} / ${n(e.hu.p50)} / ${n(e.hu.p99)}`],
+    ["Vóxeles fuera del campo de visión (≤ −2000 HU)", `${n(100 * e.hu.fuera_de_campo, 1)} %`],
+    ["Vóxeles de metal (≥ 2500 HU)", `${n(100 * e.hu.metal_2500, 3)} %`],
+  ];
+  const cabecera = Object.entries(e.cabecera);
+  return (
+    <div className="tarjeta panel-entrada">
+      <h3>Lo que trae el archivo</h3>
+      <div className="tabla-envoltura"><table className="tabla"><tbody>
+        {filas.map(([k, v]) => <tr key={k}><td>{k}</td><td className="dato-mono">{v}</td></tr>)}
+      </tbody></table></div>
+      {e.cambios.length > 0 && (<>
+        <b>Qué se le cambió antes del modelo</b>
+        <ul className="lista-detalles">{e.cambios.map((c) => <li key={c}>{c}</li>)}</ul>
+      </>)}
+      {cabecera.length > 0 && (
+        <details className="desplegable"><summary>Cabecera completa ({cabecera.length} campos)</summary>
+          <div className="tabla-envoltura"><table className="tabla"><tbody>
+            {cabecera.map(([k, v]) => <tr key={k}><td>{k}</td><td className="dato-mono">{v}</td></tr>)}
+          </tbody></table></div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 export function PestanaPasos({ caso }: { caso: Caso }) {
   const pasos = caso.meta.pasos;
+  const entrada = caso.meta.subido?.entrada;
   if (!pasos?.length || !Object.keys(caso.meta.paquete.pasos).length)
     return (
       <div className="vacio">
@@ -47,6 +86,7 @@ export function PestanaPasos({ caso }: { caso: Caso }) {
     );
   return (
     <div>
+      {entrada && <PanelEntrada e={entrada} />}
       <Nota>
         Qué le pasa al volumen antes de entrar a la red. A la izquierda, el corte axial con más hueso (el mismo en
         todas las etapas); a la derecha, la proyección de máxima intensidad (MIP) axial. Las etapas 1 a 3 se ven con
@@ -161,28 +201,38 @@ export function TablaFragmentos({ fragmentos }: { fragmentos: Fragmento[] }) {
   );
 }
 
-// Ventana de visualización en HU: cambia solo cómo se ven los grises, no lo que recibe el modelo.
-const VENTANAS: Record<string, [number, number] | null> = {
-  red: null, hueso: [150, 1300], blando: [-160, 240], metal: [800, 1300],
-};
-function ControlVentana({ ventana, cambiar }: {
+// Ventana de visualización en HU: cambia solo cómo se ven los grises, no lo que recibe el modelo. Con los HU
+// originales del corte (exportaciones nuevas) va de −1024 HU al máximo del volumen; sin ellos, de −500 a +1300.
+function ControlVentana({ ventana, cambiar, limites, completo }: {
   ventana: [number, number] | null; cambiar: (v: [number, number] | null) => void;
+  limites: [number, number]; completo: boolean;
 }) {
-  const [lo, hi] = ventana ?? [HU_MIN, HU_MAX];
-  const preset = Object.keys(VENTANAS).find((k) => JSON.stringify(VENTANAS[k]) === JSON.stringify(ventana)) ?? "manual";
-  const mover = (nuevoLo: number, nuevoHi: number) =>
-    cambiar([Math.min(nuevoLo, nuevoHi - 20), Math.max(nuevoHi, nuevoLo + 20)]);
+  const [minimo, maximo] = limites;
+  const presets: Record<string, [number, number] | null> = {
+    red: null, hueso: [150, 1300], blando: [-160, 240],
+    metal: completo ? [2000, Math.max(maximo, 2100)] : [800, 1300], todo: [minimo, maximo],
+  };
+  const [lo, hi] = ventana ?? [Math.max(minimo, -500), Math.min(maximo, 1300)];
+  const preset = Object.keys(presets).find((k) => JSON.stringify(presets[k]) === JSON.stringify(ventana)) ?? "manual";
+  const acotar = (v: number) => Math.min(maximo, Math.max(minimo, v));
+  const mover = (nuevoLo: number, nuevoHi: number) => {
+    const a = acotar(Math.min(nuevoLo, nuevoHi - 20));
+    cambiar([a, acotar(Math.max(nuevoHi, a + 20))]);
+  };
+  const paso = maximo - minimo > 6000 ? 50 : 10;
   return (
     <div className="control">
       <div className="control-titulo"><span>Ventana de grises (HU)</span><b>{ventana ? `${lo} a ${hi}` : "la del modelo"}</b></div>
-      <Segmentado valor={preset} cambiar={(v) => v !== "manual" && cambiar(VENTANAS[v])}
-        opciones={[{ valor: "red", texto: "Modelo" }, { valor: "hueso", texto: "Hueso" },
-          { valor: "blando", texto: "Tejido" }, { valor: "metal", texto: "Denso" }]} />
+      <Segmentado valor={preset} cambiar={(v) => v !== "manual" && cambiar(presets[v])}
+        opciones={[{ valor: "red", texto: "Modelo" }, { valor: "hueso", texto: "Hueso" }, { valor: "blando", texto: "Tejido" },
+          { valor: "metal", texto: completo ? "Metal" : "Denso" }, { valor: "todo", texto: "Todo" }]} />
       <label className="rango-hu"><span>Mínimo {lo} HU</span>
-        <input type="range" min={HU_MIN} max={HU_MAX} step={10} value={lo} onChange={(e) => mover(+e.target.value, hi)} /></label>
+        <input type="range" min={minimo} max={maximo} step={paso} value={lo} onChange={(e) => mover(+e.target.value, hi)} /></label>
       <label className="rango-hu"><span>Máximo {hi} HU</span>
-        <input type="range" min={HU_MIN} max={HU_MAX} step={10} value={hi} onChange={(e) => mover(lo, +e.target.value)} /></label>
-      <span className="dato">Solo cambia cómo se ve el corte; el modelo siempre recibe −500 a +1300 HU con gamma 1.5. Lo que pasa de +1300 HU (metal) ya viene en blanco.</span>
+        <input type="range" min={minimo} max={maximo} step={paso} value={hi} onChange={(e) => mover(lo, +e.target.value)} /></label>
+      <span className="dato">Solo cambia cómo se ve el corte; el modelo siempre recibe −500 a +1300 HU con gamma 1.5.
+        {completo ? ` Este caso trae los HU originales: de ${minimo} a ${maximo} HU.`
+          : " Este caso se exportó sin los HU originales: la ventana solo va de −500 a +1300 HU (vuelve a procesarlo para el rango completo)."}</span>
     </div>
   );
 }
@@ -205,6 +255,9 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
   const [verGt, setVerGt] = useState(false);
   const [ventana, setVentana] = useState<[number, number] | null>(null);   // solo visual
   const [gris, setGris] = useState<{ z: number; datos: Uint8Array } | null>(null);
+  const [hu, setHu] = useState<{ z: number; datos: Int16Array } | null>(null);
+  const conHu = !!m.paquete.hu;
+  const limitesHu: [number, number] = conHu ? [-1024, Math.max(m.hu_rango?.[1] ?? 3000, 1300)] : [HU_MIN, HU_MAX];
   const lienzo = useRef<HTMLCanvasElement>(null);
 
   // Corte en gris (PNG) y los vecinos, para que el deslizador vaya fluido.
@@ -214,6 +267,15 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
     for (const d of [1, -1, 2, -2, 3, 4]) if (z + d >= 0 && z + d < m.n_slices) grisDelCorte(caso, z + d).catch(() => undefined);
     return () => { vigente = false; };
   }, [caso, z, m.n_slices]);
+
+  // HU originales: solo se descargan cuando se elige una ventana distinta a la del modelo.
+  useEffect(() => {
+    if (!ventana || !conHu) return;
+    let vigente = true;
+    huDelCorte(caso, z)?.then((datos) => vigente && setHu({ z, datos }), () => undefined);
+    for (const d of [1, -1]) if (z + d >= 0 && z + d < m.n_slices) huDelCorte(caso, z + d)?.catch(() => undefined);
+    return () => { vigente = false; };
+  }, [caso, z, ventana, conHu, m.n_slices]);
 
   const idsCorte = useMemo(() => {
     const crudo = caso.ids.subarray(z * S * S, (z + 1) * S * S);
@@ -229,8 +291,9 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
       fragmentos, cajas: tipoCaja === "refined" ? m.slices[gris.z].boxes_refined : m.slices[gris.z].boxes_raw,
       mostrarMascaras: mascaras, mostrarCajas: cajas, mostrarGt: verGt && !!caso.gt,
       titulo: `corte ${gris.z + 1}/${m.n_slices}`, ventana,
+      hu: ventana && conHu && hu && hu.z === gris.z ? hu.datos : null,
     }, S);
-  }, [gris, idsCorte, fragmentos, mascaras, cajas, tipoCaja, verGt, ventana, caso, m, S]);
+  }, [gris, hu, idsCorte, fragmentos, mascaras, cajas, tipoCaja, verGt, ventana, conHu, caso, m, S]);
 
   const mover = (d: number) => setZ((v) => Math.min(m.n_slices - 1, Math.max(0, v + d)));
   const rueda = (e: React.WheelEvent) => { e.preventDefault(); mover(e.deltaY > 0 ? 1 : -1); };
@@ -272,7 +335,7 @@ export function PestanaCorte({ caso, fragmentos, visibles, destino, nombreDestin
           <Interruptor activo={verGt} cambiar={setVerGt} deshabilitado={!caso.gt}>
             Contorno del ground truth {!caso.gt && <small>(sin GT)</small>}
           </Interruptor>
-          <ControlVentana ventana={ventana} cambiar={setVentana} />
+          <ControlVentana ventana={ventana} cambiar={setVentana} limites={limitesHu} completo={conHu} />
           <div className="control">
             <div className="control-titulo"><span>Presencia por región en este corte</span></div>
             {REGION_ORDER.map((r, i) => {
