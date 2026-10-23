@@ -32,7 +32,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
-from demo_render import (BASE_RGB, NON_CLINICAL, REGION_LABELS, REGION_ORDER, REGION_STARTS, bone_figure,
+from demo_render import (BASE_RGB, HU_MAX, HU_MIN, NON_CLINICAL, REGION_LABELS, REGION_ORDER, REGION_STARTS, bone_figure,
                          distance_text, hex_color, legend_items, local_name, mesh_figure, render_slice)
 
 DEMO_ROOT = Path(os.environ.get("DEMO_ROOT", ROOT / "outputs" / "demo"))
@@ -152,7 +152,8 @@ def legend_html(fragments: list[dict]) -> str:
 def fragments_dataframe(rows: list[dict]):
     import pandas as pd
     return pd.DataFrame([{"Hueso": REGION_LABELS[r["region"]], "Fragmento": local_name(r["id"]),
-                          "Distancia al principal": "—" if r["is_main"] else distance_text(r["distance_mm"]),
+                          "Distancia al principal": "—" if r["is_main"] else distance_text(r["distance_mm"])
+                          + ("  ⚠ metal" if r.get("metal") else ""),
                           "Volumen (mm³)": round(r["volume_mm3"]), "Cortes": f"{r['z_range'][0]}–{r['z_range'][1]}"}
                          for r in rows])
 
@@ -452,7 +453,13 @@ def upload_page() -> Path | None:
                                  help="Una serie DICOM, o un .mha (.nii, .nrrd) por corte. Los .mha se ordenan por "
                                       "su posición en el paciente si la traen.")
     grosor = None
-    if modo != "Archivo de volumen":
+    if modo == "Archivo de volumen":
+        grosor = st.number_input("Corregir el grosor entre cortes (mm), opcional", min_value=0.0,
+                                 max_value=20.0, value=0.0, step=0.1, format="%.2f",
+                                 help="Solo si la cabecera está mal (por ejemplo, dice 100 mm entre cortes). "
+                                      "Reemplaza la distancia entre cortes del archivo; déjalo en 0 para usar "
+                                      "la de la cabecera.") or None
+    else:
         grosor = st.number_input("Grosor entre cortes (mm), solo para cortes .mha en 2D", min_value=0.0,
                                  max_value=20.0, value=0.0, step=0.1, format="%.2f",
                                  help="Un .mha 2D no guarda su posición en el paciente, así que no se sabe la "
@@ -463,9 +470,13 @@ def upload_page() -> Path | None:
                       "más preciso y el doble de tiempo. Solo aplica con el modelo local.")
     enderezar = c2.checkbox("Enderezar el giro axial del paciente", True,
                             help="Estima el giro con la simetría de la pelvis y lo corrige si es de 10° o más.")
+    reducir_metal = st.checkbox("Reducir artefactos de metal (experimental, unos minutos más)", False,
+                                help="LI-MAR: en los cortes con metal (2500 HU o más) reemplaza los rayos que pasan "
+                                     "por el metal por una interpolación y reconstruye el corte. Atenúa las rayas "
+                                     "que el modelo confunde con fragmentos; el metal se repone tal cual.")
     if not st.button("Procesar", type="primary", disabled=not files):
         return None
-    from demo_export import exportar_volumen
+    from demo_export import VERSION_EXPORTACION, exportar_volumen
     from volumen_entrada import huella, leer_subida
     archivos = [(f.name, f.getbuffer()) for f in files]     # sin copiar los bytes subidos (memoria)
     free_memory()
@@ -474,7 +485,8 @@ def upload_page() -> Path | None:
             info, predecir, where = choose_predictor(tta, PROCESSING)
             out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
                 f"{huella(archivos)}-{PROCESSING['slug']}-{info.get('precision', 'fp32')}"
-                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}{f'-g{grosor:g}' if grosor else ''}")
+                f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}{f'-g{grosor:g}' if grosor else ''}"
+                f"{'-mar' if reducir_metal else ''}-v{VERSION_EXPORTACION}")
             if (out_dir / "meta.json").exists():
                 status.update(label="Este CT ya se había procesado", state="complete")
                 return out_dir
@@ -489,9 +501,9 @@ def upload_page() -> Path | None:
             started = time.perf_counter()
             exportar_volumen(volume.image, volume.spacing_xyz, out_dir, info, predecir, nombre=volume.nombre,
                              enderezar=enderezar, log=status.write, pasos=volume.pasos,
-                             max_voxeles_vista=VISTA_MAX_VOXELES,
+                             max_voxeles_vista=VISTA_MAX_VOXELES, reducir_metal=reducir_metal,
                              extra_meta={"subido": {"fuente": volume.fuente, "orientacion": volume.orientacion,
-                                                    "donde": where}})
+                                                    "donde": where, "entrada": volume.entrada}})
             status.update(label=f"Listo en {time.perf_counter() - started:.0f} s", state="complete")
         except Exception as error:
             status.update(label="No se pudo procesar", state="error")
@@ -576,7 +588,37 @@ def pengwin_page() -> Path | None:
     st.rerun()
 
 
+def input_panel(entrada: dict) -> None:
+    """Todo lo que trae el archivo subido, tal cual, y qué se le cambió (volumen_entrada.describir_entrada)."""
+    import pandas as pd
+    st.subheader("Lo que trae el archivo")
+    hu = entrada["hu"]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Tamaño (x × y × cortes)", " × ".join(str(v) for v in entrada["tamano_xyz"]))
+    c2.metric("Espaciado (mm)", " × ".join(f"{v:g}" for v in entrada["espaciado_xyz"]))
+    c3.metric("HU mínimo / máximo", f"{hu['min']:.0f} / {hu['max']:.0f}")
+    filas = [("Fuente", entrada["fuente"]), ("Archivos", f"{entrada['n_archivos']} · {entrada['bytes_total'] / 1e6:.1f} MB"),
+             ("Tipo de vóxel", entrada["tipo_voxel"]),
+             ("Origen (mm)", " ".join(f"{v:g}" for v in entrada["origen_xyz"])),
+             ("Matriz de dirección", " ".join(f"{v:g}" for v in entrada["direccion"])),
+             ("HU percentiles 1 / 50 / 99", f"{hu['p1']:.0f} / {hu['p50']:.0f} / {hu['p99']:.0f}"),
+             ("Vóxeles fuera del campo de visión (≤ −2000 HU)", f"{100 * hu['fuera_de_campo']:.1f} %"),
+             ("Vóxeles de metal (≥ 2500 HU)", f"{100 * hu['metal_2500']:.3f} %")]
+    st.table(pd.DataFrame(filas, columns=["Campo", "Valor"]).set_index("Campo"))
+    if entrada["cambios"]:
+        st.markdown("**Qué se le cambió antes del modelo**")
+        for cambio in entrada["cambios"]:
+            st.markdown(f"- {cambio}")
+    if entrada["cabecera"]:
+        with st.expander(f"Cabecera completa ({len(entrada['cabecera'])} campos)"):
+            st.table(pd.DataFrame(list(entrada["cabecera"].items()), columns=["Clave", "Valor"]).set_index("Clave"))
+    st.divider()
+
+
 def steps_tab(meta: dict, arrays: dict | None) -> None:
+    entrada = (meta.get("subido") or {}).get("entrada")
+    if entrada:
+        input_panel(entrada)
     st.subheader("Preprocesamiento paso a paso")
     if not meta.get("pasos") or not arrays:
         st.info("Este caso se exportó antes de que existiera esta vista. Vuelve a exportarlo (o elige un caso "
@@ -658,6 +700,8 @@ with st.sidebar:
         st.caption(f"Giro axial del paciente: {giro['angulo']:+.1f}° estimado; " + (
             "se enderezó antes de predecir (las tres vistas y el ground truth están enderezados)."
             if giro["corregido"] else f"no se corrigió (solo se corrigen giros claros de {giro['giro_minimo']:.0f}° o más)."))
+    for aviso in meta.get("avisos") or []:
+        st.warning(f"**{aviso['titulo']}.** {aviso['texto']}", icon="⚠️")
     st.markdown(legend_html(meta["fragments_pred"]), unsafe_allow_html=True)
 
 all_fragments = meta["fragments_pred"]
@@ -723,6 +767,20 @@ with tab2:
         box_kind = st.radio("Caja", ["refined", "raw"], horizontal=True,
                             format_func=lambda k: "refinada con la semántica" if k == "refined" else "cabeza grid cruda")
         show_gt = st.checkbox("Contorno del ground truth", False, disabled=not has_gt)
+        hu_volume = data.get("hu")
+        hu_lo, hu_hi = ((-1024, max(int(hu_volume.max()), 1300)) if hu_volume is not None
+                        else (int(HU_MIN), int(HU_MAX)))
+        windows = {"Modelo": None, "Hueso": (150, 1300), "Tejido": (-160, 240),
+                   "Metal": (2000, max(hu_hi, 2100)) if hu_volume is not None else (800, 1300),
+                   "Completo": (hu_lo, hu_hi), "Manual": "manual"}
+        window_name = st.radio("Ventana de grises (HU)", list(windows), horizontal=True,
+                               help="Solo cambia cómo se ve el corte; el modelo siempre recibe −500 a +1300 HU "
+                                    "con gamma 1.5." + ("" if hu_volume is not None else
+                                    " Este caso se exportó sin los HU originales: la ventana solo va de −500 a "
+                                    "+1300 HU."))
+        window = windows[window_name]
+        if window == "manual":
+            window = st.slider("Rango de HU", hu_lo, hu_hi, (max(hu_lo, -500), min(hu_hi, 1300)), step=10)
         slice_meta = meta["slices"][z]
         st.markdown("**Presencia por región en este corte**")
         for name, prob in zip(REGION_ORDER, slice_meta["classification"]):
@@ -732,7 +790,8 @@ with tab2:
         image = render_slice(data["images"][z], ids_slice, fragments, slice_meta,
                              gt_slice=data["gt_ids"][z] if has_gt else None, boxes=box_kind,
                              show_masks=show_masks, show_boxes=show_boxes, show_gt=show_gt,
-                             title=f"corte {z + 1}/{meta['n_slices']}")
+                             title=f"corte {z + 1}/{meta['n_slices']}", window=window,
+                             hu_slice=hu_volume[z] if hu_volume is not None else None)
         st.image(image, use_container_width=True)
     st.caption("La distancia junto a cada fragmento es la mínima borde a borde, en mm, entre ese fragmento y el "
                "principal de su hueso, medida sobre el volumen 3D completo (spacing del header): es la misma en "

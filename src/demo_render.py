@@ -107,18 +107,44 @@ def slice_labels(ids_slice: np.ndarray, fragments: list[dict]) -> list[dict]:
         ys, xs = np.nonzero(ids_slice == fragment_id)
         if len(xs) < 4:
             continue
-        labels.append({"id": fragment_id, "text": f"{local_name(fragment_id)} · {short_distance(row['distance_mm'])}",
+        labels.append({"id": fragment_id, "text": f"{local_name(fragment_id)} · {short_distance(row['distance_mm'])}"
+                       + (" ⚠" if row.get("metal") else ""),
                        "x": float(xs.mean()), "y": float(ys.mean()), "distance_mm": row["distance_mm"],
                        "region": row["region"]})
     return labels
+
+
+HU_MIN, HU_MAX = -500.0, 1300.0      # ventana del modelo (pengwin_io.window_hu), con gamma 1.5
+
+
+def lut_ventana(lo: float, hi: float) -> np.ndarray:
+    """Tabla 256 → 256 para ver el corte con otra ventana de HU (solo visual).
+
+    Los cortes guardados ya pasaron por la ventana del modelo y gamma 1.5; se deshace esa curva
+    (HU = −500 + 1800 · (gris/255)^(1/1.5)) y se aplica la ventana lineal [lo, hi]. Fuera de −500 a
+    +1300 HU la imagen guardada ya está saturada, así que la ventana solo se mueve dentro de ese rango.
+    """
+    hu = HU_MIN + (HU_MAX - HU_MIN) * (np.arange(256) / 255.0) ** (1 / 1.5)
+    return np.clip(np.rint(255 * (hu - lo) / max(hi - lo, 1.0)), 0, 255).astype(np.uint8)
 
 
 def render_slice(image_u8: np.ndarray, ids_slice: np.ndarray, fragments: list[dict],
                  slice_meta: dict | None = None, gt_slice: np.ndarray | None = None,
                  boxes: str = "refined", show_masks: bool = True, show_boxes: bool = True,
                  show_gt: bool = False, scale: int = 2, alpha: float = 0.45,
-                 title: str | None = None) -> Image.Image:
-    """Visualizador 2 para un corte. ``boxes`` es 'refined' (con la semántica) o 'raw' (cabeza grid)."""
+                 title: str | None = None, window: tuple[float, float] | None = None,
+                 hu_slice: np.ndarray | None = None) -> Image.Image:
+    """Visualizador 2 para un corte. ``boxes`` es 'refined' (con la semántica) o 'raw' (cabeza grid).
+
+    ``window`` = (HU mínimo, HU máximo) para ver los grises con otra ventana; None = como la ve la red. Con
+    ``hu_slice`` (los HU originales del corte, exportaciones nuevas) la ventana puede ir de −1024 HU al metal;
+    sin él solo se puede reestirar dentro de −500 a +1300 HU.
+    """
+    if window is not None and hu_slice is not None:
+        lo, hi = window
+        image_u8 = np.clip(np.rint(255 * (hu_slice.astype(np.float32) - lo) / max(hi - lo, 1.0)), 0, 255).astype(np.uint8)
+    elif window is not None:
+        image_u8 = lut_ventana(*window)[image_u8]
     size = image_u8.shape[0]
     side = size * scale
     gray = Image.fromarray(image_u8).resize((side, side), Image.BILINEAR)
@@ -249,7 +275,8 @@ def mesh_figure(meshes: dict[str, np.ndarray], fragments: list[dict],
     for index, row in enumerate(r for r in secondary if label_contacts or (r["distance_mm"] or 0) >= 0.05):
         z, y, x = np.asarray(row["centroid_zyx_vox"]) * spacing_zyx
         annotations.append(dict(
-            x=float(x), y=float(y), z=float(z), text=f"<b>{local_name(row['id'])} · {short_distance(row['distance_mm'])}</b>",
+            x=float(x), y=float(y), z=float(z), text=f"<b>{local_name(row['id'])} · {short_distance(row['distance_mm'])}"
+                 f"{' ⚠' if row.get('metal') else ''}</b>",
             showarrow=True, arrowhead=0, arrowwidth=1.5, arrowcolor="#222222",
             ax=-46 + 28 * (index % 3), ay=-48 - 16 * (index % 4),          # reparte los rótulos para no apilarlos
             font=dict(size=13, color="#111111"), bgcolor="rgba(255,255,255,0.88)",

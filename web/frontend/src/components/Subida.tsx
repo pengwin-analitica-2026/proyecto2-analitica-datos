@@ -40,6 +40,7 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
   const [archivos, setArchivos] = useState<Archivo[]>([]);
   const [tta, setTta] = useState(false);
   const [enderezar, setEnderezar] = useState(true);
+  const [reducirMetal, setReducirMetal] = useState(false);
   const [grosor, setGrosor] = useState("");
   const [arrastrando, setArrastrando] = useState(false);
   const [subido, setSubido] = useState<{ bytes: number; total: number } | null>(null);
@@ -82,8 +83,8 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         }
       };
       await Promise.all(Array.from({ length: Math.min(6, enviar.length) }, obrero));
-      const grosorMm = modo === "dicom" && parseFloat(grosor.replace(",", ".")) > 0 ? parseFloat(grosor.replace(",", ".")) : null;
-      const { trabajo: idTrabajo } = await api.procesarSubida(id, { destino, tta, enderezar, grosor_mm: grosorMm });
+      const grosorMm = parseFloat(grosor.replace(",", ".")) > 0 ? parseFloat(grosor.replace(",", ".")) : null;
+      const { trabajo: idTrabajo } = await api.procesarSubida(id, { destino, tta, enderezar, grosor_mm: grosorMm, reducir_metal: reducirMetal });
       const nombre = modo === "dicom" ? enviar[0].nombre.split("/")[0] || "carpeta de cortes" : enviar[0].nombre;
       trabajo(idTrabajo, `CT subido · ${nombre}`);
     } catch (e) {
@@ -104,7 +105,7 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
           mismo pipeline que los casos de ejemplo. No hay ground truth, así que no se calculan métricas.
         </p>
       </div>
-      <Segmentado valor={modo} cambiar={(v) => { setModo(v); setArchivos([]); }}
+      <Segmentado valor={modo} cambiar={(v) => { setModo(v); setArchivos([]); setGrosor(""); }}
         opciones={[{ valor: "volumen", texto: "Archivo de volumen" }, { valor: "dicom", texto: "Carpeta de cortes (DICOM o .mha)" }]} />
       <div
         className={`zona-soltar ${arrastrando ? "encima" : ""} ${archivos.length ? "con-archivos" : ""}`}
@@ -139,12 +140,19 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
         )}
       </div>
       {aviso && <div className="alerta aviso">{aviso}</div>}
-      {modo === "dicom" && (
+      {modo === "dicom" ? (
         <label className="campo campo-grosor">
           <span>Grosor entre cortes (mm) · solo si son cortes .mha en 2D</span>
           <input inputMode="decimal" placeholder="Déjalo vacío si es DICOM o si los .mha traen su posición" value={grosor}
             onChange={(e) => setGrosor(e.target.value)} />
           <small>Un .mha 2D no guarda su posición en el paciente, así que no se sabe la distancia entre cortes. Si hace falta, el servidor lo pide.</small>
+        </label>
+      ) : (
+        <label className="campo campo-grosor">
+          <span>Corregir el grosor entre cortes (mm) · opcional</span>
+          <input inputMode="decimal" placeholder="Déjalo vacío para usar el de la cabecera del archivo" value={grosor}
+            onChange={(e) => setGrosor(e.target.value)} />
+          <small>Solo si la cabecera está mal (por ejemplo, dice 100 mm entre cortes). Reemplaza la distancia entre cortes del archivo; las distancias, los volúmenes y las vistas 3D dependen de ella.</small>
         </label>
       )}
       <div className="opciones">
@@ -152,6 +160,8 @@ export default function Subida({ destino, nombreDestino, maxMb, trabajo }: {
           <span><b>TTA de espejo</b><small>Predice también la imagen en espejo y promedia: un poco más preciso y el doble de tiempo. En la GPU la fija el servicio.</small></span></label>
         <label className="casilla"><input type="checkbox" checked={enderezar} onChange={(e) => setEnderezar(e.target.checked)} />
           <span><b>Enderezar el giro axial del paciente</b><small>Estima el giro con la simetría de la pelvis y lo corrige si es de 10° o más.</small></span></label>
+        <label className="casilla"><input type="checkbox" checked={reducirMetal} onChange={(e) => setReducirMetal(e.target.checked)} />
+          <span><b>Reducir artefactos de metal (experimental)</b><small>LI-MAR en los cortes con metal (2500 HU o más): atenúa las rayas que el modelo confunde con fragmentos. Tarda unos minutos más; el metal se repone tal cual.</small></span></label>
       </div>
       {subido && (
         <div className="subiendo">

@@ -10,6 +10,7 @@ export interface Fragmento {
   distance_mm: number | null;
   centroid_zyx_vox: [number, number, number];
   z_range: [number, number];
+  metal?: boolean; // secundario en cortes con artefactos de metal (calidad_entrada.py)
 }
 
 export interface Comparacion {
@@ -20,6 +21,27 @@ export interface Comparacion {
   pred_mm: number | null;
   abs_error_mm: number | null;
   dice3d: number;
+}
+
+export interface Entrada {
+  archivos: { nombre: string; bytes: number }[];
+  n_archivos: number;
+  bytes_total: number;
+  fuente: string;
+  tamano_xyz: [number, number, number];
+  espaciado_xyz: [number, number, number];
+  origen_xyz: [number, number, number];
+  direccion: number[];
+  tipo_voxel: string;
+  hu: { min: number; max: number; p1: number; p50: number; p99: number; fuera_de_campo: number; metal_2500: number };
+  cabecera: Record<string, string>;
+  cambios: string[];
+}
+
+export interface Aviso {
+  tipo: "espaciado" | "metal" | string;
+  titulo: string;
+  texto: string;
 }
 
 export interface Paso {
@@ -50,12 +72,16 @@ export interface Meta {
   flipped?: boolean;
   enderezado?: { angulo: number; corregido: boolean; giro_minimo: number } | null;
   pasos?: Paso[];
+  avisos?: Aviso[];
+  metal?: { volumen_mm3: number; n_cortes: number; rango_z: [number, number] | null; avisar: boolean } | null;
   bone_z_range: [number, number] | null;
   fragments_pred: Fragmento[];
   fragments_gt: Fragmento[] | null;
   comparison: Comparacion[] | null;
   slices: { z: number; classification: number[]; boxes_raw: Caja[]; boxes_refined: Caja[] }[];
-  subido?: { fuente: string; orientacion: { accion: string }; donde: string };
+  subido?: { fuente: string; orientacion: { accion: string }; donde: string; entrada?: Entrada };
+  hu_rango?: [number, number];
+  reduccion_metal?: { metodo: string; cortes: number[]; segundos: number } | null;
   en_vivo?: { donde: string };
   paquete: {
     version: number;
@@ -67,6 +93,7 @@ export interface Meta {
     mips: Record<"axial" | "coronal" | "sagital", string> | null;
     hueso: ({ archivo: string } & Partial<Record<"crudo" | "pulido", ItemBinario>>) | null;
     pasos: Record<string, string>;
+    hu?: string | null; // "hu/{z}.png": HU originales en RGB (paquete_web._png_hu)
   };
 }
 
@@ -163,6 +190,38 @@ export function grisDelCorte(caso: Caso, z: number): Promise<Uint8Array> {
     });
     cacheCortes.set(url, promesa);
     if (cacheCortes.size > 160) cacheCortes.delete(cacheCortes.keys().next().value!);
+  }
+  return promesa;
+}
+
+// HU originales del corte (exportaciones nuevas): PNG RGB con (HU + 1024) en 16 bits, R = byte alto, G = bajo.
+const cacheHu = new Map<string, Promise<Int16Array>>();
+
+export function huDelCorte(caso: Caso, z: number): Promise<Int16Array> | null {
+  const p = caso.meta.paquete;
+  if (!p.hu) return null;
+  const url = caso.url(p.hu.replace("{z}", String(z).padStart(p.digitos, "0")));
+  let promesa = cacheHu.get(url);
+  if (!promesa) {
+    promesa = new Promise<Int16Array>((resolve, reject) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.onload = () => {
+        const n = caso.meta.size;
+        const lienzo = document.createElement("canvas");
+        lienzo.width = lienzo.height = n;
+        const ctx = lienzo.getContext("2d", { willReadFrequently: true, colorSpace: "srgb" })!;
+        ctx.drawImage(img, 0, 0, n, n);
+        const rgba = ctx.getImageData(0, 0, n, n).data;
+        const hu = new Int16Array(n * n);
+        for (let i = 0; i < hu.length; i++) hu[i] = rgba[i * 4] * 256 + rgba[i * 4 + 1] - 1024;
+        resolve(hu);
+      };
+      img.onerror = () => { cacheHu.delete(url); reject(new Error(`No pude cargar los HU del corte ${z + 1}`)); };
+      img.src = url;
+    });
+    cacheHu.set(url, promesa);
+    if (cacheHu.size > 60) cacheHu.delete(cacheHu.keys().next().value!);
   }
   return promesa;
 }

@@ -391,9 +391,13 @@ function VistaCaso({ prefijo, destino, nombreDestino, resumen, volver }: {
             <span className="chip">{m.fragments_pred.length} fragmentos</span>
             {m.fragments_gt && <span className="chip gt">Ground truth: {m.fragments_gt.length} fragmentos ({m.fragments_gt.filter((f) => !f.is_main).length} secundarios)</span>}
             {m.en_vivo && <span className="chip vivo">procesado ahora</span>}
+            {m.metal?.avisar && <span className="chip aviso">⚠ metal en {m.metal.n_cortes} cortes</span>}
           </div>
         </div>
       </div>
+      {(m.avisos ?? []).map((a, i) => (
+        <div key={i} className="alerta aviso"><b>⚠ {a.titulo}.</b> {a.texto}</div>
+      ))}
 
       <div className="barra-caso">
         <div className="leyenda">

@@ -48,6 +48,41 @@ class VolumenSubido:
     fuente: str                     # "archivo .mha", "serie DICOM (312 cortes)", ...
     orientacion: dict               # qué hizo la orientación con los metadatos
     pasos: object = None            # pasos_preproceso.Pasos con las etapas «crudo» y «orientado»
+    entrada: dict | None = None     # lo que trae el archivo tal cual (describir_entrada) y qué se le cambió
+
+
+def describir_entrada(imagen, archivos: list[tuple[str, bytes]], fuente: str) -> dict:
+    """Todo lo que trae el archivo subido, antes de cambiarle nada: cabecera, geometría y estadística de HU.
+
+    Sirve para ver qué está entrando (p. ej. un ElementSpacing de 100 mm, o vóxeles fuera del campo de
+    visión en −2048 HU). Las claves de la cabecera son las que SimpleITK deja en el diccionario de
+    metadatos (en .mha: AnatomicalOrientation, restos de NIfTI como qform/sform, ITK_original_*...).
+    """
+    import SimpleITK as sitk
+    cabecera = {}
+    for clave in imagen.GetMetaDataKeys():
+        valor = str(imagen.GetMetaData(clave))
+        cabecera[clave] = valor if len(valor) <= 200 else valor[:200] + "…"
+    datos = sitk.GetArrayViewFromImage(imagen)
+    muestra = np.asarray(datos[::2, ::4, ::4], dtype=np.float32)       # estadística sin copiar el volumen
+    return {
+        "archivos": [{"nombre": Path(n).name, "bytes": len(d)} for n, d in archivos][:20],
+        "n_archivos": len(archivos),
+        "bytes_total": int(sum(len(d) for _, d in archivos)),
+        "fuente": fuente,
+        "tamano_xyz": [int(v) for v in imagen.GetSize()],
+        "espaciado_xyz": [float(v) for v in imagen.GetSpacing()],
+        "origen_xyz": [float(v) for v in imagen.GetOrigin()],
+        "direccion": [round(float(v), 6) for v in imagen.GetDirection()],
+        "tipo_voxel": imagen.GetPixelIDTypeAsString(),
+        "hu": {"min": float(np.min(datos)), "max": float(np.max(datos)),
+               "p1": float(np.percentile(muestra, 1)), "p50": float(np.percentile(muestra, 50)),
+               "p99": float(np.percentile(muestra, 99)),
+               "fuera_de_campo": round(float(np.mean(muestra <= -2000)), 4),
+               "metal_2500": round(float(np.mean(muestra >= 2500)), 6)},
+        "cabecera": cabecera,
+        "cambios": [],
+    }
 
 
 def preprocess_volume(image_hu: np.ndarray, size: int = 384, gamma: float = GAMMA) -> np.ndarray:
@@ -99,7 +134,8 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
     corte). ``archivos`` = [(nombre, bytes)].
 
     ``grosor_mm`` es la distancia entre cortes para una carpeta de cortes 2D, que no guardan su posición;
-    si los cortes la traen (archivos 3D de un solo corte), se usa la de los archivos.
+    si los cortes la traen (archivos 3D de un solo corte), se usa la de los archivos. En un volumen o una
+    serie DICOM reemplaza la distancia entre cortes de la cabecera, para corregir una cabecera errónea.
 
     Con ``orientar=True`` (modelos con orientación canónica) lleva el volumen a la orientación estándar
     con la matriz de dirección de la cabecera.
@@ -139,6 +175,15 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
             fuente, corto = f"serie DICOM ({n_cortes} cortes)", _nombre_corto(carpeta_origen or "dicom")
     if imagen.GetDimension() != 3:
         raise ValueError(f"Se esperaba un volumen 3D y llegó uno de {imagen.GetDimension()} dimensiones.")
+    entrada = describir_entrada(imagen, archivos, fuente)
+    if grosor_mm and grosor_mm > 0 and len(volumenes) <= 1:
+        # Volumen o serie DICOM: el usuario corrige el grosor entre cortes de la cabecera (p. ej. un .mha que
+        # dice 100 mm; ver calidad_entrada.py). Se cambia el espaciado del eje de cortes antes de orientar.
+        espaciado = list(imagen.GetSpacing())
+        original, espaciado[2] = espaciado[2], float(grosor_mm)
+        imagen.SetSpacing(espaciado)
+        fuente += f" · grosor entre cortes corregido a {grosor_mm:g} mm (la cabecera decía {original:g} mm)"
+        entrada["cambios"].append(f"Grosor entre cortes corregido por el usuario: {original:g} → {grosor_mm:g} mm")
     if imagen.GetNumberOfComponentsPerPixel() != 1:
         raise ValueError("El volumen tiene varios canales por vóxel (¿color?); un CT tiene uno.")
     if imagen.GetSize()[2] < MIN_CORTES:
@@ -176,8 +221,10 @@ def leer_subida(archivos: list[tuple[str, bytes]], orientar: bool = True,
     image = sitk.GetArrayFromImage(imagen)
     spacing_xyz = tuple(float(s) for s in imagen.GetSpacing())
     del imagen
+    if orientacion["accion"] != "ninguna" and not orientacion.get("estandar", True):
+        entrada["cambios"].append(f"Orientación con los metadatos: {orientacion['accion']}")
     return VolumenSubido(nombre=corto, image=image, spacing_xyz=spacing_xyz,
-                         fuente=fuente, orientacion=orientacion, pasos=pasos)
+                         fuente=fuente, orientacion=orientacion, pasos=pasos, entrada=entrada)
 
 
 def _clave_natural(ruta: Path) -> list:

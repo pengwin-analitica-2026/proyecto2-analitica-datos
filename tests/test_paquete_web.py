@@ -135,5 +135,17 @@ class ServidorWeb(unittest.TestCase):
         self.assertEqual(self.client.post("/api/corte", content=b"\x00" * 10).status_code, 422)
 
 
+
+
+class TestPngHu(unittest.TestCase):
+    def test_hu_vuelve_exacto_desde_el_png(self):
+        import io
+        from PIL import Image
+        from paquete_web import _png_hu
+        hu = np.array([[-1024, -500, 0], [1300, 3000, 12868]], dtype=np.int16)
+        rgb = np.asarray(Image.open(io.BytesIO(_png_hu(hu))).convert("RGB")).astype(np.int32)
+        np.testing.assert_array_equal(rgb[..., 0] * 256 + rgb[..., 1] - 1024, hu)
+
+
 if __name__ == "__main__":
     unittest.main()
