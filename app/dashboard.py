@@ -476,7 +476,7 @@ def upload_page() -> Path | None:
                                      "que el modelo confunde con fragmentos; el metal se repone tal cual.")
     if not st.button("Procesar", type="primary", disabled=not files):
         return None
-    from demo_export import exportar_volumen
+    from demo_export import VERSION_EXPORTACION, exportar_volumen
     from volumen_entrada import huella, leer_subida
     archivos = [(f.name, f.getbuffer()) for f in files]     # sin copiar los bytes subidos (memoria)
     free_memory()
@@ -486,7 +486,7 @@ def upload_page() -> Path | None:
             out_dir = UPLOAD_ROOT / Path(info["checkpoint"]).stem / (
                 f"{huella(archivos)}-{PROCESSING['slug']}-{info.get('precision', 'fp32')}"
                 f"{'-tta' if info.get('tta') else ''}{'' if enderezar else '-sinenderezar'}{f'-g{grosor:g}' if grosor else ''}"
-                f"{'-mar' if reducir_metal else ''}")
+                f"{'-mar' if reducir_metal else ''}-v{VERSION_EXPORTACION}")
             if (out_dir / "meta.json").exists():
                 status.update(label="Este CT ya se había procesado", state="complete")
                 return out_dir
@@ -590,6 +590,7 @@ def pengwin_page() -> Path | None:
 
 def input_panel(entrada: dict) -> None:
     """Todo lo que trae el archivo subido, tal cual, y qué se le cambió (volumen_entrada.describir_entrada)."""
+    import pandas as pd
     st.subheader("Lo que trae el archivo")
     hu = entrada["hu"]
     c1, c2, c3 = st.columns(3)

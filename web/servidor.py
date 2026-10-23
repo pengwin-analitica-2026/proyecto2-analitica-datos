@@ -330,7 +330,7 @@ def _vivo(caso: str, destino: str, tta: bool, log) -> str:
 
 def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, grosor_mm: float | None = None,
             reducir_metal: bool = False) -> str:
-    from demo_export import exportar_volumen
+    from demo_export import VERSION_EXPORTACION, exportar_volumen
     from volumen_entrada import leer_subida
     manifiesto = json.loads(ALMACEN.leer(f"subidas/{id_subida}/manifiesto.json") or b"null")
     if not manifiesto:
@@ -350,7 +350,7 @@ def _subida(id_subida: str, destino: str, tta: bool, enderezar: bool, log, groso
         info, predecir, donde = _predictor(destino, tta)
         prefijo = (f"resultados/{MODELO}/subidas/{huella}-{_slug(destino, info, tta)}"
                    f"{'' if enderezar else '-sinenderezar'}{f'-g{grosor_mm:g}' if grosor_mm else ''}"
-                   f"{'-mar' if reducir_metal else ''}")
+                   f"{'-mar' if reducir_metal else ''}-v{VERSION_EXPORTACION}")
         if resultado_listo(prefijo):
             log("Este CT ya se había procesado con la misma configuración")
             return prefijo

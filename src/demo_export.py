@@ -61,6 +61,10 @@ DISTANCE_METHOD = "postprocess_3d(fill_unlabeled=False)"
 # Umbral del enderezado en la demo. Con 10° no cambia ningún caso de validación sin girar (los dos
 # que se corregían con 5°, 014 y 095, tenían 6°) y los giros de 30° y 60° se siguen corrigiendo.
 GIRO_MINIMO_DEMO = 10.0
+# Versión del formato de exportación. Va en el nombre de la carpeta de un CT subido: al cambiarla (p. ej. al
+# agregar los HU originales, los avisos o el panel de la entrada), un CT ya procesado se vuelve a procesar en
+# vez de reutilizar un resultado viejo al que le faltan esos datos.
+VERSION_EXPORTACION = 2
 
 
 def region_of(fragment_id: int) -> str:
